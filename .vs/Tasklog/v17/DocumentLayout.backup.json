@@ -1,0 +1,139 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "D:\\Personal\\Code\\Depth Projects\\Tasklog\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{095C5ED3-1DFA-4BEC-BC00-1110FEFF81BF}|Tasklog\\Tasklog.csproj|d:\\personal\\code\\depth projects\\tasklog\\tasklog\\controllers\\taskcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{095C5ED3-1DFA-4BEC-BC00-1110FEFF81BF}|Tasklog\\Tasklog.csproj|solutionrelative:tasklog\\controllers\\taskcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{095C5ED3-1DFA-4BEC-BC00-1110FEFF81BF}|Tasklog\\Tasklog.csproj|d:\\personal\\code\\depth projects\\tasklog\\tasklog\\views\\task\\viewtask.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{095C5ED3-1DFA-4BEC-BC00-1110FEFF81BF}|Tasklog\\Tasklog.csproj|solutionrelative:tasklog\\views\\task\\viewtask.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{095C5ED3-1DFA-4BEC-BC00-1110FEFF81BF}|Tasklog\\Tasklog.csproj|d:\\personal\\code\\depth projects\\tasklog\\tasklog\\views\\task\\index.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{095C5ED3-1DFA-4BEC-BC00-1110FEFF81BF}|Tasklog\\Tasklog.csproj|solutionrelative:tasklog\\views\\task\\index.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{095C5ED3-1DFA-4BEC-BC00-1110FEFF81BF}|Tasklog\\Tasklog.csproj|d:\\personal\\code\\depth projects\\tasklog\\tasklog\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{095C5ED3-1DFA-4BEC-BC00-1110FEFF81BF}|Tasklog\\Tasklog.csproj|solutionrelative:tasklog\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{095C5ED3-1DFA-4BEC-BC00-1110FEFF81BF}|Tasklog\\Tasklog.csproj|d:\\personal\\code\\depth projects\\tasklog\\tasklog\\views\\shared\\error.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{095C5ED3-1DFA-4BEC-BC00-1110FEFF81BF}|Tasklog\\Tasklog.csproj|solutionrelative:tasklog\\views\\shared\\error.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{095C5ED3-1DFA-4BEC-BC00-1110FEFF81BF}|Tasklog\\Tasklog.csproj|d:\\personal\\code\\depth projects\\tasklog\\tasklog\\models\\taskmodel.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{095C5ED3-1DFA-4BEC-BC00-1110FEFF81BF}|Tasklog\\Tasklog.csproj|solutionrelative:tasklog\\models\\taskmodel.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{095C5ED3-1DFA-4BEC-BC00-1110FEFF81BF}|Tasklog\\Tasklog.csproj|d:\\personal\\code\\depth projects\\tasklog\\tasklog\\views\\shared\\_layout.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{095C5ED3-1DFA-4BEC-BC00-1110FEFF81BF}|Tasklog\\Tasklog.csproj|solutionrelative:tasklog\\views\\shared\\_layout.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 5,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "ViewTask.cshtml",
+              "DocumentMoniker": "D:\\Personal\\Code\\Depth Projects\\Tasklog\\Tasklog\\Views\\Task\\ViewTask.cshtml",
+              "RelativeDocumentMoniker": "Tasklog\\Views\\Task\\ViewTask.cshtml",
+              "ToolTip": "D:\\Personal\\Code\\Depth Projects\\Tasklog\\Tasklog\\Views\\Task\\ViewTask.cshtml",
+              "RelativeToolTip": "Tasklog\\Views\\Task\\ViewTask.cshtml",
+              "ViewState": "AgIAAAEAAAAAAAAAAAAUwBQAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-01-31T12:38:35.801Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "Error.cshtml",
+              "DocumentMoniker": "D:\\Personal\\Code\\Depth Projects\\Tasklog\\Tasklog\\Views\\Shared\\Error.cshtml",
+              "RelativeDocumentMoniker": "Tasklog\\Views\\Shared\\Error.cshtml",
+              "ToolTip": "D:\\Personal\\Code\\Depth Projects\\Tasklog\\Tasklog\\Views\\Shared\\Error.cshtml",
+              "RelativeToolTip": "Tasklog\\Views\\Shared\\Error.cshtml",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-01-31T11:45:53.225Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "TaskModel.cs",
+              "DocumentMoniker": "D:\\Personal\\Code\\Depth Projects\\Tasklog\\Tasklog\\Models\\TaskModel.cs",
+              "RelativeDocumentMoniker": "Tasklog\\Models\\TaskModel.cs",
+              "ToolTip": "D:\\Personal\\Code\\Depth Projects\\Tasklog\\Tasklog\\Models\\TaskModel.cs",
+              "RelativeToolTip": "Tasklog\\Models\\TaskModel.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAYAAAAhAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-01-31T11:15:25.191Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "_Layout.cshtml",
+              "DocumentMoniker": "D:\\Personal\\Code\\Depth Projects\\Tasklog\\Tasklog\\Views\\Shared\\_Layout.cshtml",
+              "RelativeDocumentMoniker": "Tasklog\\Views\\Shared\\_Layout.cshtml",
+              "ToolTip": "D:\\Personal\\Code\\Depth Projects\\Tasklog\\Tasklog\\Views\\Shared\\_Layout.cshtml",
+              "RelativeToolTip": "Tasklog\\Views\\Shared\\_Layout.cshtml",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-01-31T11:12:57.67Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "Index.cshtml",
+              "DocumentMoniker": "D:\\Personal\\Code\\Depth Projects\\Tasklog\\Tasklog\\Views\\Task\\Index.cshtml",
+              "RelativeDocumentMoniker": "Tasklog\\Views\\Task\\Index.cshtml",
+              "ToolTip": "D:\\Personal\\Code\\Depth Projects\\Tasklog\\Tasklog\\Views\\Task\\Index.cshtml",
+              "RelativeToolTip": "Tasklog\\Views\\Task\\Index.cshtml",
+              "ViewState": "AgIAABAAAAAAAAAAAAAAACEAAAA9AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-01-31T11:09:58.948Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "TaskController.cs",
+              "DocumentMoniker": "D:\\Personal\\Code\\Depth Projects\\Tasklog\\Tasklog\\Controllers\\TaskController.cs",
+              "RelativeDocumentMoniker": "Tasklog\\Controllers\\TaskController.cs",
+              "ToolTip": "D:\\Personal\\Code\\Depth Projects\\Tasklog\\Tasklog\\Controllers\\TaskController.cs",
+              "RelativeToolTip": "Tasklog\\Controllers\\TaskController.cs",
+              "ViewState": "AgIAACsAAAAAAAAAAAA4wEIAAAAvAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-01-31T11:06:49.678Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "Program.cs",
+              "DocumentMoniker": "D:\\Personal\\Code\\Depth Projects\\Tasklog\\Tasklog\\Program.cs",
+              "RelativeDocumentMoniker": "Tasklog\\Program.cs",
+              "ToolTip": "D:\\Personal\\Code\\Depth Projects\\Tasklog\\Tasklog\\Program.cs",
+              "RelativeToolTip": "Tasklog\\Program.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAgAAAA3AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-01-27T16:28:21.446Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

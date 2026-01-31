@@ -1,0 +1,20 @@
+﻿@model TaskModel
+
+@{
+    ViewData["Title"] = "View Task";
+}
+<h1>@ViewData["Title"]</h1>
+<ul>
+    <li>Title: @Model.Title</li>
+    <li>Deadline on: @Model.Deadline</li>
+    <li>Created At: @Model.CreatedAt</li>
+    <li>
+        <form action="/task/delete/@Model.Id" method="post">
+            <button type="submit">
+                <strong>Delete Task</strong>
+            </button>
+        </form>
+    </li>
+</ul>
+
+

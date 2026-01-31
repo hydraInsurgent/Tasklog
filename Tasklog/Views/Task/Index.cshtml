@@ -1,0 +1,59 @@
+﻿@model List<TaskModel>
+@{
+    ViewData["Title"] = "Home Page";
+    int index = 1;
+}
+
+<div class="text-center">
+    <h1 class="display-4">Welcome to Tasklog.</h1>
+    @if (TempData["Message"] != null)
+    {
+        <p class="alert-success" style="color: green">@TempData["Message"]</p>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <p class="alert-danger" style="color: red">@TempData["ErrorMessage"]</p>
+    }
+    <p>List of all tasks : </p>
+    <table>
+        <tr>
+            <th>Index</th>
+            <th>Title</th>
+            <th>Deadline</th>
+            <th>CreatedAt</th>
+            <th>Actions</th>
+        </tr>
+        @foreach (var task in Model)
+        {
+            <tr>
+                <td>@index</td>
+                <td>@task.Title</td>
+                <td>@task.Deadline</td>
+                <td>@task.CreatedAt</td>
+                <td>
+                    <form action="/task/@task.Id" method="get">
+                        <button type="submit">
+                            <strong>View Task</strong>
+                        </button>
+                    </form>
+                    <form action="/task/delete/@task.Id" method="post">
+                        <button type="submit">
+                            <strong>Delete Task</strong>
+                        </button>
+                    </form>
+                </td>
+            </tr>
+            index++;
+        }
+    </table>
+
+    <h2>Add Task Form</h2>
+
+    <form action="/task/add" method="post">
+        <label for="title">Title:</label><br>
+        <input type="text" id="title" name="title" value=""><br>
+        <label for="deadline">Deadline:</label><br>
+        <input type="date" id="deadline" name="deadline" value=""><br><br>
+        <input type="submit" value="Submit">
+    </form>
+</div>
