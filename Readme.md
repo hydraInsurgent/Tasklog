@@ -3,48 +3,72 @@
 Tasklog is a **minimal, self-hosted task application** built for personal use.
 
 The project started for two simple reasons:
-1. I didn’t want to keep paying for a Todoist subscription.
+1. I didn't want to keep paying for a Todoist subscription.
 2. I wanted full control over my tasks, data, and code.
 
 Rather than recreating an existing SaaS app, the goal was to build the **smallest useful system**, ship it end-to-end, and evolve it deliberately over time.
 
 ---
 
-## Intention & Backstory
+## Architecture (v2)
 
-I rarely keep complex task systems up to date. Over time, feature-rich tools tend to become heavier instead of more helpful.
+Tasklog v2 is a separated client-server application:
 
-Tasklog is an experiment in the opposite direction:
-- fewer concepts
-- fewer decisions
-- less ceremony
+```
+backend/    .NET Core Web API (ASP.NET Core 9, EF Core, SQLite)
+frontend/   Next.js 16 app (React 19, App Router, Tailwind CSS v4)
+```
 
-v1 focuses on **ownership and simplicity**, not productivity optimization.
-
----
-
-## What Tasklog v1 is
-
-- A single-user task log
-- Server-rendered and easy to reason about
-- Self-hosted on a local machine
-- Accessible from both phone and desktop on the same network
-- Backed by a local SQLite database
-
-The emphasis is on **understanding the whole system**, not building a perfect task manager.
+The backend exposes a REST JSON API. The frontend consumes it.
 
 ---
 
-## Current Capabilities (v1)
+## Running the app
+
+### Backend
+
+```bash
+cd backend/Tasklog.Api
+dotnet run
+```
+
+Runs on `http://localhost:5115` by default (see `Properties/launchSettings.json`).
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Runs on `http://localhost:3000`. API base URL is configured in `frontend/.env.local`.
+
+> **Note:** Both servers must be running at the same time for the app to work.
+
+---
+
+## API endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/tasks` | List all tasks (newest first) |
+| GET | `/api/tasks/:id` | Get a single task |
+| POST | `/api/tasks` | Create a task `{ title, deadline? }` |
+| DELETE | `/api/tasks/:id` | Delete a task |
+
+---
+
+## Capabilities (v2)
 
 - Create tasks with a title and optional deadline
-- View all active tasks
-- View a single task in a read-only detail page
-- Delete tasks (delete = done)
-- Persistent storage using SQLite
-- End-to-end flow validated on real devices (phone + desktop)
-
-v1 is intentionally small and complete for its original scope.
+- View all tasks in a clean list
+- View a single task on its own page
+- Delete tasks from the list or the detail page
+- Deadline color coding: red (overdue), yellow (due within 3 days)
+- Inline feedback after every action (no page reloads)
+- Responsive layout for mobile and desktop
+- SQLite persistence (database file: `backend/Tasklog.Api/TasklogDatabase.db`)
 
 ---
 
@@ -60,66 +84,34 @@ v1 is intentionally small and complete for its original scope.
 
 ## Tech Stack
 
-- ASP.NET MVC
-- Entity Framework Core
-- SQLite
-- Razor views (server-rendered)
-- HTTP over local network
-
-The stack was chosen to minimize friction and maximize understanding.
+- **Backend:** ASP.NET Core Web API, Entity Framework Core 9, SQLite
+- **Frontend:** Next.js 16 (App Router), React 19, Tailwind CSS v4
+- **Icons:** Lucide React
+- **Fonts:** Space Grotesk (headings), DM Sans (body)
 
 ---
 
 ## Roadmap
 
-Tasklog is intended to evolve incrementally. Planned future work is grouped into stages rather than individual features.
+### Next - v2 features
 
-### v2 — Task Lifecycle & Organization
-**Focus:** correctness and behavior.
+Now that the architecture is in place, planned additions:
 
-Planned ideas:
-- Mark tasks as completed using a checkbox
-- Maintain a separate history of completed tasks
-- Clarify delete semantics in the presence of completion
-- Introduce basic task grouping (projects)
+- Mark tasks as completed (completion lifecycle)
+- Separate history of completed tasks
+- Task grouping via projects
+- Filtering and pagination
 
-This phase is about defining a clear task lifecycle.
+### v3+ - Reliability
 
----
-
-### v2.1 — Usability & Navigation
-**Focus:** making the app more comfortable to use.
-
-Planned ideas:
-- Improved UI layout for mobile and desktop
-- Table and card-based views
-- Filtering and basic pagination
-- Better visual separation of active vs completed tasks
-
----
-
-### v3+ — Reliability & Power Features
-**Focus:** resilience and convenience.
-
-Exploratory ideas:
-- Offline access using browser storage
-- Sync strategies when the server becomes available
-- Always-on hosting (e.g. Raspberry Pi)
-- API-first architecture and richer frontend (if needed)
-
-These are intentionally deferred until the core behavior proves useful.
+- Always-on hosting (Raspberry Pi or VPS)
+- PostgreSQL migration (when SQLite is no longer sufficient)
+- Offline access and sync
 
 ---
 
 ## Status
 
-**v1 is complete and stable.**
+**v2 architecture is live.** Backend API and Next.js frontend are both running.
 
-The project is now in an evolution phase rather than a build-from-scratch phase. New features will be added only when they solve a real usage problem.
-
----
-
-## Notes
-
-This project is primarily for personal use and learning.  
-If it’s useful to someone else, that’s a bonus.
+The project is in an evolution phase. New features will be added only when they solve a real usage problem.

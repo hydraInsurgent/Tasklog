@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+/* Design token: custom fonts from next/font/google.
+   --font-space-grotesk and --font-dm-sans are injected by layout.tsx.
+   Defining them in @theme makes `font-heading` and `font-body` Tailwind utilities. */
+@theme {
+  --font-heading: var(--font-space-grotesk), sans-serif;
+  --font-body: var(--font-dm-sans), sans-serif;
+}
+
+/* Base styles */
+body {
+  background-color: #fafafa; /* zinc-50 */
+  color: #18181b;            /* zinc-900 */
+  font-family: var(--font-dm-sans), system-ui, sans-serif;
+  font-size: 1rem;
+  line-height: 1.6;
+}

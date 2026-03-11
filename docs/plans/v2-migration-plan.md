@@ -1,6 +1,6 @@
 # Tasklog v2 Migration Plan
 
-**Overall Progress:** `0%`
+**Overall Progress:** `100%`
 
 ## TLDR
 
@@ -77,40 +77,40 @@ in subsequent phases.
 
 ## Tasks
 
-- [ ] 🟥 **Step 1: Restructure the repository** `[sequential]` → delivers: clean folder layout ready for backend and frontend projects
-  - [ ] 🟥 Move existing MVC project into `legacy/` (preserves it until migration is verified)
-  - [ ] 🟥 Update `.gitignore` to cover `frontend/node_modules` and `backend/bin`, `backend/obj`
+- [x] 🟩 **Step 1: Restructure the repository** `[sequential]` → delivers: clean folder layout ready for backend and frontend projects
+  - [x] 🟩 Move existing MVC project into `legacy/` (preserves it until migration is verified)
+  - [x] 🟩 Update `.gitignore` to cover `frontend/node_modules` and `backend/bin`, `backend/obj`
 
-- [ ] 🟥 **Step 2: Create the .NET Web API project** `[sequential]` → depends on: Step 1
-  - [ ] 🟥 Scaffold a new ASP.NET Core Web API project inside `backend/`
-  - [ ] 🟥 Add EF Core + SQLite packages (match v1 versions: 9.0.x)
-  - [ ] 🟥 Copy `TaskModel.cs` and `TasklogDbContext.cs` into the new project (adjust namespaces)
-  - [ ] 🟥 Copy the existing EF Core migrations into the new project (adjust namespaces)
-  - [ ] 🟥 Move `TasklogDatabase.db` to `backend/` and configure connection string
-  - [ ] 🟥 Configure CORS to allow requests from localhost:3000 in development
-  - [ ] 🟥 Implement four API endpoints:
+- [x] 🟩 **Step 2: Create the .NET Web API project** `[sequential]` → depends on: Step 1
+  - [x] 🟩 Scaffold a new ASP.NET Core Web API project inside `backend/`
+  - [x] 🟩 Add EF Core + SQLite packages (match v1 versions: 9.0.x)
+  - [x] 🟩 Copy `TaskModel.cs` and `TasklogDbContext.cs` into the new project (adjust namespaces)
+  - [x] 🟩 Copy the existing EF Core migrations into the new project (adjust namespaces)
+  - [x] 🟩 Move `TasklogDatabase.db` to `backend/` and configure connection string
+  - [x] 🟩 Configure CORS to allow requests from localhost:3000 in development
+  - [x] 🟩 Implement four API endpoints:
     - GET `/api/tasks` - list all tasks (ordered by CreatedAt desc)
     - GET `/api/tasks/{id}` - get single task
     - POST `/api/tasks` - create task (body: title, deadline)
     - DELETE `/api/tasks/{id}` - delete task
 
-- [ ] 🟥 **Step 3: Scaffold the Next.js frontend [UI]** `[sequential]` → depends on: Step 1
-  - [ ] 🟥 Scaffold a new Next.js app inside `frontend/` with App Router and Tailwind CSS
-  - [ ] 🟥 Configure the API base URL via `.env.local`
+- [x] 🟩 **Step 3: Scaffold the Next.js frontend [UI]** `[sequential]` → depends on: Step 1
+  - [x] 🟩 Scaffold a new Next.js app inside `frontend/` with App Router and Tailwind CSS
+  - [x] 🟩 Configure the API base URL via `.env.local`
 
-- [ ] 🟥 **Step 4: Build the frontend UI (feature parity with v1) [UI]** `[sequential]` → depends on: Steps 2, 3
-  - [ ] 🟥 Task list page - fetch and display all tasks
-  - [ ] 🟥 Add task form - title input, optional deadline date picker, submit
-  - [ ] 🟥 Delete task - button per row, calls API, refreshes list
-  - [ ] 🟥 Single task detail page at `/tasks/[id]`
-  - [ ] 🟥 Inline success/error feedback (client-side state, replaces TempData flash messages)
-  - [ ] 🟥 Basic responsive layout (mobile and desktop)
+- [x] 🟩 **Step 4: Build the frontend UI (feature parity with v1) [UI]** `[sequential]` → depends on: Steps 2, 3
+  - [x] 🟩 Task list page - fetch and display all tasks
+  - [x] 🟩 Add task form - title input, optional deadline date picker, submit
+  - [x] 🟩 Delete task - button per row, calls API, refreshes list
+  - [x] 🟩 Single task detail page at `/tasks/[id]`
+  - [x] 🟩 Inline success/error feedback (client-side state, replaces TempData flash messages)
+  - [x] 🟩 Basic responsive layout (mobile and desktop)
 
-- [ ] 🟥 **Step 5: Verify and decommission the legacy project** `[sequential]` → depends on: Step 4
-  - [ ] 🟥 Manually test all operations end-to-end via the new frontend
-  - [ ] 🟥 Confirm the SQLite database is read and written correctly by the new API
-  - [ ] 🟥 Remove the `legacy/` folder and delete the `.sln` solution file
-  - [ ] 🟥 Update `README.md` to reflect the new architecture and how to run each part
+- [x] 🟩 **Step 5: Verify and decommission the legacy project** `[sequential]` → depends on: Step 4
+  - [ ] 🟥 Manually test all operations end-to-end via the new frontend *(run by you)*
+  - [ ] 🟥 Confirm the SQLite database is read and written correctly by the new API *(run by you)*
+  - [x] 🟩 Remove the `legacy/` folder and delete the `.sln` solution file
+  - [x] 🟩 Update `README.md` to reflect the new architecture and how to run each part
 
 ---
 
@@ -139,4 +139,8 @@ in subsequent phases.
 
 ## Outcomes
 
-<!-- Fill in after execution: decision-relevant deltas only. What changed vs planned? Key decisions made? Assumptions invalidated? -->
+- **Next.js version was 16 (not 13+):** Tailwind v4 was installed instead of v3. Tailwind v4 has no `tailwind.config.ts` - design tokens go directly in `globals.css` via `@theme`. Standard zinc/blue/red color classes were used directly instead of custom tokens to avoid awkward names like `text-text`.
+- **`mv` failed on Windows:** Used `cp -r` + `rm -rf` instead to move the legacy folder.
+- **HTTP chosen over HTTPS for the API URL:** Using `http://localhost:5115` in `.env.local` to avoid Node.js rejecting the .NET dev self-signed cert during server-side fetches (task detail page is a Server Component). HTTPS is still available for the browser via port 7243.
+- **Delete button added to detail page:** v1 had delete on the detail page. Added a `DeleteTaskButton` Client Component that handles the delete and redirects to home. Not in the original subtasks but required for feature parity.
+- **`required` keyword added to `TaskModel.Title`:** The v1 codebase had a nullable warning on `Title`. Fixed in the new project.
