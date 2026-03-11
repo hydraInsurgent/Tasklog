@@ -16,11 +16,37 @@ The tracking issue evolves through stages:
 
 ---
 
-## Step 1: Ask two questions only
+## Step 1: Check for an existing issue
+
+Ask first:
+
+```
+Is there an existing GitHub issue for this work?
+- Yes → provide the issue number and I'll use it as the tracking issue
+- No  → I'll create a new one
+```
+
+**If an existing issue is provided:**
+
+```bash
+gh issue view [N]
+```
+
+Show the issue title and body. Confirm this is the right one. If confirmed:
+- Use this as the tracking issue - skip Step 4 (do not create a new issue)
+- The branch will be named using this issue number
+- Continue from Step 2
+
+**If no existing issue:** proceed normally - a new one will be created in Step 4.
+
+---
+
+## Step 2: Ask two questions only
 
 Ask the user exactly these two things - nothing else:
 
-1. **What are we building?** - 2-3 sentences describing the feature, bug fix, or improvement.
+1. **What are we building?** - 2-3 sentences describing the feature or improvement.
+   (If linking to an existing issue, this can be inferred from the issue body - confirm rather than ask.)
 2. **What type is this?**
    - `feature` - new capability that doesn't exist yet
    - `fix` - something broken that needs correcting
@@ -28,7 +54,7 @@ Ask the user exactly these two things - nothing else:
    - `refactor` - internal code change with no user-visible behaviour change
 
 Do NOT ask about: version, branch name, issue title, milestone, labels.
-Infer all of those automatically in Step 2.
+Infer all of those automatically in the next step.
 
 ---
 
@@ -112,6 +138,19 @@ git checkout -b [type]/[slugified-name]-#[issue-number]
 ```
 
 Example: feature "Task Completion", issue #8 → `git checkout -b feature/task-completion-#8`
+
+---
+
+## Step 5b: Update backlog.md
+
+Add a row to the **Active** section of `docs/backlog.md`:
+
+```
+| P[N]-[slug].md (pending) | #[N] | [branch-name] | Planning |
+```
+
+The plan filename is marked `(pending)` because the plan doesn't exist until `/create-plan` runs.
+After `/create-plan` runs, that step will update this row with the real filename.
 
 ---
 

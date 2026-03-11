@@ -53,17 +53,19 @@ Once you're satisfied with the problem definition, shift to technical exploratio
 
 ### 2a. Read the project docs first (always)
 
-Before looking at any code, read these three documents:
+Before looking at any code, read these four documents:
 
 - `docs/architecture.md` - current system structure, layers, endpoints, components, data model
-- `docs/product-design.md` - what the product is, current scope, feature rules
+- `docs/product-design.md` - what the product is, who it's for, current scope and feature rules
+- `docs/backlog.md` - what's active, what's in the pipeline, known bugs
 - `docs/engineering-guidelines.md` - current patterns, what's not yet in place, known deviations
 
 These are your anchors. They tell you what exists, what the constraints are, and what's already been decided.
 
 Flag anything relevant before proceeding:
 
-- **Scope flag:** If the feature expands beyond the current scope in `product-design.md`, surface it explicitly. Example: "This adds multi-device sync which is outside the current single-user scope. Worth noting before we plan."
+- **Scope flag:** Check `docs/backlog.md` Active section. If there is another active plan already running, and this new feature is outside that plan's scope, surface it. This is a concurrent work check - not a blocker, just a flag. Example: "There is an active plan for task completion. This adds project grouping which is outside that scope - worth noting before we plan."
+- **Product fit flag:** Check `docs/product-design.md`. If the feature significantly changes what the product is (new user type, fundamentally new behaviour, scope expansion), note it. Not a blocker - the user decides.
 - **Pattern flag:** If the feature requires a pattern not yet in the codebase (e.g. a service layer, a new state management approach), note it. The plan will need to account for introducing it.
 - **Deviation flag:** If any open deviation in `engineering-guidelines.md` (the known issues table) is directly relevant to this feature, flag it. It may need to be resolved as part of this work.
 

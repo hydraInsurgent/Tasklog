@@ -10,44 +10,73 @@
 2. **Ask questions** - If something is unclear, ask before assuming
 3. **Explain simply** - Use plain English, avoid jargon
 4. **Show your work** - Tell me what you're doing and why
-5. **Use the Skill tool for slash commands** - Never manually replicate /start-feature, /create-plan, /review, /ship, or /document. Always invoke them via the Skill tool so the template is followed.
+5. **Use the Skill tool for slash commands** - Never manually replicate /start-feature, /explore, /create-plan, /review, /fix, /ship, or /document. Always invoke them via the Skill tool so the template is followed.
 6. **No em dashes or en dashes** - Never use em dashes or en dashes in any output (conversation, file writes, file edits). Use regular hyphens or rewrite the sentence.
 7. **Teach the why** - When explaining, focus on *why* things work so the user can solve similar problems independently next time.
 
 ### Our Workflow
 
-We follow this flow for features:
-1. `/start-feature` - Classify the work, create tracking issue and branch, run explore
-2. `/create-plan` - Create a step-by-step plan with status tracking
-3. `/ui-spec` - (optional) Generate UI design spec with colors, fonts, and rules
-4. `/execute` - Build it, updating the plan as we go
-5. `/review` - Review work (report only, don't fix)
-6. `/ask-gpt` or `/ask-gemini` - Get a second opinion via multi-model debate
-7. `/peer-review` - Evaluate debate findings (paste results here)
-8. `/document` - Update documentation
-9. `/ship` - Close tracking issue, merge branch, tag version, create release
+#### Feature workflow
+1. `/start-feature` - Classify the work, create tracking issue and branch
+2. `/explore` - Understand the problem and codebase, define scope
+3. `/create-plan` - Create a step-by-step implementation plan
+4. `/ui-spec` - (optional) Generate UI design spec before building
+5. `/execute` - Build it, updating the plan as we go
+6. `/review` - Code review (report only, don't fix)
+7. `/document` - Update documentation
+8. `/ship` - Close tracking issue, merge branch, tag version, create release
+
+#### Bug fix workflow
+1. `/create-issue` - Capture the bug
+2. `/pair-debug` - (optional) Investigate root cause if not already known
+3. `/fix` - Branch-aware fix: apply, verify, close issue, PATCH release
+
+#### Additional commands
+Use these when needed - not part of the standard flow:
+
+| Command | When to use |
+|---------|-------------|
+| `/ask-gpt` | Get a second opinion from ChatGPT (3-round debate) |
+| `/ask-gemini` | Get a second opinion from Gemini (3-round debate) |
+| `/peer-review` | Evaluate findings from a multi-model debate |
+| `/learning-opportunity` | Pause to understand a concept at depth |
+| `/package-review` | Review a package or external codebase |
+
 
 ---
 
 ## Slash Commands
 
+### Feature workflow
+
 | Command | Purpose |
 |---------|---------|
-| `/explore` | Understand the problem, ask clarifying questions before implementation |
-| `/start-feature` | Classify work, create GitHub issue and branch, then explore |
+| `/start-feature` | Classify work, create GitHub tracking issue and branch |
+| `/explore` | Understand the problem and codebase, define scope |
 | `/create-plan` | Create a step-by-step implementation plan with status tracking |
 | `/ui-spec` | Generate a UI design spec (colors, fonts, accessibility rules) for a plan |
 | `/execute` | Build the feature, updating the plan as you go |
 | `/review` | Review code - report issues only, don't fix |
-| `/peer-review` | Evaluate feedback from other AI models |
 | `/document` | Update documentation after changes |
 | `/ship` | Close tracking issue, merge branch, tag with semver, create GitHub release |
-| `/create-issue` | Create GitHub issues (ask questions first, keep short) |
+
+### Bug fix workflow
+
+| Command | Purpose |
+|---------|---------|
+| `/create-issue` | Capture a bug or idea (ask questions first, keep short) |
+| `/pair-debug` | Investigate a bug - confirm root cause before fixing |
+| `/fix` | Apply a targeted fix: branch-aware, single or multiple issues, closes and PATCH tags |
+
+### Additional commands
+
+| Command | Purpose |
+|---------|---------|
 | `/ask-gpt` | AI peer review with ChatGPT debate (3 rounds) |
 | `/ask-gemini` | AI peer review with Gemini debate (3 rounds) |
-| `/pair-debug` | Focused debugging partner - investigate before fixing |
-| `/package-review` | Review a package/codebase |
+| `/peer-review` | Evaluate feedback from other AI models |
 | `/learning-opportunity` | Pause to learn a concept at 3 levels of depth |
+| `/package-review` | Review a package or external codebase |
 
 ### Command-Specific Rules
 
@@ -60,6 +89,11 @@ We follow this flow for features:
 - Ask 2-3 clarifying questions first
 - Keep issues short (10-15 lines max)
 - No implementation details - that's for /explore and /create-plan
+
+**When Running /fix:**
+- Check branch context first - inline if on a feature branch, new branch if on main
+- Verify the fix works before closing the issue
+- Only change what is necessary - no refactoring alongside fixes
 
 ### Subagent Strategy
 

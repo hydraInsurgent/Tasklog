@@ -41,6 +41,24 @@ Output numbered hypotheses and checks:
 
 Wait for the user to say which check to run (e.g., "do C1").
 
-## Step 4: Confirm Root Cause, Then Fix
+## Step 4: Confirm Root Cause
 
-Only suggest a fix after a check confirms the root cause. Present the fix as a report - don't edit files until the user approves.
+Only after a check confirms the root cause:
+
+1. State the root cause clearly in one sentence
+2. Describe the fix direction (what to change, not the code)
+3. List the files affected
+
+Then output this hand-off:
+
+```
+Root cause confirmed: [one sentence]
+
+Fix: [what needs to change]
+Files: [list]
+
+If this bug has a GitHub issue, run /fix #N to apply it.
+If no issue exists yet, run /create-issue first, then /fix #N.
+```
+
+Do NOT edit files. Do NOT proceed to fix. The fix happens in `/fix`, not here.

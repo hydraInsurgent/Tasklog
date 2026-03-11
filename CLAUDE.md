@@ -17,6 +17,10 @@ AI assistants should read this file before proposing or implementing changes.
 
 # Project Overview
 
+<!-- Project-Code: (not set) -->
+<!-- Uncomment and set a short code (e.g. TL) to prefix plan filenames: TL-P9-task-completion.md -->
+<!-- If not set, plans use plain naming: P9-task-completion.md -->
+
 **Tasklog** is a self-hosted task management application built as a personal alternative to subscription-based task apps.
 
 The project began from a simple frustration: paying for a Todoist subscription for functionality that could be implemented independently.

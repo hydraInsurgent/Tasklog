@@ -170,6 +170,18 @@ gh issue comment [N] --body "Release: [release URL]"
 
 ---
 
+## Step 8b: Update backlog.md
+
+Remove the row from the **Active** section and add it to **Closed**:
+
+```
+| #[N] | [feature name] | feature | [today's date] |
+```
+
+Keep Closed to the last 10 entries - remove the oldest if it exceeds that.
+
+---
+
 ## Step 9: Final output
 
 ```

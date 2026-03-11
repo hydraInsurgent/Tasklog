@@ -2,6 +2,27 @@
 
 Based on our full exchange, produce a markdown plan document.
 
+## Plan file naming
+
+Plans are named `P[N]-[slug].md` where N is the GitHub issue number this plan belongs to.
+
+```
+P9-task-completion.md
+P12-filter-and-pagination.md
+P5-code-cleanup.md
+```
+
+Get the issue number from the current branch name (branch contains `#N`).
+If no branch issue number is available, ask the user for the issue number before creating the file.
+
+If a project code is defined in `CLAUDE.md` (field: `Project-Code`), prefix the filename:
+```
+TL-P9-task-completion.md
+```
+If no project code is defined, use the plain `P[N]-[slug].md` format.
+
+Save to `docs/plans/[filename].md`.
+
 ## Requirements for the Plan
 
 - Include clear, minimal, concise steps
@@ -70,6 +91,17 @@ Key architectural/implementation choices made during exploration:
 Again, it's still not time to build yet. Just write the clear plan document. No extra complexity or extra scope beyond what we discussed.
 
 If your plan includes UI work, consider running `/ui-spec` before `/execute` to set design guardrails (colors, fonts, accessibility rules).
+
+---
+
+## Backlog Update
+
+After writing the plan file, update `docs/backlog.md` Active section.
+Find the row for this issue (it will have `(pending)` in the Plan file column) and replace it with the real filename:
+
+```
+| [P[N]-slug.md] | #[N] | [branch-name] | In Progress |
+```
 
 ---
 
