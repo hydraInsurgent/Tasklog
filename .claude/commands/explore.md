@@ -49,12 +49,32 @@ Since you're working with someone learning to code, briefly explain *why* you're
 
 ## Phase 2: Codebase Analysis
 
-Once you're satisfied with the problem definition, shift to technical exploration:
+Once you're satisfied with the problem definition, shift to technical exploration.
 
-- Analyze and understand the existing codebase thoroughly
-- Determine exactly how this feature integrates, including dependencies, structure, edge cases, and constraints
-- Clearly identify anything unclear or ambiguous in the current implementation
-- List clearly all technical questions or ambiguities you need clarified
+### 2a. Read the project docs first (always)
+
+Before looking at any code, read these three documents:
+
+- `docs/architecture.md` - current system structure, layers, endpoints, components, data model
+- `docs/product-design.md` - what the product is, current scope, feature rules
+- `docs/engineering-guidelines.md` - current patterns, what's not yet in place, known deviations
+
+These are your anchors. They tell you what exists, what the constraints are, and what's already been decided.
+
+Flag anything relevant before proceeding:
+
+- **Scope flag:** If the feature expands beyond the current scope in `product-design.md`, surface it explicitly. Example: "This adds multi-device sync which is outside the current single-user scope. Worth noting before we plan."
+- **Pattern flag:** If the feature requires a pattern not yet in the codebase (e.g. a service layer, a new state management approach), note it. The plan will need to account for introducing it.
+- **Deviation flag:** If any open deviation in `engineering-guidelines.md` (the known issues table) is directly relevant to this feature, flag it. It may need to be resolved as part of this work.
+
+### 2b. Analyze the codebase
+
+With the docs in mind, analyze the code:
+
+- Determine exactly how this feature integrates - which files, layers, and components are affected
+- Identify dependencies, constraints, and edge cases
+- Note anything unclear or ambiguous in the current implementation
+- List any technical questions that need answering before planning can begin
 
 ## Important
 

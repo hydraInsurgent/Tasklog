@@ -1,6 +1,6 @@
 # Tasklog v2 Migration Plan
 
-**Overall Progress:** `100%`
+**Overall Progress:** `100% ✓ Complete`
 
 ## TLDR
 
@@ -9,6 +9,7 @@ separated architecture: a .NET Web API backend and a Next.js + React frontend wi
 Tailwind CSS. The migration replicates v1 functionality exactly - no new features
 are introduced during this phase.
 
+Feature issue https://github.com/hydraInsurgent/Tasklog/issues/7
 ---
 
 ## Current System Summary
@@ -107,8 +108,8 @@ in subsequent phases.
   - [x] 🟩 Basic responsive layout (mobile and desktop)
 
 - [x] 🟩 **Step 5: Verify and decommission the legacy project** `[sequential]` → depends on: Step 4
-  - [ ] 🟥 Manually test all operations end-to-end via the new frontend *(run by you)*
-  - [ ] 🟥 Confirm the SQLite database is read and written correctly by the new API *(run by you)*
+  - [x] 🟩 Manually test all operations end-to-end via the new frontend *(verified)*
+  - [x] 🟩 Confirm the SQLite database is read and written correctly by the new API *(verified)*
   - [x] 🟩 Remove the `legacy/` folder and delete the `.sln` solution file
   - [x] 🟩 Update `README.md` to reflect the new architecture and how to run each part
 
@@ -144,3 +145,5 @@ in subsequent phases.
 - **HTTP chosen over HTTPS for the API URL:** Using `http://localhost:5115` in `.env.local` to avoid Node.js rejecting the .NET dev self-signed cert during server-side fetches (task detail page is a Server Component). HTTPS is still available for the browser via port 7243.
 - **Delete button added to detail page:** v1 had delete on the detail page. Added a `DeleteTaskButton` Client Component that handles the delete and redirects to home. Not in the original subtasks but required for feature parity.
 - **`required` keyword added to `TaskModel.Title`:** The v1 codebase had a nullable warning on `Title`. Fixed in the new project.
+
+Release is live at https://github.com/hydraInsurgent/Tasklog/releases/tag/v2.0

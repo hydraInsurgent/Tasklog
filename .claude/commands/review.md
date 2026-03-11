@@ -83,3 +83,35 @@ After the standard review, step back and evaluate as a staff engineer:
 - Blocks: X | Warns: X | Suggests: X
 
 ## REMEMBER: Report issues only. Do NOT edit any files until I approve.
+
+---
+
+## GitHub Integration
+
+After delivering the review report, check if on a feature branch:
+
+```bash
+git branch --show-current
+```
+
+If the branch contains an issue number (e.g. `feature/task-completion-#8`), extract it.
+
+Then tell the user:
+
+```
+When you run /create-issue to track any of these findings, tell me and I'll
+link the new issues back to the tracking issue #N so everything stays connected.
+```
+
+After the user has created issues from the review findings, add a comment to the
+tracking issue listing them:
+
+```bash
+gh issue comment [N] --body "Issues raised from code review:
+[#X - one-line description]
+[#Y - one-line description]
+
+These are tracked separately and do not block shipping unless they are Blocks."
+```
+
+If not on a feature branch, skip this section entirely.

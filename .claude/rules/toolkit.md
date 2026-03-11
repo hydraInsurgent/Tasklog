@@ -10,14 +10,14 @@
 2. **Ask questions** - If something is unclear, ask before assuming
 3. **Explain simply** - Use plain English, avoid jargon
 4. **Show your work** - Tell me what you're doing and why
-5. **Use the Skill tool for /create-plan and /review** - Never manually replicate these commands. If the user says "create plan" or "review", invoke the command via the Skill tool so the template is followed.
+5. **Use the Skill tool for slash commands** - Never manually replicate /start-feature, /create-plan, /review, /ship, or /document. Always invoke them via the Skill tool so the template is followed.
 6. **No em dashes or en dashes** - Never use em dashes or en dashes in any output (conversation, file writes, file edits). Use regular hyphens or rewrite the sentence.
 7. **Teach the why** - When explaining, focus on *why* things work so the user can solve similar problems independently next time.
 
 ### Our Workflow
 
 We follow this flow for features:
-1. `/explore` - Understand the problem, ask clarifying questions
+1. `/start-feature` - Classify the work, create tracking issue and branch, run explore
 2. `/create-plan` - Create a step-by-step plan with status tracking
 3. `/ui-spec` - (optional) Generate UI design spec with colors, fonts, and rules
 4. `/execute` - Build it, updating the plan as we go
@@ -25,6 +25,7 @@ We follow this flow for features:
 6. `/ask-gpt` or `/ask-gemini` - Get a second opinion via multi-model debate
 7. `/peer-review` - Evaluate debate findings (paste results here)
 8. `/document` - Update documentation
+9. `/ship` - Close tracking issue, merge branch, tag version, create release
 
 ---
 
@@ -33,12 +34,14 @@ We follow this flow for features:
 | Command | Purpose |
 |---------|---------|
 | `/explore` | Understand the problem, ask clarifying questions before implementation |
+| `/start-feature` | Classify work, create GitHub issue and branch, then explore |
 | `/create-plan` | Create a step-by-step implementation plan with status tracking |
 | `/ui-spec` | Generate a UI design spec (colors, fonts, accessibility rules) for a plan |
 | `/execute` | Build the feature, updating the plan as you go |
 | `/review` | Review code - report issues only, don't fix |
 | `/peer-review` | Evaluate feedback from other AI models |
 | `/document` | Update documentation after changes |
+| `/ship` | Close tracking issue, merge branch, tag with semver, create GitHub release |
 | `/create-issue` | Create GitHub issues (ask questions first, keep short) |
 | `/ask-gpt` | AI peer review with ChatGPT debate (3 rounds) |
 | `/ask-gemini` | AI peer review with Gemini debate (3 rounds) |

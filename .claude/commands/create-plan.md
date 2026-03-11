@@ -43,6 +43,11 @@ Key architectural/implementation choices made during exploration:
 - Decision 1: [choice] - [brief rationale]
 - Decision 2: [choice] - [brief rationale]
 
+<!-- GUIDELINES CHECK: If this plan introduces a pattern not yet in engineering-guidelines.md
+     (e.g. first use of a service layer, new state management, new library), add it here as
+     a decision. If it resolves a known deviation from the deviations table, note that too.
+     If it expands product scope beyond product-design.md, flag it explicitly. -->
+
 ## Tasks
 <!-- For 3+ steps: tag each step [parallel] or [sequential]. See "Execution Order Tags" above. -->
 
@@ -65,3 +70,39 @@ Key architectural/implementation choices made during exploration:
 Again, it's still not time to build yet. Just write the clear plan document. No extra complexity or extra scope beyond what we discussed.
 
 If your plan includes UI work, consider running `/ui-spec` before `/execute` to set design guardrails (colors, fonts, accessibility rules).
+
+---
+
+## GitHub Integration
+
+After writing the plan file, check if on a feature branch:
+
+```bash
+git branch --show-current
+```
+
+If the branch contains an issue number (e.g. `feature/task-completion-#8`), extract it.
+Then update the tracking issue's Plan section with the path to the plan file:
+
+```bash
+gh issue edit [N] --body "## What we're building
+[existing description - do not change]
+
+## Scope
+[existing scope - do not change]
+
+## Plan
+docs/plans/[plan-filename].md
+
+## Outcome
+To be filled when shipped."
+```
+
+Then tell the user:
+
+```
+Plan linked to issue #N.
+Next: run /ui-spec if this includes UI work, then /execute to build it.
+```
+
+If not on a feature branch, skip this section entirely.

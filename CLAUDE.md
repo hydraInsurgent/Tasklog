@@ -38,16 +38,8 @@ The goals were:
 - build something understandable end-to-end
 - evolve the system gradually rather than designing everything upfront
 
-Version 1 of Tasklog focused on proving that a simple system could work end-to-end:
-
-- task creation
-- viewing tasks
-- deleting tasks
-- optional deadlines
-- SQLite storage
-- local hosting accessible from phone and desktop
-
-With this foundation complete, the project now moves toward **Version 2**, which will introduce a more structured architecture and improved user experience.
+The system is now on v2 - a .NET Web API backend and Next.js frontend.
+See `CHANGELOG.md` for history and `docs/architecture.md` for current structure.
 
 ---
 
@@ -143,23 +135,15 @@ Clear understanding is preferred over rapid implementation.
 
 # Architecture Awareness
 
-This repository contains additional documents that define system rules.
+**Always read `docs/architecture.md` before proposing or implementing changes.**
 
-Important documents:
+It defines the current system structure, layer responsibilities, API contract,
+data model, and known limitations. It is the primary reference for any code work.
 
-docs/product-design.md
-docs/architecture.md
-docs/engineering-guidelines.md
+Also read before making changes:
 
-These documents define:
-
-- product features
-- system architecture
-- coding conventions
-
-When generating code, ensure implementations respect the constraints defined in these documents.
-
-If a requested change conflicts with these rules, raise the issue before implementing.
+- `docs/product-design.md` - what the product is, who it's for, feature rules
+- `docs/engineering-guidelines.md` - patterns to follow, patterns to avoid
 
 ---
 
@@ -194,39 +178,6 @@ When assisting with development tasks:
 4. Ask questions when requirements are unclear.
 
 The goal is collaborative development rather than automatic code generation.
-
----
-
-# Project Evolution
-
-Tasklog evolves through versions.
-
-### Version 1 (Completed)
-
-A minimal system demonstrating end-to-end functionality.
-
-Features included:
-
-- task creation
-- task viewing
-- task deletion
-- optional deadline
-- SQLite persistence
-- local hosting
-
----
-
-### Version 2 (Current Focus)
-
-Version 2 will restructure the system and expand its capabilities.
-
-Planned improvements include:
-
-- task completion lifecycle
-- project grouping
-- improved UI
-- filtering and pagination
-- clearer separation between backend API and frontend
 
 ---
 
