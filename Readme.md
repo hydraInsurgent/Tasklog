@@ -115,3 +115,16 @@ Now that the architecture is in place, planned additions:
 **v2 architecture is live.** Backend API and Next.js frontend are both running.
 
 The project is in an evolution phase. New features will be added only when they solve a real usage problem.
+
+### Known limitations
+
+Six issues were identified in the v2 code review and are tracked on GitHub:
+
+| # | Area |
+|---|------|
+| [#1](https://github.com/hydraInsurgent/Tasklog/issues/1) | CORS and server-side fetch break outside localhost |
+| [#2](https://github.com/hydraInsurgent/Tasklog/issues/2) | State/UX bugs in feedback timer and delete flow |
+| [#3](https://github.com/hydraInsurgent/Tasklog/issues/3) | Fragile database path and silent API URL failure |
+| [#4](https://github.com/hydraInsurgent/Tasklog/issues/4) | Accessibility - contrast and focus indicators |
+| [#5](https://github.com/hydraInsurgent/Tasklog/issues/5) | Code cleanup - duplicated utils, UTC timestamps |
+| [#6](https://github.com/hydraInsurgent/Tasklog/issues/6) | Security hardening - CORS methods, AllowedHosts |
