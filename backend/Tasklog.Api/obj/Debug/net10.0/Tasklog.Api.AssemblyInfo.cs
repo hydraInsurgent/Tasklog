@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Tasklog.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+26e2217feb40179698bdf197a75f712c8003866c")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+632ddac3ec9d54c8d67daa0966214da7e636d14e")]
 [assembly: System.Reflection.AssemblyProductAttribute("Tasklog.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Tasklog.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

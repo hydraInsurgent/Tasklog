@@ -10,14 +10,19 @@ builder.Services.AddControllers();
 builder.Services.AddDbContext<TasklogDbContext>(opt =>
     opt.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Allow the Next.js dev server (localhost:3000) to call this API.
-// In production, a reverse proxy on the same host removes the need for CORS.
+// Read allowed origins from config - defined in appsettings.Development.json.
+// Supports both localhost (PC browser) and the PC's LAN IP (phone/other devices).
+// If the PC's IP changes, update CorsAllowedOrigins in appsettings.Development.json.
+var allowedOrigins = builder.Configuration
+    .GetSection("CorsAllowedOrigins")
+    .Get<string[]>() ?? [];
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("FrontendDev", policy =>
     {
         policy
-            .WithOrigins("http://localhost:3000")
+            .WithOrigins(allowedOrigins)
             .AllowAnyHeader()
             .AllowAnyMethod();
     });
