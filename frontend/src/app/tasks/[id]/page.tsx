@@ -1,12 +1,13 @@
 // Task detail page. Fetches a single task server-side (Server Component).
 // The [id] segment is provided by Next.js App Router dynamic routing.
-// DeleteTaskButton is a Client Component for the interactive delete action.
+// DeleteTaskButton and CompleteTaskButton are Client Components for interactive actions.
 
 import Link from "next/link";
 import { getTask } from "@/lib/api";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import DeleteTaskButton from "@/components/DeleteTaskButton";
+import CompleteTaskButton from "@/components/CompleteTaskButton";
 
 // Format an ISO date string to a readable local date (e.g. "12 Mar 2026").
 function formatDate(iso: string): string {
@@ -69,6 +70,22 @@ export default async function TaskDetailPage({ params }: PageProps) {
 
         <dl className="divide-y divide-zinc-100">
           <div className="px-6 py-4 flex justify-between items-center">
+            <dt className="text-sm font-medium text-zinc-500">Status</dt>
+            <dd className={`text-sm font-medium ${task.isCompleted ? "text-green-600" : "text-zinc-500"}`}>
+              {task.isCompleted ? "Complete" : "Pending"}
+            </dd>
+          </div>
+          <div className="px-6 py-4 flex justify-between items-center">
+            <dt className="text-sm font-medium text-zinc-500">Completed</dt>
+            <dd className="text-sm">
+              {task.completedAt ? (
+                <span className="text-green-600 font-medium">{formatDate(task.completedAt)}</span>
+              ) : (
+                <span className="text-zinc-300">Not yet</span>
+              )}
+            </dd>
+          </div>
+          <div className="px-6 py-4 flex justify-between items-center">
             <dt className="text-sm font-medium text-zinc-500">Deadline</dt>
             <dd className={`text-sm ${deadlineColorClass(task.deadline)}`}>
               {task.deadline ? formatDate(task.deadline) : (
@@ -82,8 +99,13 @@ export default async function TaskDetailPage({ params }: PageProps) {
           </div>
         </dl>
 
-        {/* Delete action: Client Component handles the API call and redirect. */}
-        <div className="px-6 py-5 border-t border-zinc-200">
+        {/* Complete/incomplete toggle and delete actions. Both are Client Components. */}
+        <div className="px-6 py-5 border-t border-zinc-200 flex items-center gap-3">
+          <CompleteTaskButton
+            taskId={task.id}
+            taskTitle={task.title}
+            isCompleted={task.isCompleted}
+          />
           <DeleteTaskButton taskId={task.id} taskTitle={task.title} />
         </div>
       </div>

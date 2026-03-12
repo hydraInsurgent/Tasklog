@@ -9,6 +9,8 @@ export interface Task {
   title: string;
   deadline: string | null; // ISO 8601 date string or null
   createdAt: string;       // ISO 8601 date string
+  isCompleted: boolean;    // Whether the task has been marked done
+  completedAt: string | null; // ISO 8601 datetime when completed, or null
 }
 
 // GET /api/tasks - fetch all tasks ordered by creation date (newest first).
@@ -46,4 +48,16 @@ export async function createTask(
 export async function deleteTask(id: number): Promise<void> {
   const res = await fetch(`${API_URL}/api/tasks/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error(`Failed to delete task ${id}.`);
+}
+
+// PATCH /api/tasks/:id/complete - mark a task complete or incomplete.
+// Returns the updated task.
+export async function completeTask(id: number, isCompleted: boolean): Promise<Task> {
+  const res = await fetch(`${API_URL}/api/tasks/${id}/complete`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ isCompleted }),
+  });
+  if (!res.ok) throw new Error(`Failed to update task ${id}.`);
+  return res.json();
 }

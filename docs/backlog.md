@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| *(none)* | | | |
+| P9-task-completion.md | #9 | feature/task-completion-#9 | In Progress |
 
 ---
 
@@ -48,6 +48,8 @@ Known bugs not yet fixed. Add GitHub issue number when created.
 | #4 | Accessibility - contrast and focus indicators | medium | |
 | #5 | Code cleanup - duplicated utils, UTC timestamps | low | |
 | #6 | Security hardening - CORS methods, AllowedHosts | low | |
+| #10 | Rapid task toggle orphans hide timer | low | |
+| #11 | Show/hide toggle during animation causes visual glitch | low | |
 
 ---
 
@@ -59,3 +61,12 @@ Recently completed work (keep last 10):
 |---|-------|------|--------|
 | #8 | App not accessible from phone on local network | bug | 2026-03-11 |
 | #7 | Feature: v2 Architecture Migration | feature | 2026-03-11 |
+
+---
+
+## Someday / Maybe
+
+Untracked ideas - not estimated, not prioritized, not committed to. Just things worth remembering.
+
+- Relative time display for completed date - show "just now", "2 hours ago", "3 days ago" instead of a formatted date. CompletedAt timestamp is already stored so this would be a UI-only change.
+- Cross-device sync / live updates - changes on one device reflect on another without a manual reload.
