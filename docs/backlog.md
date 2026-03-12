@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| P9-task-completion.md | #9 | feature/task-completion-#9 | In Progress |
+| *(none)* | | | |
 
 ---
 
@@ -57,6 +57,7 @@ Recently completed work (keep last 10):
 
 | # | Title | Type | Closed |
 |---|-------|------|--------|
+| #9 | Feature: Task completion | feature | 2026-03-12 |
 | #11 | Show/hide toggle during animation causes visual glitch | bug | 2026-03-12 |
 | #10 | Rapid task toggle orphans hide timer | bug | 2026-03-12 |
 | #8 | App not accessible from phone on local network | bug | 2026-03-11 |
