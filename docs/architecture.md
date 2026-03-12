@@ -1,6 +1,6 @@
 # Tasklog Architecture
 
-This document describes the current system structure as of v2.
+This document describes the current system structure.
 It is the primary reference for any AI assistant or contributor working in this repo.
 
 ---

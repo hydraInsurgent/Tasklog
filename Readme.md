@@ -10,9 +10,9 @@ Rather than recreating an existing SaaS app, the goal was to build the **smalles
 
 ---
 
-## Architecture (v2)
+## Architecture
 
-Tasklog v2 is a separated client-server application:
+Tasklog is a separated client-server application:
 
 ```
 backend/    .NET Core Web API (ASP.NET Core 9, EF Core, SQLite)
@@ -60,7 +60,7 @@ Runs on `http://localhost:3000`. API base URL is configured in `frontend/.env.lo
 
 ---
 
-## Capabilities (v2)
+## Capabilities
 
 - Create tasks with a title and optional deadline
 - Mark tasks as complete via checkbox - completed tasks hide with a brief animation
@@ -75,6 +75,28 @@ Runs on `http://localhost:3000`. API base URL is configured in `frontend/.env.lo
 
 ---
 
+## Tech Stack
+
+- **Backend:** ASP.NET Core Web API, Entity Framework Core 9, SQLite
+- **Frontend:** Next.js 16 (App Router), React 19, Tailwind CSS v4
+- **Icons:** Lucide React
+- **Fonts:** Space Grotesk (headings), DM Sans (body)
+
+---
+
+## Documentation
+
+| File | What it covers |
+|------|---------------|
+| [docs/architecture.md](docs/architecture.md) | System structure, data model, API endpoints, component responsibilities |
+| [docs/product-design.md](docs/product-design.md) | What the product is, who it's for, feature rules and current scope |
+| [docs/engineering-guidelines.md](docs/engineering-guidelines.md) | Coding patterns, component conventions, known deviations |
+| [docs/backlog.md](docs/backlog.md) | Active work, feature and bug backlog, closed items |
+| [CHANGELOG.md](CHANGELOG.md) | Version history and what changed in each release |
+| [LESSONS.md](LESSONS.md) | Session learnings and things worth remembering |
+
+---
+
 ## Design Philosophy
 
 - Ship something usable before optimizing
@@ -85,45 +107,15 @@ Runs on `http://localhost:3000`. API base URL is configured in `frontend/.env.lo
 
 ---
 
-## Tech Stack
-
-- **Backend:** ASP.NET Core Web API, Entity Framework Core 9, SQLite
-- **Frontend:** Next.js 16 (App Router), React 19, Tailwind CSS v4
-- **Icons:** Lucide React
-- **Fonts:** Space Grotesk (headings), DM Sans (body)
-
----
-
 ## Roadmap
 
-### Next - v2 features
+### Coming next
 
 - Task grouping via projects
 - Filtering and pagination
 
-### v3+ - Reliability
+### Later
 
 - Always-on hosting (Raspberry Pi or VPS)
 - PostgreSQL migration (when SQLite is no longer sufficient)
 - Offline access and sync
-
----
-
-## Status
-
-**v2 architecture is live.** Backend API and Next.js frontend are both running.
-
-The project is in an evolution phase. New features will be added only when they solve a real usage problem.
-
-### Known limitations
-
-Six issues were identified in the v2 code review and are tracked on GitHub:
-
-| # | Area |
-|---|------|
-| [#1](https://github.com/hydraInsurgent/Tasklog/issues/1) | CORS and server-side fetch break outside localhost |
-| [#2](https://github.com/hydraInsurgent/Tasklog/issues/2) | State/UX bugs in feedback timer and delete flow |
-| [#3](https://github.com/hydraInsurgent/Tasklog/issues/3) | Fragile database path and silent API URL failure |
-| [#4](https://github.com/hydraInsurgent/Tasklog/issues/4) | Accessibility - contrast and focus indicators |
-| [#5](https://github.com/hydraInsurgent/Tasklog/issues/5) | Code cleanup - duplicated utils, UTC timestamps |
-| [#6](https://github.com/hydraInsurgent/Tasklog/issues/6) | Security hardening - CORS methods, AllowedHosts |
