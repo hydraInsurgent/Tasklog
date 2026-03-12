@@ -108,6 +108,12 @@ export default function TasksClient() {
         prev.map((t) => (t.id === id ? updated : t))
       );
       if (isCompleted && !showCompleted) {
+        // Clear any existing timer for this task before starting a new one.
+        // Without this, rapidly toggling the same task orphans the old timer -
+        // it can't be cancelled and fires at an unexpected moment (#10).
+        const existing = hideTimers.current.get(id);
+        if (existing) clearTimeout(existing);
+
         setHidingIds((prev) => new Set(prev).add(id));
         const timer = setTimeout(() => {
           // Keep the task in the array - the visibleTasks filter hides it when
@@ -166,7 +172,19 @@ export default function TasksClient() {
           </h1>
           {hasCompleted && (
             <button
-              onClick={() => setShowCompleted((prev) => !prev)}
+              onClick={() => {
+                setShowCompleted((prev) => {
+                  const next = !prev;
+                  if (next) {
+                    // Turning "show completed" on - cancel all pending hide timers
+                    // and clear animation state so tasks appear immediately (#11).
+                    hideTimers.current.forEach((t) => clearTimeout(t));
+                    hideTimers.current.clear();
+                    setHidingIds(new Set());
+                  }
+                  return next;
+                });
+              }}
               className="text-sm text-zinc-500 hover:text-zinc-900 focus:outline-none focus:underline transition-colors duration-150 cursor-pointer"
             >
               {showCompleted ? "Hide completed" : "Show completed"}
