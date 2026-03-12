@@ -48,8 +48,6 @@ Known bugs not yet fixed. Add GitHub issue number when created.
 | #4 | Accessibility - contrast and focus indicators | medium | |
 | #5 | Code cleanup - duplicated utils, UTC timestamps | low | |
 | #6 | Security hardening - CORS methods, AllowedHosts | low | |
-| #10 | Rapid task toggle orphans hide timer | low | |
-| #11 | Show/hide toggle during animation causes visual glitch | low | |
 
 ---
 
@@ -59,6 +57,8 @@ Recently completed work (keep last 10):
 
 | # | Title | Type | Closed |
 |---|-------|------|--------|
+| #11 | Show/hide toggle during animation causes visual glitch | bug | 2026-03-12 |
+| #10 | Rapid task toggle orphans hide timer | bug | 2026-03-12 |
 | #8 | App not accessible from phone on local network | bug | 2026-03-11 |
 | #7 | Feature: v2 Architecture Migration | feature | 2026-03-11 |
 
