@@ -51,7 +51,8 @@ Tasklog/
 │       ├── components/            Reusable UI components
 │       │   ├── TasksClient.tsx    Task list + add form (Client Component)
 │       │   ├── AddTaskForm.tsx    Add task form (Client Component)
-│       │   └── DeleteTaskButton.tsx  Delete action on detail page (Client Component)
+│       │   ├── DeleteTaskButton.tsx  Delete action on detail page (Client Component)
+│       │   └── CompleteTaskButton.tsx  Complete/incomplete toggle on detail page (Client Component)
 │       └── lib/
 │           └── api.ts             Typed API call functions (used by both server and client)
 │
@@ -96,6 +97,8 @@ Tasks
   Title       TEXT     not null
   Deadline    TEXT     nullable  (ISO 8601 date string)
   CreatedAt   TEXT     not null  (ISO 8601 datetime string)
+  IsCompleted INTEGER  not null  default 0  (boolean: 0 = pending, 1 = complete)
+  CompletedAt TEXT     nullable  (ISO 8601 datetime string, set when marked complete, cleared on un-complete)
 ```
 
 ### API endpoints
@@ -106,6 +109,7 @@ Tasks
 | GET | `/api/tasks/{id}` | Single task by ID. 404 if not found |
 | POST | `/api/tasks` | Create task. Body: `{ title: string, deadline?: string }` |
 | DELETE | `/api/tasks/{id}` | Delete task. 204 on success, 404 if not found |
+| PATCH | `/api/tasks/{id}/complete` | Mark task complete or incomplete. Body: `{ isCompleted: bool }`. Returns updated task |
 
 ### CORS
 
@@ -148,9 +152,10 @@ src/app/
 TasksClient.tsx         Client Component.
                         - Owns the task list state
                         - Fetches all tasks on mount (useEffect)
-                        - Handles add and delete operations
+                        - Handles add, delete, and completion operations
                         - Shows loading spinner, inline feedback messages
-                        - Renders the task table and AddTaskForm
+                        - Renders the task table with checkbox column and AddTaskForm
+                        - Toggle to show/hide completed tasks
 
 AddTaskForm.tsx         Client Component.
                         - Owns title and deadline input state
@@ -162,6 +167,12 @@ DeleteTaskButton.tsx    Client Component.
                         - Used only on the task detail page
                         - Calls DELETE API, then redirects to home on success
                         - Shows spinner during request, error on failure
+
+CompleteTaskButton.tsx  Client Component.
+                        - Used only on the task detail page
+                        - Toggles IsCompleted via PATCH API, then calls router.refresh()
+                        - Shows "Mark complete" or "Mark incomplete" based on current state
+                        - Shows spinner during request, error on failure
 ```
 
 ### API calls
@@ -170,10 +181,11 @@ All fetch calls go through `src/lib/api.ts`. This is the only place
 that knows the API base URL and constructs request shapes.
 
 ```
-getTasks()       GET /api/tasks         Used by TasksClient (client-side)
-getTask(id)      GET /api/tasks/:id     Used by tasks/[id]/page.tsx (server-side)
-createTask()     POST /api/tasks        Used by TasksClient via AddTaskForm callback
-deleteTask(id)   DELETE /api/tasks/:id  Used by TasksClient and DeleteTaskButton
+getTasks()            GET /api/tasks                Used by TasksClient (client-side)
+getTask(id)           GET /api/tasks/:id            Used by tasks/[id]/page.tsx (server-side)
+createTask()          POST /api/tasks               Used by TasksClient via AddTaskForm callback
+deleteTask(id)        DELETE /api/tasks/:id         Used by TasksClient and DeleteTaskButton
+completeTask(id, bool) PATCH /api/tasks/:id/complete Used by TasksClient and CompleteTaskButton
 ```
 
 **Known issue:** `getTask()` uses `NEXT_PUBLIC_API_URL` which resolves to `localhost`
@@ -241,10 +253,7 @@ These are tracked as GitHub issues:
 
 These are planned but not built:
 
-- Task completion (mark done without deleting)
 - Projects / task grouping
 - Filtering and pagination
 - Authentication
 - Production deployment configuration
-- `docs/product-design.md` - product feature definitions
-- `docs/engineering-guidelines.md` - coding conventions

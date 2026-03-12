@@ -56,14 +56,17 @@ Runs on `http://localhost:3000`. API base URL is configured in `frontend/.env.lo
 | GET | `/api/tasks/:id` | Get a single task |
 | POST | `/api/tasks` | Create a task `{ title, deadline? }` |
 | DELETE | `/api/tasks/:id` | Delete a task |
+| PATCH | `/api/tasks/:id/complete` | Mark a task complete or incomplete `{ isCompleted: bool }` |
 
 ---
 
 ## Capabilities (v2)
 
 - Create tasks with a title and optional deadline
-- View all tasks in a clean list
-- View a single task on its own page
+- Mark tasks as complete via checkbox - completed tasks hide with a brief animation
+- Show/hide completed tasks via toggle - completion can be undone
+- View all tasks in a clean list with created and completed dates
+- View a single task on its own page with full status and completion history
 - Delete tasks from the list or the detail page
 - Deadline color coding: red (overdue), yellow (due within 3 days)
 - Inline feedback after every action (no page reloads)
@@ -95,10 +98,6 @@ Runs on `http://localhost:3000`. API base URL is configured in `frontend/.env.lo
 
 ### Next - v2 features
 
-Now that the architecture is in place, planned additions:
-
-- Mark tasks as completed (completion lifecycle)
-- Separate history of completed tasks
 - Task grouping via projects
 - Filtering and pagination
 
