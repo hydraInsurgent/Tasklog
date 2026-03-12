@@ -77,8 +77,29 @@ namespace Tasklog.Api.Controllers
 
             return NoContent();
         }
+
+        // PATCH /api/tasks/{id}/complete
+        // Marks a task as complete or incomplete. Returns the updated task.
+        [HttpPatch("{id:int}/complete")]
+        public async Task<IActionResult> Complete(int id, [FromBody] CompleteTaskRequest request)
+        {
+            var task = await _context.Tasks.FindAsync(id);
+
+            if (task is null)
+                return NotFound(new { message = $"Task {id} not found." });
+
+            task.IsCompleted = request.IsCompleted;
+            // Record when the task was completed; clear it if marked incomplete again.
+            task.CompletedAt = request.IsCompleted ? DateTime.Now : null;
+            await _context.SaveChangesAsync();
+
+            return Ok(task);
+        }
     }
 
     // Request body shape for task creation.
     public record CreateTaskRequest(string Title, DateTime? Deadline);
+
+    // Request body shape for toggling task completion.
+    public record CompleteTaskRequest(bool IsCompleted);
 }

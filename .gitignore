@@ -29,5 +29,9 @@ npm-debug.log*
 # Plan files (local working docs)
 PLAN-*.md
 
+# SQLite WAL mode temporary files
+*.db-shm
+*.db-wal
+
 # IDE (local Cursor settings - shared commands are in .claude/commands/)
 .cursor/

@@ -75,6 +75,7 @@ Current component breakdown:
 | `TasksClient.tsx` | Client | Owns task list state, handles mutations |
 | `AddTaskForm.tsx` | Client | Controlled inputs, form submission |
 | `DeleteTaskButton.tsx` | Client | Click handler, redirect |
+| `CompleteTaskButton.tsx` | Client | Click handler, router.refresh() (no redirect) |
 
 ### API calls
 

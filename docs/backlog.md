@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| *(none)* | | | |
+| P9-task-completion.md | #9 | feature/task-completion-#9 | In Progress |
 
 ---
 
@@ -57,5 +57,17 @@ Recently completed work (keep last 10):
 
 | # | Title | Type | Closed |
 |---|-------|------|--------|
+| #11 | Show/hide toggle during animation causes visual glitch | bug | 2026-03-12 |
+| #10 | Rapid task toggle orphans hide timer | bug | 2026-03-12 |
 | #8 | App not accessible from phone on local network | bug | 2026-03-11 |
 | #7 | Feature: v2 Architecture Migration | feature | 2026-03-11 |
+
+---
+
+## Someday / Maybe
+
+Untracked ideas - not estimated, not prioritized, not committed to. Just things worth remembering.
+
+- Relative time display for completed date - show "just now", "2 hours ago", "3 days ago" instead of a formatted date. CompletedAt timestamp is already stored so this would be a UI-only change.
+- Cross-device sync / live updates - changes on one device reflect on another without a manual reload.
+- Distributable app - let other users download and run Tasklog on their own machine. Needs exploration: Docker Compose (two services, one command), single executable (.NET serves the Next.js build), or Electron wrapper (desktop app that manages both processes). Two-process architecture makes this non-trivial.

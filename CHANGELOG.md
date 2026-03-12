@@ -2,6 +2,25 @@
 
 ---
 
+## v2.1 - Task Completion
+*March 2026*
+
+### What changed
+
+**Backend**
+- Added `IsCompleted` (boolean) and `CompletedAt` (nullable datetime) to the Tasks table
+- New endpoint: `PATCH /api/tasks/{id}/complete` - marks a task complete or incomplete, records timestamp
+
+**Frontend**
+- Checkbox on each task row to mark complete/incomplete
+- Completed tasks animate out and hide from the default view after 1.5s
+- "Show completed" toggle in the task list header reveals all completed tasks
+- Completed date shown in list and detail page
+- "Mark complete" / "Mark incomplete" button on the task detail page
+- New `CompleteTaskButton` component (mirrors `DeleteTaskButton` pattern)
+
+---
+
 ## v2.0 - Architecture Migration
 *March 2026*
 

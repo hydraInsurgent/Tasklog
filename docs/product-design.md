@@ -79,7 +79,10 @@ A more complex storage strategy would only make sense if the data model outgrows
 
 **Tasks**
 - A task has a title (required) and an optional deadline.
-- A task exists until it is completed or deleted.
+- A task exists until it is deleted.
+- Tasks can be marked complete via a checkbox. Completed tasks hide from the default view with a brief animation.
+- A "Show completed" toggle reveals all completed tasks. Completion can be undone.
+- CompletedAt timestamp is recorded when a task is marked done and cleared if un-completed.
 - Deadlines are visible to the user but the app does not enforce or act on them.
 
 **Data**
