@@ -12,5 +12,8 @@ namespace Tasklog.Api.Models
         // The date and time the task was marked complete. Null if not yet completed.
         // Cleared back to null if the task is marked incomplete again.
         public DateTime? CompletedAt { get; set; }
+        // The project this task belongs to. Null means the task is in the Inbox (uncategorized).
+        public int? ProjectId { get; set; }
+        public Project? Project { get; set; }
     }
 }

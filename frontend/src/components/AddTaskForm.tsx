@@ -1,19 +1,34 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import { Plus } from "lucide-react";
+import { Project } from "@/lib/api";
 
 interface Props {
   // Called by the parent when the form submits. Parent handles the API call
   // and any feedback display, so this component stays focused on form state.
-  onAdd: (title: string, deadline?: string) => Promise<void>;
+  onAdd: (title: string, deadline?: string, projectId?: number | null) => Promise<void>;
+  // Projects list for the optional project dropdown. Omit to hide the dropdown.
+  projects?: Project[];
+  // Which project to pre-select (e.g. the current sidebar view). Null = Inbox.
+  defaultProjectId?: number | null;
 }
 
-export default function AddTaskForm({ onAdd }: Props) {
+export default function AddTaskForm({ onAdd, projects, defaultProjectId }: Props) {
   const [title, setTitle] = useState("");
   const [deadline, setDeadline] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // "inbox" sentinel string represents null projectId (no project).
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(
+    defaultProjectId != null ? String(defaultProjectId) : "inbox"
+  );
+
+  // Sync the dropdown when the parent switches to a different project view.
+  // Without this, the form retains the previous project after the sidebar selection changes.
+  useEffect(() => {
+    setSelectedProjectId(defaultProjectId != null ? String(defaultProjectId) : "inbox");
+  }, [defaultProjectId]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -24,9 +39,11 @@ export default function AddTaskForm({ onAdd }: Props) {
       return;
     }
 
+    const projectId = selectedProjectId === "inbox" ? null : parseInt(selectedProjectId, 10);
+
     setLoading(true);
     try {
-      await onAdd(title.trim(), deadline || undefined);
+      await onAdd(title.trim(), deadline || undefined, projectId);
       // Clear the form on success.
       setTitle("");
       setDeadline("");
@@ -93,6 +110,32 @@ export default function AddTaskForm({ onAdd }: Props) {
             disabled={loading}
           />
         </div>
+
+        {/* Project dropdown - only shown when projects are available */}
+        {projects && projects.length > 0 && (
+          <div className="sm:w-44">
+            <label
+              htmlFor="task-project"
+              className="block text-sm font-medium text-zinc-700 mb-1"
+            >
+              Project (optional)
+            </label>
+            <select
+              id="task-project"
+              value={selectedProjectId}
+              onChange={(e) => setSelectedProjectId(e.target.value)}
+              disabled={loading}
+              className="w-full px-3 py-2 border border-zinc-200 rounded-md text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-shadow duration-150 cursor-pointer bg-white"
+            >
+              <option value="inbox">Inbox</option>
+              {projects.map((p) => (
+                <option key={p.id} value={String(p.id)}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Submit button: disabled while the request is in flight (disable-during-async rule). */}
         <div className="sm:self-end">

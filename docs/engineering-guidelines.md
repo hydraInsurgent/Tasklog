@@ -71,9 +71,12 @@ Current component breakdown:
 |-----------|------|--------|
 | `layout.tsx` | Server | Static shell, no interaction |
 | `page.tsx` | Server | Renders client component, no state |
-| `tasks/[id]/page.tsx` | Server | Fetches data, no interaction |
-| `TasksClient.tsx` | Client | Owns task list state, handles mutations |
-| `AddTaskForm.tsx` | Client | Controlled inputs, form submission |
+| `tasks/[id]/page.tsx` | Server | Fetches task and projects, no interaction |
+| `ProjectLayout.tsx` | Client | Owns activeView and projects state, handles project CRUD |
+| `ProjectSidebar.tsx` | Client | Project nav with create/rename/delete interactions |
+| `TasksClient.tsx` | Client | Owns task list state, handles mutations, filters by activeView |
+| `AddTaskForm.tsx` | Client | Controlled inputs, form submission, project dropdown |
+| `AssignProjectButton.tsx` | Client | Select element, PATCH on change, router.refresh() |
 | `DeleteTaskButton.tsx` | Client | Click handler, redirect |
 | `CompleteTaskButton.tsx` | Client | Click handler, router.refresh() (no redirect) |
 
@@ -93,7 +96,7 @@ to have before adding ad-hoc fetch calls elsewhere.
 ### Styling
 
 - Tailwind utility classes are the current approach.
-- The default Tailwind colour scale maps to the UI spec - see `UI-SPEC-v2-migration-plan.md`.
+- The default Tailwind colour scale maps to the UI spec - see `UI-SPEC.md`.
 - Arbitrary values (e.g. `w-[137px]`) are a signal to check if a scale value would work instead.
 - Responsive: mobile-first. `sm:` prefix for desktop variants.
 
@@ -117,6 +120,9 @@ They are tracked rather than hidden so they can be addressed deliberately.
 | [#4](https://github.com/hydraInsurgent/Tasklog/issues/4) | Contrast and focus indicators below WCAG AA in places |
 | [#5](https://github.com/hydraInsurgent/Tasklog/issues/5) | Utility functions duplicated; DateTime.Now instead of UtcNow |
 | [#6](https://github.com/hydraInsurgent/Tasklog/issues/6) | CORS policy too broad; AllowedHosts is wildcard |
+| [#17](https://github.com/hydraInsurgent/Tasklog/issues/17) | ProjectsController CreatedAtAction points to wrong route |
+| [#18](https://github.com/hydraInsurgent/Tasklog/issues/18) | Inconsistent DateTime.Now vs UtcNow across controllers |
+| [#19](https://github.com/hydraInsurgent/Tasklog/issues/19) | Assigning task to non-existent project returns 500 not 400 |
 
 ---
 

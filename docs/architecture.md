@@ -49,8 +49,11 @@ Tasklog/
 │       │   └── tasks/[id]/
 │       │       └── page.tsx       Task detail route /tasks/:id
 │       ├── components/            Reusable UI components
-│       │   ├── TasksClient.tsx    Task list + add form (Client Component)
-│       │   ├── AddTaskForm.tsx    Add task form (Client Component)
+│       │   ├── ProjectLayout.tsx  Sidebar + task list wrapper, owns activeView (Client Component)
+│       │   ├── ProjectSidebar.tsx Project navigation and management (Client Component)
+│       │   ├── TasksClient.tsx    Task list + add form, filters by activeView (Client Component)
+│       │   ├── AddTaskForm.tsx    Add task form with optional project dropdown (Client Component)
+│       │   ├── AssignProjectButton.tsx  Project reassignment on detail page (Client Component)
 │       │   ├── DeleteTaskButton.tsx  Delete action on detail page (Client Component)
 │       │   └── CompleteTaskButton.tsx  Complete/incomplete toggle on detail page (Client Component)
 │       └── lib/
@@ -62,7 +65,7 @@ Tasklog/
 │
 ├── CLAUDE.md                      Instructions for AI assistants
 ├── LESSONS.md                     Session learnings log
-├── UI-SPEC-v2-migration-plan.md   Design tokens and UX rules for v2 frontend
+├── UI-SPEC.md                     Design tokens and UX rules for v2 frontend
 └── Readme.md                      Human-facing project overview
 ```
 
@@ -81,17 +84,23 @@ HTTP request
     │
     ▼
 TasksController          Handles routing, validation, HTTP response codes.
-    │                    No business logic beyond input checking.
+ProjectsController       No business logic beyond input checking.
+    │
     ▼
 TasklogDbContext         EF Core context. Direct DbSet access - no repository layer.
     │
     ▼
-TasklogDatabase.db       SQLite file. One table: Tasks.
+TasklogDatabase.db       SQLite file. Two tables: Tasks, Projects.
 ```
 
 ### Data model
 
 ```
+Projects
+  Id          INTEGER  primary key, autoincrement
+  Name        TEXT     not null
+  CreatedAt   TEXT     not null  (ISO 8601 datetime string)
+
 Tasks
   Id          INTEGER  primary key, autoincrement
   Title       TEXT     not null
@@ -99,6 +108,7 @@ Tasks
   CreatedAt   TEXT     not null  (ISO 8601 datetime string)
   IsCompleted INTEGER  not null  default 0  (boolean: 0 = pending, 1 = complete)
   CompletedAt TEXT     nullable  (ISO 8601 datetime string, set when marked complete, cleared on un-complete)
+  ProjectId   INTEGER  nullable  foreign key -> Projects.Id (null = Inbox)
 ```
 
 ### API endpoints
@@ -107,9 +117,14 @@ Tasks
 |--------|------|-------------|
 | GET | `/api/tasks` | All tasks, ordered by `CreatedAt` descending |
 | GET | `/api/tasks/{id}` | Single task by ID. 404 if not found |
-| POST | `/api/tasks` | Create task. Body: `{ title: string, deadline?: string }` |
+| POST | `/api/tasks` | Create task. Body: `{ title, deadline?, projectId? }` |
 | DELETE | `/api/tasks/{id}` | Delete task. 204 on success, 404 if not found |
 | PATCH | `/api/tasks/{id}/complete` | Mark task complete or incomplete. Body: `{ isCompleted: bool }`. Returns updated task |
+| PATCH | `/api/tasks/{id}/project` | Reassign task to a project or Inbox. Body: `{ projectId: int? }` |
+| GET | `/api/projects` | All projects, ordered by name |
+| POST | `/api/projects` | Create project. Body: `{ name: string }`. Returns created project |
+| PATCH | `/api/projects/{id}` | Rename project. Body: `{ name: string }`. Returns updated project |
+| DELETE | `/api/projects/{id}` | Delete project and cascade delete all its tasks. 204 on success |
 
 ### CORS
 
@@ -138,30 +153,49 @@ src/app/
                        Loads fonts, renders header, wraps all pages in <main>.
 
   page.tsx             Server Component. Route: /
-                       Renders <TasksClient />.
+                       Renders <ProjectLayout />.
 
   tasks/[id]/
     page.tsx           Server Component. Route: /tasks/:id
-                       Reads id from URL, fetches task from API, renders detail card.
-                       Returns 404 if task not found.
+                       Fetches task and projects from API, renders detail card.
+                       Returns 404 if task not found. Projects fallback to [] silently.
 ```
 
 ### Component responsibilities
 
 ```
+ProjectLayout.tsx       Client Component.
+                        - Owns activeView state ("all" | "inbox" | projectId)
+                        - Fetches projects on mount
+                        - Handles create/rename/delete project actions
+                        - Shows error feedback banner for project operation failures
+                        - Renders ProjectSidebar and TasksClient side by side
+                        - On mobile: renders sidebar as a slide-in drawer
+
+ProjectSidebar.tsx      Client Component.
+                        - Renders "All Tasks", "Inbox", and project list
+                        - Highlights the active selection
+                        - Create project: inline input at the bottom
+                        - Rename project: opens an Edit Project modal dialog
+                        - Delete project: opens a confirmation dialog (warns about cascade)
+                        - Delegates all data operations to ProjectLayout via callbacks
+
 TasksClient.tsx         Client Component.
                         - Owns the task list state
                         - Fetches all tasks on mount (useEffect)
+                        - Filters tasks client-side by activeView prop
                         - Handles add, delete, and completion operations
                         - Shows loading spinner, inline feedback messages
-                        - Renders the task table with checkbox column and AddTaskForm
+                        - Renders task table with AddTaskForm below
+                        - Project column shown only in "all" view
                         - Toggle to show/hide completed tasks
 
 AddTaskForm.tsx         Client Component.
-                        - Owns title and deadline input state
+                        - Owns title, deadline, and project dropdown state
+                        - Project dropdown pre-selected to active project view
+                        - Syncs dropdown when defaultProjectId prop changes
                         - Validates title not empty before calling parent's onAdd
                         - Shows inline field-level error messages
-                        - Disabled during submit
 
 DeleteTaskButton.tsx    Client Component.
                         - Used only on the task detail page
@@ -173,6 +207,12 @@ CompleteTaskButton.tsx  Client Component.
                         - Toggles IsCompleted via PATCH API, then calls router.refresh()
                         - Shows "Mark complete" or "Mark incomplete" based on current state
                         - Shows spinner during request, error on failure
+
+AssignProjectButton.tsx Client Component.
+                        - Used only on the task detail page
+                        - Dropdown to reassign task to a project or Inbox
+                        - Calls PATCH /api/tasks/{id}/project, then router.refresh()
+                        - State only updates after API confirms (no optimistic update)
 ```
 
 ### API calls
@@ -181,11 +221,16 @@ All fetch calls go through `src/lib/api.ts`. This is the only place
 that knows the API base URL and constructs request shapes.
 
 ```
-getTasks()            GET /api/tasks                Used by TasksClient (client-side)
-getTask(id)           GET /api/tasks/:id            Used by tasks/[id]/page.tsx (server-side)
-createTask()          POST /api/tasks               Used by TasksClient via AddTaskForm callback
-deleteTask(id)        DELETE /api/tasks/:id         Used by TasksClient and DeleteTaskButton
-completeTask(id, bool) PATCH /api/tasks/:id/complete Used by TasksClient and CompleteTaskButton
+getTasks()                GET /api/tasks                  Used by TasksClient (client-side)
+getTask(id)               GET /api/tasks/:id              Used by tasks/[id]/page.tsx (server-side)
+createTask()              POST /api/tasks                 Used by TasksClient via AddTaskForm callback
+deleteTask(id)            DELETE /api/tasks/:id           Used by TasksClient and DeleteTaskButton
+completeTask(id, bool)    PATCH /api/tasks/:id/complete   Used by TasksClient and CompleteTaskButton
+assignTaskProject(id, pid) PATCH /api/tasks/:id/project   Used by AssignProjectButton
+getProjects()             GET /api/projects               Used by ProjectLayout and tasks/[id]/page.tsx
+createProject(name)       POST /api/projects              Used by ProjectLayout
+renameProject(id, name)   PATCH /api/projects/:id         Used by ProjectLayout
+deleteProject(id)         DELETE /api/projects/:id        Used by ProjectLayout
 ```
 
 **Known issue:** `getTask()` uses `NEXT_PUBLIC_API_URL` which resolves to `localhost`
@@ -253,7 +298,6 @@ These are tracked as GitHub issues:
 
 These are planned but not built:
 
-- Projects / task grouping
 - Filtering and pagination
 - Authentication
 - Production deployment configuration

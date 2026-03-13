@@ -29,7 +29,9 @@ npm-debug.log*
 # Plan files (local working docs)
 PLAN-*.md
 
-# SQLite WAL mode temporary files
+# SQLite database and WAL mode temporary files
+# The schema is captured in EF Core migrations - the .db file is local data only
+*.db
 *.db-shm
 *.db-wal
 

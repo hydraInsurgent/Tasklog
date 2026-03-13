@@ -84,6 +84,14 @@ A more complex storage strategy would only make sense if the data model outgrows
 - A "Show completed" toggle reveals all completed tasks. Completion can be undone.
 - CompletedAt timestamp is recorded when a task is marked done and cleared if un-completed.
 - Deadlines are visible to the user but the app does not enforce or act on them.
+- A task can belong to a project (optional). Tasks with no project are in Inbox.
+
+**Projects**
+- Projects let the user categorize tasks.
+- The sidebar shows All Tasks, Inbox, and each project as separate views.
+- Tasks can be assigned to a project at creation or reassigned from the task detail page.
+- Deleting a project also deletes all its tasks (cascade delete, always confirmed first).
+- Project names can be renamed after creation.
 
 **Data**
 - All data is stored locally in `backend/Tasklog.Api/TasklogDatabase.db`.

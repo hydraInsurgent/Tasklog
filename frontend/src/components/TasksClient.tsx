@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { Trash2, CheckCircle, XCircle, Loader2 } from "lucide-react";
-import { getTasks, createTask, deleteTask, completeTask, Task } from "@/lib/api";
+import { getTasks, createTask, deleteTask, completeTask, Task, Project } from "@/lib/api";
 import AddTaskForm from "./AddTaskForm";
 
 // Feedback shown briefly after an action (replaces TempData flash messages from v1).
@@ -31,7 +31,15 @@ function formatDate(iso: string): string {
   });
 }
 
-export default function TasksClient() {
+interface Props {
+  // Controls which tasks are shown. "all" = no filter, "inbox" = unassigned,
+  // number = tasks belonging to that project ID.
+  activeView: "all" | "inbox" | number;
+  // Full project list, used to display project names in the table.
+  projects: Project[];
+}
+
+export default function TasksClient({ activeView, projects }: Props) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState<Feedback>(null);
@@ -77,8 +85,13 @@ export default function TasksClient() {
   }
 
   // Called by AddTaskForm on submit. Updates local state so no full reload is needed.
-  async function handleAdd(title: string, deadline?: string) {
-    const task = await createTask(title, deadline);
+  // When viewing a specific project, new tasks are assigned to that project automatically.
+  async function handleAdd(title: string, deadline?: string, projectId?: number | null) {
+    // If the caller didn't pass a projectId but we're viewing a specific project,
+    // default to that project. Inbox / All views default to null (Inbox).
+    const resolvedProjectId =
+      projectId !== undefined ? projectId : typeof activeView === "number" ? activeView : null;
+    const task = await createTask(title, deadline, resolvedProjectId);
     setTasks((prev) => [task, ...prev]);
     showFeedback("success", "Task created.");
   }
@@ -135,10 +148,31 @@ export default function TasksClient() {
     }
   }
 
-  const hasCompleted = tasks.some((t) => t.isCompleted);
-  const visibleTasks = tasks.filter(
+  // Apply the sidebar view filter before any completed-task filtering.
+  const filteredTasks = tasks.filter((t) => {
+    if (activeView === "all") return true;
+    if (activeView === "inbox") return t.projectId === null;
+    return t.projectId === activeView;
+  });
+
+  const hasCompleted = filteredTasks.some((t) => t.isCompleted);
+  const visibleTasks = filteredTasks.filter(
     (t) => showCompleted || !t.isCompleted || hidingIds.has(t.id)
   );
+
+  // Human-readable label for the current view, used in empty state text.
+  const viewLabel =
+    activeView === "all"
+      ? "tasks"
+      : activeView === "inbox"
+      ? "inbox tasks"
+      : `tasks in "${projects.find((p) => p.id === activeView)?.name ?? "this project"}"`;
+
+  // Look up a project name by ID. Returns "Inbox" for null projectId.
+  function projectName(projectId: number | null): string {
+    if (projectId === null) return "Inbox";
+    return projects.find((p) => p.id === projectId)?.name ?? "Unknown";
+  }
 
   return (
     <div className="space-y-6">
@@ -168,7 +202,11 @@ export default function TasksClient() {
             className="text-lg font-semibold text-zinc-900"
             style={{ fontFamily: "var(--font-space-grotesk), sans-serif" }}
           >
-            Tasks
+            {activeView === "all"
+              ? "All Tasks"
+              : activeView === "inbox"
+              ? "Inbox"
+              : projects.find((p) => p.id === activeView)?.name ?? "Tasks"}
           </h1>
           {hasCompleted && (
             <button
@@ -198,9 +236,9 @@ export default function TasksClient() {
             <Loader2 size={20} className="animate-spin" aria-hidden="true" />
             <span>Loading tasks...</span>
           </div>
-        ) : tasks.length === 0 ? (
+        ) : filteredTasks.length === 0 ? (
           <p className="py-16 text-center text-zinc-400 text-sm">
-            No tasks yet. Add one below.
+            No {viewLabel} yet. Add one below.
           </p>
         ) : (
           // Responsive table: scrolls horizontally on small viewports (no-horizontal-scroll rule).
@@ -214,6 +252,12 @@ export default function TasksClient() {
                   <th className="px-6 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">
                     Title
                   </th>
+                  {/* Project column - only meaningful in the All Tasks view */}
+                  {activeView === "all" && (
+                    <th className="px-6 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">
+                      Project
+                    </th>
+                  )}
                   <th className="px-6 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">
                     Deadline
                   </th>
@@ -260,6 +304,13 @@ export default function TasksClient() {
                           {task.title}
                         </Link>
                       </td>
+
+                      {/* Project cell - only shown in All Tasks view */}
+                      {activeView === "all" && (
+                        <td className="px-6 py-4 text-zinc-500 text-sm">
+                          {projectName(task.projectId)}
+                        </td>
+                      )}
 
                       {/* Deadline with proximity-based color */}
                       <td
@@ -312,8 +363,12 @@ export default function TasksClient() {
         )}
       </div>
 
-      {/* Add task form */}
-      <AddTaskForm onAdd={handleAdd} />
+      {/* Add task form - pass projects for dropdown and pre-select the active project */}
+      <AddTaskForm
+        onAdd={handleAdd}
+        projects={projects}
+        defaultProjectId={typeof activeView === "number" ? activeView : null}
+      />
     </div>
   );
 }

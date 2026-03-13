@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| *(none)* | | | |
+| [P12-projects-inbox.md](plans/P12-projects-inbox.md) | #12 | feature/projects-inbox-#12 | In Progress |
 
 ---
 
@@ -32,7 +32,7 @@ Future features - not yet started. Add GitHub issue number when created.
 
 | # | Title | Priority | Notes |
 |---|-------|----------|-------|
-| | | | |
+| #20 | Extract shared date formatting helpers to lib/format.ts | low | from #12 review |
 
 ---
 
@@ -48,6 +48,14 @@ Known bugs not yet fixed. Add GitHub issue number when created.
 | #4 | Accessibility - contrast and focus indicators | medium | |
 | #5 | Code cleanup - duplicated utils, UTC timestamps | low | |
 | #6 | Security hardening - CORS methods, AllowedHosts | low | |
+| #13 | Project create/rename/delete failures give no feedback | high | from #12 review |
+| #14 | Add task form project dropdown doesn't update on view change | high | from #12 review |
+| #15 | AssignProjectButton shows new project before API confirms | medium | from #12 review |
+| #16 | Edit/delete project buttons below 44px touch target | medium | from #12 review |
+| #17 | CreatedAtAction in ProjectsController points to wrong route | low | from #12 review |
+| #18 | Inconsistent DateTime.Now vs UtcNow across controllers | low | from #12 review |
+| #19 | Assigning task to non-existent project returns 500 not 400 | low | from #12 review |
+| #21 | Add project button missing minimum touch target height | low | from #12 review |
 
 ---
 
@@ -72,3 +80,5 @@ Untracked ideas - not estimated, not prioritized, not committed to. Just things 
 - Relative time display for completed date - show "just now", "2 hours ago", "3 days ago" instead of a formatted date. CompletedAt timestamp is already stored so this would be a UI-only change.
 - Cross-device sync / live updates - changes on one device reflect on another without a manual reload.
 - Distributable app - let other users download and run Tasklog on their own machine. Needs exploration: Docker Compose (two services, one command), single executable (.NET serves the Next.js build), or Electron wrapper (desktop app that manages both processes). Two-process architecture makes this non-trivial.
+- Project color codes - each project could have an assigned color shown as a swatch in the sidebar and next to tasks. The Edit Project dialog is already planned as a modal, making this a natural future addition (add a color picker field).
+- Mobile task cards - replace the task table with a compact card layout on small screens. Each card shows title, project, deadline, and completion state at a glance, avoiding the horizontal scroll that a wide table causes on phones. Desktop keeps the table. Would be a CSS/layout-only change with no backend work.

@@ -35,7 +35,7 @@ export default function RootLayout({
       >
         {/* Site header */}
         <header className="border-b border-zinc-200 bg-white">
-          <div className="max-w-3xl mx-auto px-4 py-4">
+          <div className="max-w-6xl mx-auto px-4 py-4">
             <a
               href="/"
               className="font-heading text-xl font-semibold text-zinc-900 hover:text-blue-600 transition-colors duration-150"
@@ -47,7 +47,7 @@ export default function RootLayout({
         </header>
 
         {/* Page content */}
-        <main className="max-w-3xl mx-auto px-4 py-8">{children}</main>
+        <main className="max-w-6xl mx-auto px-4 py-8">{children}</main>
       </body>
     </html>
   );
