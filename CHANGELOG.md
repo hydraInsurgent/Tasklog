@@ -2,6 +2,30 @@
 
 ---
 
+## v2.2 - Projects and Inbox
+*March 2026*
+
+### What changed
+
+**Backend**
+- New `Projects` table: `Id`, `Name`, `CreatedAt`
+- `Tasks` table: added nullable `ProjectId` foreign key
+- New endpoints: `GET /api/projects`, `POST /api/projects`, `PATCH /api/projects/{id}`, `DELETE /api/projects/{id}` (cascade deletes all tasks in the project)
+- New endpoint: `PATCH /api/tasks/{id}/project` - reassigns a task to a project or Inbox (null)
+
+**Frontend**
+- Left sidebar with "All Tasks", "Inbox", and named project views
+- Sidebar hidden on mobile - opens as a drawer via hamburger button
+- Create, rename, and delete projects from the sidebar
+- Delete project shows a confirmation dialog warning that all tasks will also be deleted
+- Task list filters by the active view (client-side)
+- Add task form includes a project dropdown, pre-selected to the current view
+- Task detail page includes a project selector to reassign after creation
+- Error feedback banner for project create/rename/delete failures
+- New components: `ProjectLayout`, `ProjectSidebar`, `AssignProjectButton`
+
+---
+
 ## v2.1 - Task Completion
 *March 2026*
 
