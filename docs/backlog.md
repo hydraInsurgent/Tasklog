@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| [P12-projects-inbox.md](plans/P12-projects-inbox.md) | #12 | feature/projects-inbox-#12 | In Progress |
+| - | - | - | - |
 
 ---
 
@@ -48,10 +48,6 @@ Known bugs not yet fixed. Add GitHub issue number when created.
 | #4 | Accessibility - contrast and focus indicators | medium | |
 | #5 | Code cleanup - duplicated utils, UTC timestamps | low | |
 | #6 | Security hardening - CORS methods, AllowedHosts | low | |
-| #13 | Project create/rename/delete failures give no feedback | high | from #12 review |
-| #14 | Add task form project dropdown doesn't update on view change | high | from #12 review |
-| #15 | AssignProjectButton shows new project before API confirms | medium | from #12 review |
-| #16 | Edit/delete project buttons below 44px touch target | medium | from #12 review |
 | #17 | CreatedAtAction in ProjectsController points to wrong route | low | from #12 review |
 | #18 | Inconsistent DateTime.Now vs UtcNow across controllers | low | from #12 review |
 | #19 | Assigning task to non-existent project returns 500 not 400 | low | from #12 review |
@@ -65,6 +61,7 @@ Recently completed work (keep last 10):
 
 | # | Title | Type | Closed |
 |---|-------|------|--------|
+| #12 | Feature: Projects and Inbox | feature | 2026-03-13 |
 | #9 | Feature: Task completion | feature | 2026-03-12 |
 | #11 | Show/hide toggle during animation causes visual glitch | bug | 2026-03-12 |
 | #10 | Rapid task toggle orphans hide timer | bug | 2026-03-12 |
