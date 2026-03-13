@@ -1,6 +1,6 @@
 # Projects and Inbox - Implementation Plan
 
-**Overall Progress:** `40%`
+**Overall Progress:** `100%`
 
 ## TLDR
 Add a Projects feature that lets the user categorize tasks. Tasks without a project go to Inbox. A sidebar lets the user navigate between All Tasks, Inbox, and individual projects. Tasks can be assigned to a project at creation or updated afterwards.
@@ -76,38 +76,45 @@ Add a Projects feature that lets the user categorize tasks. Tasks without a proj
     - Set `ProjectId` on the new task in the `Create` action
     - Add `PATCH /api/tasks/{id}/project` endpoint, body: `{ projectId: int? }` (null to unassign)
 
-- [ ] 🟥 **Step 3: Frontend API client** `[UI]` `[parallel]` → delivers: typed functions and updated Task type (independent of Step 4 files)
-  - [ ] 🟥 Add `Project` interface to `lib/api.ts`: `{ id: number; name: string; createdAt: string }`
-  - [ ] 🟥 Add `projectId: number | null` field to the `Task` interface
-  - [ ] 🟥 Add `getProjects()` - GET /api/projects
-  - [ ] 🟥 Add `createProject(name)` - POST /api/projects
-  - [ ] 🟥 Add `renameProject(id, name)` - PATCH /api/projects/{id}
-  - [ ] 🟥 Add `deleteProject(id)` - DELETE /api/projects/{id}
-  - [ ] 🟥 Add `assignTaskProject(id, projectId)` - PATCH /api/tasks/{id}/project
+- [x] 🟩 **Step 3: Frontend API client** `[UI]` `[parallel]` → delivers: typed functions and updated Task type (independent of Step 4 files)
+  - [x] 🟩 Add `Project` interface to `lib/api.ts`: `{ id: number; name: string; createdAt: string }`
+  - [x] 🟩 Add `projectId: number | null` field to the `Task` interface
+  - [x] 🟩 Add `getProjects()` - GET /api/projects
+  - [x] 🟩 Add `createProject(name)` - POST /api/projects
+  - [x] 🟩 Add `renameProject(id, name)` - PATCH /api/projects/{id}
+  - [x] 🟩 Add `deleteProject(id)` - DELETE /api/projects/{id}
+  - [x] 🟩 Add `assignTaskProject(id, projectId)` - PATCH /api/tasks/{id}/project
 
-- [ ] 🟥 **Step 4: Sidebar + layout components** `[UI]` `[parallel]` → delivers: sidebar UI and layout structure (independent of Step 3 files)
-  - [ ] 🟥 Update `app/layout.tsx` - widen container from `max-w-3xl` to `max-w-6xl` on the main element; sidebar will sit inside content, not the shell
-  - [ ] 🟥 Create `components/ProjectSidebar.tsx` (Client Component):
+- [x] 🟩 **Step 4: Sidebar + layout components** `[UI]` `[parallel]` → delivers: sidebar UI and layout structure (independent of Step 3 files)
+  - [x] 🟩 Update `app/layout.tsx` - widen container from `max-w-3xl` to `max-w-6xl` on the main element; sidebar will sit inside content, not the shell
+  - [x] 🟩 Create `components/ProjectSidebar.tsx` (Client Component):
     - Receives `projects`, `activeView`, `onSelectView`, `onCreateProject`, `onRenameProject`, `onDeleteProject` as props
     - Renders "All Tasks" and "Inbox" as fixed items at the top
     - Lists each project below with an edit icon (opens Edit Project dialog) and delete action
     - Highlights the active selection
-  - [ ] 🟥 Create `components/ProjectLayout.tsx` (Client Component):
+  - [x] 🟩 Create `components/ProjectLayout.tsx` (Client Component):
     - Owns `activeView` state: `"all" | "inbox" | number` (number = project ID)
     - Fetches projects on mount (`getProjects`)
     - Handles create/rename/delete project actions (calls API, updates local state)
     - Renders `<ProjectSidebar />` and `<TasksClient />` side by side in a flex row
-  - [ ] 🟥 Update `app/page.tsx` - render `<ProjectLayout />` instead of `<TasksClient />`
+  - [x] 🟩 Update `app/page.tsx` - render `<ProjectLayout />` instead of `<TasksClient />`
 
-- [ ] 🟥 **Step 5: TasksClient integration** `[UI]` `[sequential]` → depends on: Steps 3, 4
-  - [ ] 🟥 Add `activeView: "all" | "inbox" | number` prop to `TasksClient`
-  - [ ] 🟥 Add filtering logic: All = no filter, Inbox = `projectId === null`, Project = `projectId === id`
-  - [ ] 🟥 Update `handleAdd` to pass `projectId` from `activeView` (null for All/Inbox views)
-  - [ ] 🟥 Update `createTask` call to include `projectId`
-  - [ ] 🟥 Add a "Project" column to the task table showing the project name (or "Inbox" if unassigned) - receive `projects` list as a prop for the name lookup
-  - [ ] 🟥 Update `AddTaskForm.tsx` - add optional project dropdown, defaulting to active project view
-  - [ ] 🟥 Update `tasks/[id]/page.tsx` - fetch projects server-side, pass to new `AssignProjectButton.tsx`
-  - [ ] 🟥 Create `components/AssignProjectButton.tsx` (Client Component) - dropdown to reassign task project, calls `assignTaskProject`, then `router.refresh()`
+- [x] 🟩 **Step 5: TasksClient integration** `[UI]` `[sequential]` → depends on: Steps 3, 4
+  - [x] 🟩 Add `activeView: "all" | "inbox" | number` prop to `TasksClient`
+  - [x] 🟩 Add filtering logic: All = no filter, Inbox = `projectId === null`, Project = `projectId === id`
+  - [x] 🟩 Update `handleAdd` to pass `projectId` from `activeView` (null for All/Inbox views)
+  - [x] 🟩 Update `createTask` call to include `projectId`
+  - [x] 🟩 Add a "Project" column to the task table (All Tasks view only) showing project name or "Inbox"
+  - [x] 🟩 Update `AddTaskForm.tsx` - added optional project dropdown, defaults to active project view
+  - [x] 🟩 Update `tasks/[id]/page.tsx` - fetch projects server-side, pass to `AssignProjectButton.tsx`
+  - [x] 🟩 Create `components/AssignProjectButton.tsx` (Client Component) - dropdown reassigns project, calls `router.refresh()`
 
 ## Outcomes
-<!-- Fill in after execution -->
+
+- All 5 steps completed as planned. No deviations from the architecture.
+- `ProjectLayout` owns sidebar + task list, `TasksClient` stays focused on task CRUD.
+- Project column only shown in "All Tasks" view to avoid redundant info in project/inbox views.
+- `AddTaskForm` project dropdown defaults to the active view's project (auto-assigns on create).
+- Task detail page fetches projects independently with a silent fallback to `[]` so a projects API failure doesn't 404 the task.
+- `AssignProjectButton` uses `router.refresh()` to re-run the Server Component and reflect the updated project name immediately.
+- `defaultProjectId` in `AddTaskForm` is a snapshot at render time - if the user switches views while the form is open, the dropdown won't auto-update (acceptable given the use pattern).

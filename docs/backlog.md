@@ -32,7 +32,7 @@ Future features - not yet started. Add GitHub issue number when created.
 
 | # | Title | Priority | Notes |
 |---|-------|----------|-------|
-| | | | |
+| #20 | Extract shared date formatting helpers to lib/format.ts | low | from #12 review |
 
 ---
 
@@ -48,6 +48,14 @@ Known bugs not yet fixed. Add GitHub issue number when created.
 | #4 | Accessibility - contrast and focus indicators | medium | |
 | #5 | Code cleanup - duplicated utils, UTC timestamps | low | |
 | #6 | Security hardening - CORS methods, AllowedHosts | low | |
+| #13 | Project create/rename/delete failures give no feedback | high | from #12 review |
+| #14 | Add task form project dropdown doesn't update on view change | high | from #12 review |
+| #15 | AssignProjectButton shows new project before API confirms | medium | from #12 review |
+| #16 | Edit/delete project buttons below 44px touch target | medium | from #12 review |
+| #17 | CreatedAtAction in ProjectsController points to wrong route | low | from #12 review |
+| #18 | Inconsistent DateTime.Now vs UtcNow across controllers | low | from #12 review |
+| #19 | Assigning task to non-existent project returns 500 not 400 | low | from #12 review |
+| #21 | Add project button missing minimum touch target height | low | from #12 review |
 
 ---
 

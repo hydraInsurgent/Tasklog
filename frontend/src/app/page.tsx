@@ -1,7 +1,7 @@
-// Home page - renders the interactive task list.
-// TasksClient is a Client Component that handles all data fetching and mutations.
-import TasksClient from "@/components/TasksClient";
+// Home page - renders the project layout with sidebar navigation and task list.
+// ProjectLayout is a Client Component that owns project state and renders the sidebar.
+import ProjectLayout from "@/components/ProjectLayout";
 
 export default function HomePage() {
-  return <TasksClient />;
+  return <ProjectLayout />;
 }

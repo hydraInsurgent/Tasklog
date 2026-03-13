@@ -3,11 +3,12 @@
 // DeleteTaskButton and CompleteTaskButton are Client Components for interactive actions.
 
 import Link from "next/link";
-import { getTask } from "@/lib/api";
+import { getTask, getProjects } from "@/lib/api";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import DeleteTaskButton from "@/components/DeleteTaskButton";
 import CompleteTaskButton from "@/components/CompleteTaskButton";
+import AssignProjectButton from "@/components/AssignProjectButton";
 
 // Format an ISO date string to a readable local date (e.g. "12 Mar 2026").
 function formatDate(iso: string): string {
@@ -44,6 +45,15 @@ export default async function TaskDetailPage({ params }: PageProps) {
     task = await getTask(taskId);
   } catch {
     notFound();
+  }
+
+  // Fetch projects for the assignment dropdown. If this fails, fall back to an
+  // empty list so the task detail page still loads (assignment will be hidden).
+  let projects;
+  try {
+    projects = await getProjects();
+  } catch {
+    projects = [];
   }
 
   return (
@@ -96,6 +106,17 @@ export default async function TaskDetailPage({ params }: PageProps) {
           <div className="px-6 py-4 flex justify-between items-center">
             <dt className="text-sm font-medium text-zinc-500">Created</dt>
             <dd className="text-sm text-zinc-700">{formatDate(task.createdAt)}</dd>
+          </div>
+          {/* Project assignment - editable via dropdown */}
+          <div className="px-6 py-4 flex justify-between items-center">
+            <dt className="text-sm font-medium text-zinc-500">Project</dt>
+            <dd>
+              <AssignProjectButton
+                taskId={task.id}
+                currentProjectId={task.projectId}
+                projects={projects ?? []}
+              />
+            </dd>
           </div>
         </dl>
 
