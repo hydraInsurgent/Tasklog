@@ -1,6 +1,9 @@
 # UI Specification Generator
 
-Generate a UI specification file linked to an existing plan.
+Generates UI design decisions for a feature or the project as a whole.
+Mode is inferred automatically from workflow context - no argument needed.
+
+---
 
 ## Step 0: Read Reference Data (MANDATORY)
 
@@ -9,36 +12,145 @@ Before doing anything else, read all three reference files:
 2. `.claude/ui-reference/fonts.md`
 3. `.claude/ui-reference/ux-rules.md`
 
-Do NOT proceed without reading these files. Do NOT use your own knowledge for palettes, fonts, or rules - use only what is in the reference files.
+Do NOT proceed without reading these files.
 
-## Step 1: Identify the Plan
+---
 
-The plan file path is: $ARGUMENTS
+## Step 1: Infer Context (MANDATORY)
 
-- Read the plan file
-- If no argument was provided, ask the user which plan file to use (do not auto-detect)
+Gather two signals silently before asking the user anything:
 
-## Step 2: Ask Questions
+**Signal A - Active plan:**
+Read `docs/backlog.md`. Check the Active section for a plan file and branch.
+- If an active plan is listed, read that plan file. Note its path.
+- If no active plan exists, there is no feature plan in scope.
 
-Ask the user these 3 questions and wait for answers before proceeding:
+**Signal B - Global spec:**
+Check whether `UI-SPEC.md` exists in the project root.
+- If found, read it. This is the project's established design system.
+- If not found, no design system exists yet.
+
+**Determine mode from the two signals:**
+
+| Active plan? | UI-SPEC.md? | Mode |
+|---|---|---|
+| Yes | Yes | **feature** - add UI decisions to the active plan |
+| Yes | No | **new project** - generate UI-SPEC.md, then link it to the active plan |
+| No | Yes | **global update** - update UI-SPEC.md directly, no plan involved |
+| No | No | **new project** - generate UI-SPEC.md, no plan to link |
+
+Tell the user which mode was inferred and which plan (if any) will be used.
+Ask for confirmation before continuing. Example:
+> "Found active plan: docs/plans/P12-projects-inbox.md. UI-SPEC.md exists.
+> Running in feature mode - I'll add UI decisions to the plan. Confirm?"
+
+---
+
+## Step 2: Ask Questions (mode-dependent)
+
+### Mode: new project
+
+No global spec exists. Ask these 3 questions and wait for answers:
 
 1. **Product type** - What kind of product is this? (Show the list of product types from `colors.md`)
 2. **Mood/audience** - What feeling should it convey? (Show the available mood tags from the reference data)
 3. **Preferred styling system** - Tailwind CSS or CSS custom properties (variables)?
 
-## Step 3: Generate UI-SPEC File
+### Mode: feature
 
-Based on the answers, select the best-matching palette, font pairing, and relevant UX rules from the reference data. Create `UI-SPEC-[PLAN-NAME].md` in the project root. Derive the name from the plan filename (e.g., if the plan is `PLAN-dashboard.md`, the spec is `UI-SPEC-dashboard.md`).
+A global spec exists. Do NOT ask palette, font, or styling system questions - those
+are already decided. Instead:
 
-If the user wants to customize colors or fonts from the selected palette (e.g., "I like saas-general but want a different accent"), apply those changes in the UI-SPEC output. Never modify the reference files - they are a static library.
+1. Read the plan's `## Tasks` section carefully.
+2. Identify every new component, layout structure, and interaction pattern introduced by this feature.
+   Look for: sidebars, modals, drawers, inline editing, dropdowns, mobile layout changes,
+   empty states, destructive actions, multi-step flows.
+3. For each significant UX decision point found, draft one focused question.
+   Keep it to 3-5 questions maximum. Skip anything already obvious from the existing spec
+   or existing components. Only ask where a real choice exists.
 
-The file MUST use this exact schema:
+**Examples of good feature-mode questions:**
+- "The sidebar will be visible on desktop - should it collapse or hide on mobile? Options: hidden by default with a toggle button, or a slide-in drawer?"
+- "Inline project rename - should clicking the name make it editable in place, or a separate rename button?"
+- "Deleting a project that has tasks - silent reassign to Inbox, or show a confirmation first?"
 
+### Mode: global update
+
+The user wants to update the project design system directly (e.g. change the theme,
+add new tokens, revise accessibility rules). Ask what they want to change and why,
+then edit `UI-SPEC.md` in place. No plan is involved.
+
+Wait for the user's answers before generating any output.
+
+---
+
+## Step 3: Generate Output (mode-dependent)
+
+### Mode: new project
+
+Create `UI-SPEC.md` in the project root using the full schema (Appendix A).
+
+If an active plan exists, also update the plan file:
+- Add a `## UI Specification` section after `## Critical Decisions`, linking to `UI-SPEC.md`
+- Compute the relative path from the plan file's location to `UI-SPEC.md` at the project root.
+  Example: plan at `docs/plans/P12.md` - relative path is `../../UI-SPEC.md`.
+- Tag plan steps that involve visual/frontend work with `[UI]` (append before the parallel/sequential tag)
+
+### Mode: feature
+
+Do NOT create a new file. Append a `## UI Decisions` section to the plan file,
+placed after `## Critical Decisions`.
+
+Compute the relative path from the plan file to `UI-SPEC.md` at the project root.
+Example: plan at `docs/plans/P12.md` - relative path is `../../UI-SPEC.md`.
+
+Use this format:
+
+```markdown
+## UI Decisions
+
+> Design tokens and global rules inherited from [UI-SPEC.md]([relative-path-to-UI-SPEC.md]).
+> Only feature-specific decisions are recorded here.
+
+### [Component or area name]
+- **[Decision point]:** [Chosen approach] - [brief rationale if not obvious]
+
+### [Another component or area]
+- **[Decision point]:** [Chosen approach]
+
+### UX Rules in scope for this feature
+[List only the rules from the global spec relevant to the new components.
+Copy by rule ID. Do not list rules that do not apply to this feature.]
+- [ ] `rule-id` (SEVERITY) - description
 ```
+
+After appending the section, tag plan steps that involve visual/frontend work with `[UI]`
+(append before the parallel/sequential tag). Sub-tasks inherit from their parent - do not
+tag sub-tasks individually.
+
+### Mode: global update
+
+Edit `UI-SPEC.md` in place with the agreed changes. No plan updates needed.
+
+---
+
+## Important Notes
+
+- This command does NOT modify any code - it only updates plan files and `UI-SPEC.md`
+- In feature mode, `UI-SPEC.md` is the single source of truth for tokens. `/execute` should
+  read the `## UI Decisions` section in the plan for feature-specific decisions, and
+  `UI-SPEC.md` for tokens. It should NOT read the reference library files directly.
+- Never modify the `.claude/ui-reference/` files - they are a static library.
+
+---
+
+## Appendix A: Full UI-SPEC.md Schema (new project mode only)
+
+```markdown
 # UI Specification
 
-## Linked Plan
-- Plan file: [PLAN-name.md](PLAN-name.md)
+## Project Design System
+
 - Generated by: /ui-spec command
 - Preferred styling system: [Tailwind / CSS Variables]
 
@@ -70,9 +182,7 @@ Selected: [fontpair_id] - [pairing name]
 - Body: [font name]
 
 Google Fonts import:
-```html
-<link href="[url]" rel="stylesheet">
-```
+[url]
 
 ## Accessibility Requirements
 - Text on background: minimum 4.5:1 contrast ratio (WCAG AA)
@@ -81,60 +191,19 @@ Google Fonts import:
 - Images: descriptive alt text
 - Icon-only buttons: aria-label attribute
 
-## UX Rules Checklist
-[List selected rules from ux-rules.md by ID and severity, formatted as checkboxes]
+## UX Rules
 
-- [ ] [rule_id] (CRITICAL) - [description]
-- [ ] [rule_id] (HIGH) - [description]
-...
+[Full checklist from ux-rules.md, all rules, formatted as checkboxes by severity]
 
 ## Technical Setup
 
 ### Tailwind Config
-```js
-// Add to tailwind.config.js > theme > extend
-{
-  colors: {
-    primary: '#xxx',
-    secondary: '#xxx',
-    // ... all semantic roles
-  },
-  fontFamily: {
-    heading: ['Font Name', 'sans-serif'],
-    body: ['Font Name', 'sans-serif'],
-  }
-}
-```
+[config block]
 
 ### CSS Variables
-```css
-:root {
-  /* Colors */
-  --color-primary: #xxx;
-  --color-secondary: #xxx;
-  /* ... all semantic roles */
+[variables block]
 
-  /* Typography */
-  --font-heading: 'Font Name', sans-serif;
-  --font-body: 'Font Name', sans-serif;
-}
+## Component Notes
+
+[Any project-wide component decisions made during this session]
 ```
-
-**Note:** Use these variables/classes instead of hardcoding hex values. This keeps your design consistent and makes future changes easy - update one variable and it changes everywhere.
-```
-
-## Step 4: Update the Plan File
-
-After generating the UI-SPEC file:
-
-1. Add a `## UI Specification` section to the plan file after `## Critical Decisions`, linking to the spec file
-2. Read through the plan's `## Tasks` section and identify steps that involve visual or frontend work
-3. Tag those top-level steps with `[UI]` (append to the step name, before the parallel/sequential tag)
-4. Sub-tasks inherit the `[UI]` tag from their parent - do not tag sub-tasks separately
-
-## Important Notes
-
-- This command does NOT modify any code - it only creates the spec file and updates the plan
-- The UI-SPEC is the single source of truth for design decisions during `/execute`
-- Reference files are for browsing and selection only - `/execute` should read the UI-SPEC, not the reference files
-- Each project gets its own UI-SPEC with its own design choices
