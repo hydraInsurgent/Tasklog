@@ -1,6 +1,6 @@
 # Projects and Inbox - Implementation Plan
 
-**Overall Progress:** `0%`
+**Overall Progress:** `40%`
 
 ## TLDR
 Add a Projects feature that lets the user categorize tasks. Tasks without a project go to Inbox. A sidebar lets the user navigate between All Tasks, Inbox, and individual projects. Tasks can be assigned to a project at creation or updated afterwards.
@@ -58,20 +58,20 @@ Add a Projects feature that lets the user categorize tasks. Tasks without a proj
 
 ## Tasks
 
-- [ ] 🟥 **Step 1: Backend data model + migration** `[sequential]` → first - all backend work depends on this
-  - [ ] 🟥 Create `Models/Project.cs` with `Id` (int PK), `Name` (string, required), `CreatedAt` (DateTime)
-  - [ ] 🟥 Add `ProjectId` (nullable int FK) and `Project` navigation property to `Models/TaskModel.cs`
-  - [ ] 🟥 Add `DbSet<Project> Projects` to `Data/TasklogDbContext.cs`
-  - [ ] 🟥 Run `dotnet ef migrations add AddProjects` and verify the generated migration
-  - [ ] 🟥 Run `dotnet ef database update` to apply the migration
+- [x] 🟩 **Step 1: Backend data model + migration** `[sequential]` → first - all backend work depends on this
+  - [x] 🟩 Create `Models/Project.cs` with `Id` (int PK), `Name` (string, required), `CreatedAt` (DateTime)
+  - [x] 🟩 Add `ProjectId` (nullable int FK) and `Project` navigation property to `Models/TaskModel.cs`
+  - [x] 🟩 Add `DbSet<Project> Projects` to `Data/TasklogDbContext.cs`
+  - [x] 🟩 Run `dotnet ef migrations add AddProjects` and verify the generated migration
+  - [x] 🟩 Run `dotnet ef database update` to apply the migration
 
-- [ ] 🟥 **Step 2: Backend API endpoints** `[sequential]` → depends on: Step 1
-  - [ ] 🟥 Create `Controllers/ProjectsController.cs` with:
+- [x] 🟩 **Step 2: Backend API endpoints** `[sequential]` → depends on: Step 1
+  - [x] 🟩 Create `Controllers/ProjectsController.cs` with:
     - `GET /api/projects` - return all projects ordered by name
     - `POST /api/projects` - create project, body: `{ name: string }`
     - `PATCH /api/projects/{id}` - rename project, body: `{ name: string }`
-    - `DELETE /api/projects/{id}` - delete project (tasks become unassigned / move to Inbox)
-  - [ ] 🟥 Update `Controllers/TasksController.cs`:
+    - `DELETE /api/projects/{id}` - delete project and cascade delete all its tasks
+  - [x] 🟩 Update `Controllers/TasksController.cs`:
     - Add optional `ProjectId` to `CreateTaskRequest` record
     - Set `ProjectId` on the new task in the `Create` action
     - Add `PATCH /api/tasks/{id}/project` endpoint, body: `{ projectId: int? }` (null to unassign)
@@ -90,7 +90,7 @@ Add a Projects feature that lets the user categorize tasks. Tasks without a proj
   - [ ] 🟥 Create `components/ProjectSidebar.tsx` (Client Component):
     - Receives `projects`, `activeView`, `onSelectView`, `onCreateProject`, `onRenameProject`, `onDeleteProject` as props
     - Renders "All Tasks" and "Inbox" as fixed items at the top
-    - Lists each project below with rename (inline edit) and delete actions
+    - Lists each project below with an edit icon (opens Edit Project dialog) and delete action
     - Highlights the active selection
   - [ ] 🟥 Create `components/ProjectLayout.tsx` (Client Component):
     - Owns `activeView` state: `"all" | "inbox" | number` (number = project ID)
@@ -105,7 +105,9 @@ Add a Projects feature that lets the user categorize tasks. Tasks without a proj
   - [ ] 🟥 Update `handleAdd` to pass `projectId` from `activeView` (null for All/Inbox views)
   - [ ] 🟥 Update `createTask` call to include `projectId`
   - [ ] 🟥 Add a "Project" column to the task table showing the project name (or "Inbox" if unassigned) - receive `projects` list as a prop for the name lookup
-  - [ ] 🟥 Add inline project reassignment: a dropdown in the task row (or on task detail) to change `projectId` via `assignTaskProject`
+  - [ ] 🟥 Update `AddTaskForm.tsx` - add optional project dropdown, defaulting to active project view
+  - [ ] 🟥 Update `tasks/[id]/page.tsx` - fetch projects server-side, pass to new `AssignProjectButton.tsx`
+  - [ ] 🟥 Create `components/AssignProjectButton.tsx` (Client Component) - dropdown to reassign task project, calls `assignTaskProject`, then `router.refresh()`
 
 ## Outcomes
 <!-- Fill in after execution -->

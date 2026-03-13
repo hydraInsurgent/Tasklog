@@ -53,7 +53,9 @@ namespace Tasklog.Api.Controllers
             {
                 Title = request.Title.Trim(),
                 Deadline = request.Deadline,
-                CreatedAt = DateTime.Now
+                CreatedAt = DateTime.Now,
+                // Null means the task goes to Inbox (uncategorized).
+                ProjectId = request.ProjectId
             };
 
             _context.Tasks.Add(task);
@@ -95,11 +97,31 @@ namespace Tasklog.Api.Controllers
 
             return Ok(task);
         }
+
+        // PATCH /api/tasks/{id}/project
+        // Assigns or unassigns a project on an existing task. Returns the updated task.
+        // Send { projectId: null } to move the task back to Inbox.
+        [HttpPatch("{id:int}/project")]
+        public async Task<IActionResult> AssignProject(int id, [FromBody] AssignProjectRequest request)
+        {
+            var task = await _context.Tasks.FindAsync(id);
+
+            if (task is null)
+                return NotFound(new { message = $"Task {id} not found." });
+
+            task.ProjectId = request.ProjectId;
+            await _context.SaveChangesAsync();
+
+            return Ok(task);
+        }
     }
 
     // Request body shape for task creation.
-    public record CreateTaskRequest(string Title, DateTime? Deadline);
+    public record CreateTaskRequest(string Title, DateTime? Deadline, int? ProjectId);
 
     // Request body shape for toggling task completion.
     public record CompleteTaskRequest(bool IsCompleted);
+
+    // Request body shape for assigning or unassigning a project on a task.
+    public record AssignProjectRequest(int? ProjectId);
 }
