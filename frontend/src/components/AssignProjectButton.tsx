@@ -23,12 +23,13 @@ export default function AssignProjectButton({ taskId, currentProjectId, projects
   );
 
   async function handleChange(value: string) {
-    setSelected(value);
     setError("");
     const projectId = value === "inbox" ? null : parseInt(value, 10);
     setPending(true);
     try {
       await assignTaskProject(taskId, projectId);
+      // Only update the displayed value after the server confirms the change.
+      setSelected(value);
       router.refresh();
     } catch {
       setError("Failed to update project. Please try again.");

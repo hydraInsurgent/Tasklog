@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState, useEffect, FormEvent } from "react";
 import { Plus } from "lucide-react";
 import { Project } from "@/lib/api";
 
@@ -23,6 +23,12 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId }: Props
   const [selectedProjectId, setSelectedProjectId] = useState<string>(
     defaultProjectId != null ? String(defaultProjectId) : "inbox"
   );
+
+  // Sync the dropdown when the parent switches to a different project view.
+  // Without this, the form retains the previous project after the sidebar selection changes.
+  useEffect(() => {
+    setSelectedProjectId(defaultProjectId != null ? String(defaultProjectId) : "inbox");
+  }, [defaultProjectId]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();

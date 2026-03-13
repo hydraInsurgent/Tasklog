@@ -12,11 +12,21 @@ import {
 import ProjectSidebar from "./ProjectSidebar";
 import TasksClient from "./TasksClient";
 
+// Feedback shown briefly after a project action.
+type Feedback = { type: "success" | "error"; message: string } | null;
+
 export default function ProjectLayout() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [activeView, setActiveView] = useState<"all" | "inbox" | number>("all");
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [feedback, setFeedback] = useState<Feedback>(null);
+
+  // Display a feedback message that disappears after 4 seconds.
+  function showFeedback(type: "success" | "error", message: string) {
+    setFeedback({ type, message });
+    setTimeout(() => setFeedback(null), 4000);
+  }
 
   // Load projects on mount.
   const loadProjects = useCallback(async () => {
@@ -35,12 +45,14 @@ export default function ProjectLayout() {
   }, [loadProjects]);
 
   // Create a project and append it to local state.
+  // Re-throws on error so ProjectSidebar can clear its pending state.
   async function handleCreateProject(name: string) {
     try {
       const created = await createProject(name);
       setProjects((prev) => [...prev, created]);
-    } catch {
-      // Swallow for now - feedback in Step 5.
+    } catch (err) {
+      showFeedback("error", "Failed to create project. Please try again.");
+      throw err;
     }
   }
 
@@ -49,8 +61,9 @@ export default function ProjectLayout() {
     try {
       const updated = await renameProject(id, name);
       setProjects((prev) => prev.map((p) => (p.id === id ? updated : p)));
-    } catch {
-      // Swallow for now - feedback in Step 5.
+    } catch (err) {
+      showFeedback("error", "Failed to rename project. Please try again.");
+      throw err;
     }
   }
 
@@ -61,8 +74,9 @@ export default function ProjectLayout() {
       await deleteProject(id);
       setProjects((prev) => prev.filter((p) => p.id !== id));
       if (activeView === id) setActiveView("all");
-    } catch {
-      // Swallow for now - feedback in Step 5.
+    } catch (err) {
+      showFeedback("error", "Failed to delete project. Please try again.");
+      throw err;
     }
   }
 
@@ -104,6 +118,16 @@ export default function ProjectLayout() {
             <Menu size={20} aria-hidden="true" />
           </button>
         </div>
+
+        {/* Feedback from project operations (create/rename/delete errors). */}
+        {feedback && (
+          <div
+            role="alert"
+            className="mb-4 flex items-center gap-2 px-4 py-3 rounded-md text-sm font-medium bg-red-50 text-red-700 border border-red-200"
+          >
+            {feedback.message}
+          </div>
+        )}
 
         <TasksClient activeView={activeView} projects={projects} />
       </div>

@@ -128,7 +128,7 @@ export default function ProjectSidebar({
                   setEditingProject({ id: project.id, name: project.name })
                 }
                 aria-label={`Edit project: ${project.name}`}
-                className="opacity-0 group-hover:opacity-100 flex items-center justify-center p-3 text-zinc-400 hover:text-zinc-900 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-1 rounded transition-colors duration-150 cursor-pointer"
+                className="opacity-0 group-hover:opacity-100 flex items-center justify-center min-w-[44px] min-h-[44px] text-zinc-400 hover:text-zinc-900 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-1 rounded transition-colors duration-150 cursor-pointer"
               >
                 <Pencil size={14} aria-hidden="true" />
               </button>
@@ -139,7 +139,7 @@ export default function ProjectSidebar({
                   setDeletingProject({ id: project.id, name: project.name })
                 }
                 aria-label={`Delete project: ${project.name}`}
-                className="opacity-0 group-hover:opacity-100 flex items-center justify-center p-3 text-zinc-400 hover:text-red-500 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-1 rounded transition-colors duration-150 cursor-pointer mr-1"
+                className="opacity-0 group-hover:opacity-100 flex items-center justify-center min-w-[44px] min-h-[44px] text-zinc-400 hover:text-red-500 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-1 rounded transition-colors duration-150 cursor-pointer mr-1"
               >
                 <Trash2 size={14} aria-hidden="true" />
               </button>
