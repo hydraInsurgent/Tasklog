@@ -2,9 +2,10 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import AssignProjectButton from '@/components/AssignProjectButton'
 import { assignTaskProject } from '@/lib/api'
+import { useRouter } from 'next/navigation'
 
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({ refresh: jest.fn() }),
+  useRouter: jest.fn(),
 }))
 
 jest.mock('@/lib/api', () => ({
@@ -12,6 +13,7 @@ jest.mock('@/lib/api', () => ({
 }))
 
 const mockedAssign = assignTaskProject as jest.MockedFunction<typeof assignTaskProject>
+const mockedUseRouter = useRouter as jest.Mock
 
 const projects = [
   { id: 1, name: 'Work', createdAt: '2024-01-01T00:00:00Z' },
@@ -19,7 +21,12 @@ const projects = [
 ]
 
 describe('AssignProjectButton', () => {
-  beforeEach(() => jest.clearAllMocks())
+  const mockRefresh = jest.fn()
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    mockedUseRouter.mockReturnValue({ refresh: mockRefresh })
+  })
 
   it('renders with the current project pre-selected', () => {
     render(
@@ -27,6 +34,33 @@ describe('AssignProjectButton', () => {
     )
 
     expect(screen.getByRole('combobox')).toHaveValue('2')
+  })
+
+  it('updates the selection and refreshes on successful assignment', async () => {
+    mockedAssign.mockResolvedValue({} as any)
+    render(
+      <AssignProjectButton taskId={1} currentProjectId={null} projects={projects} />
+    )
+
+    await userEvent.selectOptions(screen.getByRole('combobox'), '1')
+
+    await waitFor(() => {
+      expect(screen.getByRole('combobox')).toHaveValue('1')
+      expect(mockRefresh).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  it('passes null projectId when Inbox is selected', async () => {
+    mockedAssign.mockResolvedValue({} as any)
+    render(
+      <AssignProjectButton taskId={1} currentProjectId={1} projects={projects} />
+    )
+
+    await userEvent.selectOptions(screen.getByRole('combobox'), 'inbox')
+
+    await waitFor(() => {
+      expect(mockedAssign).toHaveBeenCalledWith(1, null)
+    })
   })
 
   it('shows an inline error when the API call fails', async () => {

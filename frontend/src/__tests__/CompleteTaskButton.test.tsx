@@ -2,9 +2,10 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import CompleteTaskButton from '@/components/CompleteTaskButton'
 import { completeTask } from '@/lib/api'
+import { useRouter } from 'next/navigation'
 
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({ refresh: jest.fn() }),
+  useRouter: jest.fn(),
 }))
 
 jest.mock('@/lib/api', () => ({
@@ -12,9 +13,15 @@ jest.mock('@/lib/api', () => ({
 }))
 
 const mockedComplete = completeTask as jest.MockedFunction<typeof completeTask>
+const mockedUseRouter = useRouter as jest.Mock
 
 describe('CompleteTaskButton', () => {
-  beforeEach(() => jest.clearAllMocks())
+  const mockRefresh = jest.fn()
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    mockedUseRouter.mockReturnValue({ refresh: mockRefresh })
+  })
 
   it('renders "Mark complete" when the task is incomplete', () => {
     render(
@@ -30,6 +37,19 @@ describe('CompleteTaskButton', () => {
     )
 
     expect(screen.getByRole('button')).toHaveAccessibleName(/mark incomplete: buy milk/i)
+  })
+
+  it('calls router.refresh after successfully toggling completion', async () => {
+    mockedComplete.mockResolvedValue({} as any)
+    render(
+      <CompleteTaskButton taskId={1} taskTitle="Buy milk" isCompleted={false} />
+    )
+
+    await userEvent.click(screen.getByRole('button'))
+
+    await waitFor(() => {
+      expect(mockRefresh).toHaveBeenCalledTimes(1)
+    })
   })
 
   it('shows an inline error when the API call fails', async () => {
