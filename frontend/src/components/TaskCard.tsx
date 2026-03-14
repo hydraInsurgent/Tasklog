@@ -4,7 +4,7 @@ import { useRef, useEffect, useState } from "react";
 import Link from "next/link";
 import { MoreVertical, Trash2, Loader2 } from "lucide-react";
 import { Task, Project } from "@/lib/api";
-import { formatDate, deadlineColorClass } from "@/lib/format";
+import { formatDate, deadlineColorClass, projectName } from "@/lib/format";
 
 interface Props {
   task: Task;
@@ -45,20 +45,20 @@ export default function TaskCard({
   // Close the three-dot menu when the user clicks anywhere outside it.
   useEffect(() => {
     if (!menuOpen) return;
-    function handleClickOutside(e: MouseEvent) {
+    function handleClickOutside(e: MouseEvent | TouchEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setMenuOpen(false);
       }
     }
+    // Listen on both mousedown (desktop) and touchstart (mobile) so the menu
+    // closes reliably on touch devices where mousedown may not fire.
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
   }, [menuOpen]);
-
-  // Look up a project name by ID. Returns "Inbox" for null projectId.
-  function projectName(projectId: number | null): string {
-    if (projectId === null) return "Inbox";
-    return projects.find((p) => p.id === projectId)?.name ?? "Unknown";
-  }
 
   return (
     <div
@@ -93,7 +93,7 @@ export default function TaskCard({
         {/* Footer row: project name and deadline */}
         <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0 text-xs">
           {showProject && (
-            <span className="text-zinc-500">{projectName(task.projectId)}</span>
+            <span className="text-zinc-500">{projectName(task.projectId, projects)}</span>
           )}
           {task.deadline ? (
             <span className={deadlineColorClass(task.deadline)}>

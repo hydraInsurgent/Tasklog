@@ -1,4 +1,4 @@
-import { deadlineColorClass, formatDate } from '@/lib/format'
+import { deadlineColorClass, formatDate, projectName } from '@/lib/format'
 
 describe('deadlineColorClass', () => {
   beforeEach(() => {
@@ -37,5 +37,24 @@ describe('formatDate', () => {
   it('formats an ISO datetime string to a readable local date', () => {
     // Use noon UTC to avoid any midnight timezone boundary ambiguity.
     expect(formatDate('2026-03-20T12:00:00.000Z')).toBe('20 Mar 2026')
+  })
+})
+
+describe('projectName', () => {
+  const projects = [
+    { id: 1, name: 'Work' },
+    { id: 2, name: 'Personal' },
+  ]
+
+  it('returns "Inbox" for null projectId', () => {
+    expect(projectName(null, projects)).toBe('Inbox')
+  })
+
+  it('returns the matching project name when found', () => {
+    expect(projectName(1, projects)).toBe('Work')
+  })
+
+  it('returns "Unknown" when no project matches the id', () => {
+    expect(projectName(99, projects)).toBe('Unknown')
   })
 })

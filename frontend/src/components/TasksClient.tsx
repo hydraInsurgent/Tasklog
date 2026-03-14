@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { Trash2, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { getTasks, createTask, deleteTask, completeTask, Task, Project } from "@/lib/api";
-import { formatDate, deadlineColorClass } from "@/lib/format";
+import { formatDate, deadlineColorClass, projectName } from "@/lib/format";
 import AddTaskForm from "./AddTaskForm";
 import TaskCard from "./TaskCard";
 
@@ -148,12 +148,6 @@ export default function TasksClient({ activeView, projects }: Props) {
       ? "inbox tasks"
       : `tasks in "${projects.find((p) => p.id === activeView)?.name ?? "this project"}"`;
 
-  // Look up a project name by ID. Returns "Inbox" for null projectId.
-  function projectName(projectId: number | null): string {
-    if (projectId === null) return "Inbox";
-    return projects.find((p) => p.id === projectId)?.name ?? "Unknown";
-  }
-
   return (
     <div className="space-y-6">
       {/* Inline feedback message (color + icon: color-not-only-indicator rule). */}
@@ -289,7 +283,7 @@ export default function TasksClient({ activeView, projects }: Props) {
                       {/* Project cell - only shown in All Tasks view */}
                       {activeView === "all" && (
                         <td className="px-6 py-4 text-zinc-500 text-sm">
-                          {projectName(task.projectId)}
+                          {projectName(task.projectId, projects)}
                         </td>
                       )}
 

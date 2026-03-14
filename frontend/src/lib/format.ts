@@ -15,6 +15,13 @@ export function deadlineColorClass(deadline: string | null): string {
   return "text-zinc-500";
 }
 
+// Resolve a project name from a list by ID. Returns "Inbox" for null (uncategorized tasks).
+// Shared between the desktop table and mobile card views.
+export function projectName(projectId: number | null, projects: { id: number; name: string }[]): string {
+  if (projectId === null) return "Inbox";
+  return projects.find((p) => p.id === projectId)?.name ?? "Unknown";
+}
+
 // Format an ISO date string to a readable local date (e.g. "12 Mar 2026").
 export function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-GB", {
