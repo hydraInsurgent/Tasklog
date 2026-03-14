@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| - | - | - | - |
+| [P22-mobile-task-cards.md](plans/P22-mobile-task-cards.md) | #22 | feature/mobile-task-cards-#22 | In Progress |
 
 ---
 
@@ -78,4 +78,6 @@ Untracked ideas - not estimated, not prioritized, not committed to. Just things 
 - Cross-device sync / live updates - changes on one device reflect on another without a manual reload.
 - Distributable app - let other users download and run Tasklog on their own machine. Needs exploration: Docker Compose (two services, one command), single executable (.NET serves the Next.js build), or Electron wrapper (desktop app that manages both processes). Two-process architecture makes this non-trivial.
 - Project color codes - each project could have an assigned color shown as a swatch in the sidebar and next to tasks. The Edit Project dialog is already planned as a modal, making this a natural future addition (add a color picker field).
+- Task edit modal - inline modal popup for editing a task's title, deadline, and project without leaving the main view. Currently clicking a task navigates to /tasks/[id]. A modal would keep the user in context.
+- Task description field - add an optional description field to tasks. No UI for it currently exists; would require a backend migration, API update, and frontend form change.
 - Mobile task cards - replace the task table with a compact card layout on small screens. Each card shows title, project, deadline, and completion state at a glance, avoiding the horizontal scroll that a wide table causes on phones. Desktop keeps the table. Would be a CSS/layout-only change with no backend work.

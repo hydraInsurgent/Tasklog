@@ -4,32 +4,12 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { Trash2, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { getTasks, createTask, deleteTask, completeTask, Task, Project } from "@/lib/api";
+import { formatDate, deadlineColorClass } from "@/lib/format";
 import AddTaskForm from "./AddTaskForm";
+import TaskCard from "./TaskCard";
 
 // Feedback shown briefly after an action (replaces TempData flash messages from v1).
 type Feedback = { type: "success" | "error"; message: string } | null;
-
-// Returns a Tailwind class for the deadline based on proximity.
-// - Past due: red (danger)
-// - Within 3 days: yellow (warning)
-// - Further out or no deadline: muted zinc
-function deadlineColorClass(deadline: string | null): string {
-  if (!deadline) return "text-zinc-400";
-  const diff =
-    (new Date(deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24);
-  if (diff < 0) return "text-red-500 font-medium";
-  if (diff <= 3) return "text-yellow-500 font-medium";
-  return "text-zinc-500";
-}
-
-// Format an ISO date string to a readable local date (e.g. "12 Mar 2026").
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
 
 interface Props {
   // Controls which tasks are shown. "all" = no filter, "inbox" = unassigned,
@@ -241,8 +221,9 @@ export default function TasksClient({ activeView, projects }: Props) {
             No {viewLabel} yet. Add one below.
           </p>
         ) : (
-          // Responsive table: scrolls horizontally on small viewports (no-horizontal-scroll rule).
-          <div className="overflow-x-auto">
+          <>
+          {/* Desktop table - hidden on mobile to avoid horizontal scroll. */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-zinc-100 text-left">
@@ -360,6 +341,24 @@ export default function TasksClient({ activeView, projects }: Props) {
               </tbody>
             </table>
           </div>
+
+          {/* Mobile card list - shown below md: breakpoint, hidden on desktop. */}
+          <div className="md:hidden">
+            {visibleTasks.map((task) => (
+              <TaskCard
+                key={task.id}
+                task={task}
+                projects={projects}
+                activeView={activeView}
+                onComplete={handleComplete}
+                onDelete={handleDelete}
+                deletingId={deletingId}
+                completingId={completingId}
+                isHiding={hidingIds.has(task.id)}
+              />
+            ))}
+          </div>
+          </>
         )}
       </div>
 
