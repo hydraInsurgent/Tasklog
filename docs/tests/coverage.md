@@ -40,19 +40,24 @@
 ## Next.js Frontend
 
 ### AddTaskForm
-- [ ] 🟥 shows validation error when submitted with empty title
-- [ ] 🟥 calls onAdd with correct data on valid submission
-- [ ] 🟥 clears the form after successful submission
+- [x] 🟩 shows error when submitted with empty title
+- [x] 🟩 calls onAdd with trimmed title and correct projectId on valid submission
+- [x] 🟩 clears title and deadline fields after successful submission
+- [x] 🟩 shows error message when onAdd throws
+- [x] 🟩 syncs selected project when defaultProjectId prop changes
 
 ### AssignProjectButton
-- [ ] 🟥 renders current project name when assigned
-- [ ] 🟥 calls onAssign with selected project id on change
+- [x] 🟩 renders with the current project pre-selected
+- [x] 🟩 shows inline error when API call fails
 
 ### CompleteTaskButton
-- [ ] 🟥 calls onComplete with correct task id and toggled state
+- [x] 🟩 renders "Mark complete" when task is incomplete
+- [x] 🟩 renders "Mark incomplete" when task is completed
+- [x] 🟩 shows inline error when API call fails
 
 ### DeleteTaskButton
-- [ ] 🟥 calls onDelete with correct task id on confirmation
+- [x] 🟩 renders delete button with correct aria-label
+- [x] 🟩 shows inline error when API call fails
 
 ### api.ts
-- [ ] 🟥 evaluate whether fetch wrappers contain logic worth testing
+- skipped: all functions are thin fetch wrappers; createTask error extraction is trivial
