@@ -28,7 +28,7 @@ Read the repo structure to understand what kind of project(s) exist. A repo may 
 
 Look for language and framework signals: solution or project files, package manifests, dependency files, config files. Read them to understand the stack - not just the language but the specific framework, since that determines which test library is appropriate.
 
-Only work on the layer(s) relevant to the current target. If the target is ambiguous across layers, ask the user which layer to test.
+**Detect all layers in the repo, not just one.** The test plan in Step 4 must cover every layer unless the user has explicitly scoped the request to a single target. If the target is ambiguous, note all layers and include them all in the plan.
 
 ---
 
@@ -44,20 +44,65 @@ Once confirmed, set up the appropriate infrastructure for the detected project t
 
 ---
 
-## Step 4: Identify what to test
+## Step 4: Build the full test plan
 
-List the specific units you plan to test before writing anything. Show it to the user:
+The test plan lives in `docs/tests/coverage.md`. This is a single persistent file that
+accumulates across all `/unit-test` sessions - it is the source of truth for what is
+covered and what is not. Create the `docs/tests/` folder if it does not exist.
+
+### Reading the plan
+
+If `docs/tests/coverage.md` already exists, read it first. Items marked 🟩 are already
+covered - do not re-test them unless the user asks. Items marked 🟥 are known gaps and
+should be included in the current session's work.
+
+### Writing or updating the plan
+
+Before writing a single test, update `docs/tests/coverage.md` to include all targets
+for the current session. Add new targets as 🟥 To Do. Show the relevant section to the user:
 
 ```
-I will write unit tests for:
+Test plan (docs/tests/coverage.md updated):
 
-- [ClassName or function] - [what behaviour or scenario this covers]
-- [ClassName method] - [edge case or logic being tested]
+[Layer 1 - e.g. .NET backend]
+- [ ] 🟥 [ClassName] - [behaviours to cover]
+- [ ] 🟥 [ClassName] - [edge cases]
 
-Does this look right? (yes / adjust / skip)
+[Layer 2 - e.g. Next.js frontend]
+- [ ] 🟥 [ComponentName] - [behaviours to cover]
+- [ ] 🟥 [function] - [edge cases]
+
+Does this look right? (yes / adjust / skip [layer])
 ```
 
-Wait for confirmation.
+Wait for confirmation before writing any tests.
+
+### File format
+
+```markdown
+# Test Coverage
+
+**Last updated:** [date]
+
+## [Layer name - e.g. .NET Backend]
+
+### [ClassName]
+- [x] 🟩 [MethodName] - [what was tested]
+- [ ] 🟥 [MethodName] - [what needs testing]
+
+## [Layer name - e.g. Next.js Frontend]
+
+### [ComponentName]
+- [ ] 🟥 [behaviour] - [what needs testing]
+```
+
+### During execution
+
+After each target is tested and passing, update its entry in `docs/tests/coverage.md`
+from 🟥 To Do to 🟩 Done and check the checkbox. Do not wait until the end - update
+as you go so the file always reflects the current state.
+
+Do not stop until every item added in this session is checked off or explicitly skipped.
 
 ### What makes a good unit to test
 
@@ -75,7 +120,16 @@ Wait for confirmation.
 
 ## Step 5: Write the tests
 
-Write tests using the conventions of the detected framework. Regardless of framework:
+Work through the plan layer by layer. For each layer:
+
+1. Write the tests for that layer using the conventions of its framework.
+2. Run the tests (Step 6) and confirm they pass before moving to the next layer.
+3. Check off the completed items in the plan.
+4. Continue to the next layer.
+
+Do not finish the session until all layers in the plan are complete or explicitly skipped by the user.
+
+Regardless of framework:
 
 - Each test should cover one behaviour or scenario
 - Tests must be independent - no shared mutable state between tests
