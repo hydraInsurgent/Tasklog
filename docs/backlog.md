@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| [P22-mobile-task-cards.md](plans/P22-mobile-task-cards.md) | #22 | feature/mobile-task-cards-#22 | In Progress |
+| - | - | - | - |
 
 ---
 
@@ -68,6 +68,7 @@ Recently completed work (keep last 10):
 
 | # | Title | Type | Closed |
 |---|-------|------|--------|
+| #22 | Feature: Mobile Task Cards | feature | 2026-03-14 |
 | #12 | Feature: Projects and Inbox | feature | 2026-03-13 |
 | #9 | Feature: Task completion | feature | 2026-03-12 |
 | #11 | Show/hide toggle during animation causes visual glitch | bug | 2026-03-12 |
