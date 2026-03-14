@@ -191,6 +191,8 @@ Unit tests written and passing.
 
 Not covered (and why):
 - [Anything skipped, with a brief reason]
+
+Next: run /review to check the feature code before shipping.
 ```
 
 ---

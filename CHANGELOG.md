@@ -2,6 +2,19 @@
 
 ---
 
+## v2.3 - Mobile Task Cards
+*March 2026*
+
+### What changed
+
+**Frontend**
+- Task list now shows as compact cards on mobile (below 768px) instead of a horizontal-scrolling table
+- Each card shows a circle checkbox, task title (links to detail page), project name, deadline with proximity colour, and a three-dot menu with a Delete action
+- Desktop table layout is unchanged
+- Shared date formatting utilities extracted to `src/lib/format.ts` (closes backlog item #20)
+
+---
+
 ## v2.2 - Projects and Inbox
 *March 2026*
 
