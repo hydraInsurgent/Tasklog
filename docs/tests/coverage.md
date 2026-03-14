@@ -1,6 +1,6 @@
 # Test Coverage
 
-**Last updated:** 2026-03-14
+**Last updated:** 2026-03-14 (format.ts + TaskCard added)
 
 ---
 
@@ -28,6 +28,8 @@
 | AssignProjectButton.tsx | 100% | 100% | 100% | - |
 | CompleteTaskButton.tsx | 100% | 100% | 100% | - |
 | DeleteTaskButton.tsx | 100% | 100% | 100% | - |
+| TaskCard.tsx | 96.42% | 83.33% | 95.65% | L50 (useEffect cleanup - runs on unmount, not exercised in unit tests) |
+| format.ts | 100% | 100% | 100% | - |
 | ProjectLayout.tsx | 0% | 0% | 0% | Integration test candidate |
 | ProjectSidebar.tsx | 0% | 0% | 0% | Integration test candidate |
 | TasksClient.tsx | 0% | 0% | 0% | Integration test candidate |
@@ -94,3 +96,25 @@
 
 ### api.ts
 - skipped: all functions are thin fetch wrappers; createTask error extraction is trivial
+
+### format.ts
+- [x] 🟩 deadlineColorClass - returns muted zinc for null (no deadline)
+- [x] 🟩 deadlineColorClass - returns red for a past deadline
+- [x] 🟩 deadlineColorClass - returns yellow for a deadline exactly today (boundary: diff = 0)
+- [x] 🟩 deadlineColorClass - returns yellow for a deadline 3 days out (boundary: diff = 3)
+- [x] 🟩 deadlineColorClass - returns muted zinc for a deadline 4 days out (just outside warning)
+- [x] 🟩 formatDate - formats ISO string to a readable local date
+
+### TaskCard
+- [x] 🟩 renders task title as a link to /tasks/[id]
+- [x] 🟩 checkbox is unchecked when task is not completed
+- [x] 🟩 checkbox is checked when task is completed
+- [x] 🟩 calls onComplete(id, true) when unchecked checkbox is clicked
+- [x] 🟩 three-dot menu is hidden by default
+- [x] 🟩 three-dot menu opens when the options button is clicked
+- [x] 🟩 calls onDelete(id) when Delete is clicked from the open menu
+- [x] 🟩 shows "No deadline" when deadline is null
+- [x] 🟩 shows formatted deadline when deadline is set
+- [x] 🟩 shows project name when activeView is "all"
+- [x] 🟩 hides project name when activeView is "inbox"
+- [x] 🟩 applies line-through to title when task is completed and not hiding
