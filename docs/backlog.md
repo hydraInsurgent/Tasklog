@@ -32,7 +32,13 @@ Future features - not yet started. Add GitHub issue number when created.
 
 | # | Title | Priority | Notes |
 |---|-------|----------|-------|
-| #20 | Extract shared date formatting helpers to lib/format.ts | low | from #12 review |
+| #20 | Extract shared date formatting helpers to lib/format.ts | low | from #12 review - completed in #22 |
+| #24 | Extract shared projectName helper to format.ts | medium | from #22 review |
+| #25 | Guard against invalid date strings in format.ts | low | from #22 review |
+| #26 | Simplify className construction in TaskCard | low | from #22 review |
+| #27 | Add overflow guard to three-dot dropdown menu | low | from #22 review |
+| #28 | Align focus ring color to UI-SPEC accent token | low | from #22 review |
+| #29 | Increase three-dot button icon size to match UI-SPEC | low | from #22 review |
 
 ---
 
@@ -42,6 +48,7 @@ Known bugs not yet fixed. Add GitHub issue number when created.
 
 | # | Title | Priority | Notes |
 |---|-------|----------|-------|
+| #23 | Three-dot menu does not close on tap outside on mobile | high | from #22 review |
 | #1 | CORS and server-side fetch break outside localhost | high | |
 | #2 | State/UX bugs - feedback timer, optimistic delete | medium | |
 | #3 | Fragile DB path, silent API URL failure | medium | |
