@@ -10,7 +10,7 @@
 2. **Ask questions** - If something is unclear, ask before assuming
 3. **Explain simply** - Use plain English, avoid jargon
 4. **Show your work** - Tell me what you're doing and why
-5. **Use the Skill tool for slash commands** - Never manually replicate /start-feature, /explore, /create-plan, /review, /fix, /ship, or /document. Always invoke them via the Skill tool so the template is followed.
+5. **Use the Skill tool for slash commands** - Never manually replicate /start-feature, /explore, /create-plan, /review, /fix, /ship, /document, or /unit-test. Always invoke them via the Skill tool so the template is followed.
 6. **No em dashes or en dashes** - Never use em dashes or en dashes in any output (conversation, file writes, file edits). Use regular hyphens or rewrite the sentence.
 7. **Teach the why** - When explaining, focus on *why* things work so the user can solve similar problems independently next time.
 
@@ -22,9 +22,10 @@
 3. `/create-plan` - Create a step-by-step implementation plan
 4. `/ui-spec` - (optional) Generate UI design spec before building
 5. `/execute` - Build it, updating the plan as we go
-6. `/review` - Code review (report only, don't fix)
-7. `/document` - Update documentation
-8. `/ship` - Close tracking issue, merge branch, tag version, create release
+6. `/unit-test` - Write and run unit tests for what was just built
+7. `/review` - Code review (report only, don't fix)
+8. `/document` - Update documentation
+9. `/ship` - Close tracking issue, merge branch, tag version, create release
 
 #### Bug fix workflow
 1. `/create-issue` - Capture the bug
@@ -56,6 +57,7 @@ Use these when needed - not part of the standard flow:
 | `/create-plan` | Create a step-by-step implementation plan with status tracking |
 | `/ui-spec` | Generate a UI design spec (colors, fonts, accessibility rules) for a plan |
 | `/execute` | Build the feature, updating the plan as you go |
+| `/unit-test` | Write and run unit tests for a feature, component, or the whole project |
 | `/review` | Review code - report issues only, don't fix |
 | `/document` | Update documentation after changes |
 | `/ship` | Close tracking issue, merge branch, tag with semver, create GitHub release |
@@ -94,6 +96,11 @@ Use these when needed - not part of the standard flow:
 - Check branch context first - inline if on a feature branch, new branch if on main
 - Verify the fix works before closing the issue
 - Only change what is necessary - no refactoring alongside fixes
+
+**When Running /unit-test:**
+- Check for test infrastructure first - set it up if missing (ask before creating anything)
+- Show the list of test targets and wait for confirmation before writing tests
+- Do not move past Step 6 if tests are failing - diagnose first
 
 ### Subagent Strategy
 
