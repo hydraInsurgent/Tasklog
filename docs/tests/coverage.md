@@ -2,6 +2,39 @@
 
 **Last updated:** 2026-03-14
 
+---
+
+## Coverage Report
+
+> Updated by `/unit-test` each run. Use these numbers to assess impact without re-running tests.
+> If a component is unchanged since this date and shows 100% branch coverage, it is unaffected.
+> If a component changed, or any file it imports changed, re-run coverage to verify.
+
+### .NET Backend - last run 2026-03-14
+
+| Class | Lines | Branches | Notes |
+|---|---|---|---|
+| TasksController | 100% | 100% | All methods and branches covered |
+| ProjectsController | 100% | 100% | All methods and branches covered |
+| TasklogDbContext | 100% | 100% | |
+| Program.cs | 0% | - | Framework wiring - not a test target |
+| Migrations | 0% | - | Generated code - not a test target |
+
+### Next.js Frontend - last run 2026-03-14
+
+| Component | Statements | Branches | Lines | Uncovered |
+|---|---|---|---|---|
+| AddTaskForm.tsx | 92.59% | 94.11% | 92.59% | 108-126 (project dropdown render - untested, not a gap) |
+| AssignProjectButton.tsx | 100% | 100% | 100% | - |
+| CompleteTaskButton.tsx | 100% | 100% | 100% | - |
+| DeleteTaskButton.tsx | 100% | 100% | 100% | - |
+| ProjectLayout.tsx | 0% | 0% | 0% | Integration test candidate |
+| ProjectSidebar.tsx | 0% | 0% | 0% | Integration test candidate |
+| TasksClient.tsx | 0% | 0% | 0% | Integration test candidate |
+| api.ts | 0% | 0% | 0% | Skipped - thin fetch wrappers |
+
+---
+
 ## .NET Backend
 
 ### TasksController

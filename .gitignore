@@ -26,6 +26,10 @@ npm-debug.log*
 /tmp/
 /_tmp/
 
+# Coverage artifacts (generated on each test run - not committed)
+**/TestResults/
+frontend/coverage/
+
 # Plan files (local working docs)
 PLAN-*.md
 

@@ -12,13 +12,17 @@ Usage:
 
 ## Step 1: Resolve the target
 
-Check the current branch and which files have changed since main.
+Two things always happen here, regardless of branch or arguments:
 
-Determine what to test using context in priority order:
+**A. Check git diff** - note any source files changed but not yet committed. These are the highest-priority targets because they represent work in progress.
 
-1. **Argument provided** - use the named target directly.
-2. **On a feature branch with a plan** - read the plan file, identify what was implemented, use those files as the primary targets.
-3. **On main with no argument** - scan for source files that have no corresponding test file. Suggest the top candidates and ask the user which to focus on first.
+**B. Cross-reference against coverage.md** - if `docs/tests/coverage.md` exists, scan the actual source files and compare against it. Any source file or public method that exists in the code but is not marked 🟩 in coverage.md is a gap - regardless of when it was committed. Git diff only sees uncommitted changes; coverage.md sees the full picture.
+
+Then determine the scope using context in priority order:
+
+1. **Argument provided** - use the named target directly. Still run the coverage cross-reference to flag any other gaps as an aside.
+2. **On a feature branch with a plan** - read the plan file, identify what was implemented, use those files as the primary targets. Also surface any 🟥 items already in coverage.md.
+3. **No argument, no active plan** - use the gaps found in step B as the target list. Show them to the user grouped by layer and ask which to tackle.
 
 ---
 
@@ -84,6 +88,21 @@ Wait for confirmation before writing any tests.
 
 **Last updated:** [date]
 
+---
+
+## Coverage Report
+
+> Updated by /unit-test each run.
+
+### [Layer] - last run [date]
+
+| Class/Component | Lines | Branches | Notes |
+|---|---|---|---|
+| [Name] | 100% | 100% | |
+| [Name] | 92% | 94% | Lines 108-126 uncovered - [reason] |
+
+---
+
 ## [Layer name - e.g. .NET Backend]
 
 ### [ClassName]
@@ -140,11 +159,22 @@ Regardless of framework:
 
 ---
 
-## Step 6: Run the tests
+## Step 6: Run the tests with coverage
 
-Run the test suite for the relevant layer using the project's standard test command.
+Run the test suite for each layer with coverage enabled, not just a plain test run.
 
-Show the full output. If any tests fail, diagnose and fix before continuing. Do not move to Step 7 with a failing suite.
+Show the full output. If any tests fail, diagnose and fix before continuing.
+Do not record coverage numbers from a run with failing tests.
+
+After all layers pass, update the **Coverage Report** table at the top of
+`docs/tests/coverage.md` with the new numbers. Update the "last run" date.
+For each component record: statement %, branch %, line %, and any uncovered lines.
+Note whether uncovered lines are genuine gaps or intentional skips.
+Flag any component where branch coverage dropped compared to the previous recorded numbers.
+
+Also verify the tests are meaningful - not just passing but actually asserting:
+scan for any test that calls code under test but has no `expect` or assertion call.
+If found, flag as a hollow test and fix before continuing.
 
 ---
 
