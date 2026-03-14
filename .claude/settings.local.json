@@ -25,7 +25,8 @@
       "Bash(gh issue view:*)",
       "Bash(gh repo view:*)",
       "Bash(gh release list:*)",
-      "Bash(gh issue list:*)"
+      "Bash(gh issue list:*)",
+      "Bash(npx jest:*)"
     ],
     "additionalDirectories": [
       "/tmp"
