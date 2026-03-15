@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| - | - | - | - |
+| P30-labels-and-filtering.md | #30 | feature/labels-#30 | In Progress |
 
 ---
 
@@ -81,6 +81,8 @@ Recently completed work (keep last 10):
 ## Someday / Maybe
 
 Untracked ideas - not estimated, not prioritized, not committed to. Just things worth remembering.
+
+- Project-level labels - a label auto-applied to all tasks in a specific project. Labels are currently global only. This would require a project-to-label association and apply logic on task creation.
 
 - Relative time display for completed date - show "just now", "2 hours ago", "3 days ago" instead of a formatted date. CompletedAt timestamp is already stored so this would be a UI-only change.
 - Cross-device sync / live updates - changes on one device reflect on another without a manual reload.
