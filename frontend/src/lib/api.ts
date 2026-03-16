@@ -10,6 +10,15 @@ export interface Project {
   createdAt: string; // ISO 8601 datetime string
 }
 
+// The shape returned by the API for every label.
+export interface Label {
+  id: number;
+  name: string;
+  // Index into the 10-color VIBGYOR palette (0-9). Use labelColor() from lib/format.ts to resolve hex.
+  colorIndex: number;
+  createdAt: string; // ISO 8601 datetime string
+}
+
 // The shape returned by the API for every task.
 export interface Task {
   id: number;
@@ -20,6 +29,8 @@ export interface Task {
   completedAt: string | null; // ISO 8601 datetime when completed, or null
   // The project this task belongs to. Null means the task is in the Inbox (uncategorized).
   projectId: number | null;
+  // Labels applied to this task. Always present (empty array if none).
+  labels: Label[];
 }
 
 // GET /api/tasks - fetch all tasks ordered by creation date (newest first).
@@ -117,4 +128,54 @@ export async function assignTaskProject(taskId: number, projectId: number | null
   });
   if (!res.ok) throw new Error(`Failed to assign project for task ${taskId}.`);
   return res.json();
+}
+
+// PATCH /api/tasks/:taskId/labels - replace the full label set on a task.
+// Pass an empty array to remove all labels. Returns the updated task.
+export async function setTaskLabels(taskId: number, labelIds: number[]): Promise<Task> {
+  const res = await fetch(`${API_URL}/api/tasks/${taskId}/labels`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ labelIds }),
+  });
+  if (!res.ok) throw new Error(`Failed to update labels for task ${taskId}.`);
+  return res.json();
+}
+
+// GET /api/labels - fetch all labels ordered alphabetically.
+export async function getLabels(): Promise<Label[]> {
+  const res = await fetch(`${API_URL}/api/labels`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Failed to fetch labels.");
+  return res.json();
+}
+
+// POST /api/labels - create a new label. Returns the created label.
+export async function createLabel(name: string, colorIndex: number): Promise<Label> {
+  const res = await fetch(`${API_URL}/api/labels`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, colorIndex }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.message ?? "Failed to create label.");
+  }
+  return res.json();
+}
+
+// PATCH /api/labels/:id - update a label's name and/or color. Returns the updated label.
+export async function updateLabel(id: number, name: string, colorIndex: number): Promise<Label> {
+  const res = await fetch(`${API_URL}/api/labels/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, colorIndex }),
+  });
+  if (!res.ok) throw new Error(`Failed to update label ${id}.`);
+  return res.json();
+}
+
+// DELETE /api/labels/:id - delete a label. Unlinks it from all tasks (tasks are not deleted).
+export async function deleteLabel(id: number): Promise<void> {
+  const res = await fetch(`${API_URL}/api/labels/${id}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(`Failed to delete label ${id}.`);
 }

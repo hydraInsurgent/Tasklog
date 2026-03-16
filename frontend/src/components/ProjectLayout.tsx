@@ -11,6 +11,7 @@ import {
 } from "@/lib/api";
 import ProjectSidebar from "./ProjectSidebar";
 import TasksClient from "./TasksClient";
+import { EMPTY_FILTER, type FilterState } from "./FilterPanel";
 
 // Feedback shown briefly after a project action.
 type Feedback = { type: "success" | "error"; message: string } | null;
@@ -19,6 +20,7 @@ export default function ProjectLayout() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [activeView, setActiveView] = useState<"all" | "inbox" | number>("all");
+  const [filterState, setFilterState] = useState<FilterState>(EMPTY_FILTER);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
 
@@ -129,7 +131,7 @@ export default function ProjectLayout() {
           </div>
         )}
 
-        <TasksClient activeView={activeView} projects={projects} />
+        <TasksClient activeView={activeView} projects={projects} filterState={filterState} onFilterChange={setFilterState} />
       </div>
 
       {/* Mobile drawer backdrop */}

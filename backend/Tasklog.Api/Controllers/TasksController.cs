@@ -18,10 +18,12 @@ namespace Tasklog.Api.Controllers
 
         // GET /api/tasks
         // Returns all tasks ordered by creation date, newest first.
+        // Labels are eagerly loaded so callers don't need a second request.
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
             var tasks = await _context.Tasks
+                .Include(t => t.Labels)
                 .OrderByDescending(t => t.CreatedAt)
                 .ToListAsync();
 
@@ -30,10 +32,14 @@ namespace Tasklog.Api.Controllers
 
         // GET /api/tasks/{id}
         // Returns a single task by ID, or 404 if not found.
+        // Labels are eagerly loaded alongside the task.
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById(int id)
         {
-            var task = await _context.Tasks.FindAsync(id);
+            // FindAsync does not support Include, so we use FirstOrDefaultAsync here.
+            var task = await _context.Tasks
+                .Include(t => t.Labels)
+                .FirstOrDefaultAsync(t => t.Id == id);
 
             if (task is null)
                 return NotFound(new { message = $"Task {id} not found." });
@@ -114,6 +120,36 @@ namespace Tasklog.Api.Controllers
 
             return Ok(task);
         }
+
+        // PATCH /api/tasks/{id}/labels
+        // Replaces the full set of labels on a task. Accepts an array of label IDs.
+        // Sends back the updated task with labels included.
+        // Send an empty array to remove all labels from the task.
+        [HttpPatch("{id:int}/labels")]
+        public async Task<IActionResult> SetLabels(int id, [FromBody] SetTaskLabelsRequest request)
+        {
+            // Load the task with its current labels so EF can track the relationship changes.
+            var task = await _context.Tasks
+                .Include(t => t.Labels)
+                .FirstOrDefaultAsync(t => t.Id == id);
+
+            if (task is null)
+                return NotFound(new { message = $"Task {id} not found." });
+
+            // Load the requested labels. Unknown IDs are silently ignored.
+            var newLabels = await _context.Labels
+                .Where(l => request.LabelIds.Contains(l.Id))
+                .ToListAsync();
+
+            // Replace the current label collection. EF Core handles join table updates.
+            task.Labels.Clear();
+            foreach (var label in newLabels)
+                task.Labels.Add(label);
+
+            await _context.SaveChangesAsync();
+
+            return Ok(task);
+        }
     }
 
     // Request body shape for task creation.
@@ -124,4 +160,7 @@ namespace Tasklog.Api.Controllers
 
     // Request body shape for assigning or unassigning a project on a task.
     public record AssignProjectRequest(int? ProjectId);
+
+    // Request body shape for replacing a task's full label set.
+    public record SetTaskLabelsRequest(int[] LabelIds);
 }

@@ -29,6 +29,11 @@ When in doubt, prefer the simpler approach and evolve later.
 - Route constraints enforce types at the URL level (e.g. `{id:int}`).
 - Timestamps are stored in UTC (`DateTime.UtcNow`).
 
+### Current patterns - additions from v2.4
+
+- **EF Core eager loading with `.Include()`** - used in `TasksController` to load `Labels` alongside tasks. All task queries use `.Include(t => t.Labels)` so callers always receive a populated `labels` array. Use the same pattern for any future navigation property that is always needed with the parent entity.
+- **Many-to-many via implicit join table** - `TaskModel` and `Label` use EF Core's `HasMany/WithMany` to configure a join table (`LabelTaskModel`) without an explicit join entity. Cascade deletes on the join table are handled automatically by the database.
+
 ### Patterns not yet in use - and when to consider them
 
 **Repository pattern** - not used currently. DbContext is injected directly into controllers.

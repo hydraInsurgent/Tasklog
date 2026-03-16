@@ -1,6 +1,6 @@
 # Feature Implementation Plan: Labels and Filtering
 
-**Overall Progress:** `0%`
+**Overall Progress:** `100%`
 
 ## TLDR
 Add user-created labels (tags) to tasks, a labels management dashboard in the sidebar, and a universal filter panel that lets the user filter any task view by label, project, or date.
@@ -81,68 +81,76 @@ Add user-created labels (tags) to tasks, a labels management dashboard in the si
 
 ### UX Rules in scope for this feature
 
-- [ ] `color-contrast` (CRITICAL) - White text on each of the 10 label color backgrounds must pass 4.5:1. Verify all swatches.
-- [ ] `focus-states` (CRITICAL) - Label chips, color picker swatches, inline edit inputs, and filter popover trigger all need visible focus rings.
-- [ ] `touch-targets` (CRITICAL) - Color swatch circles, chip `×` buttons, and filter trigger must meet 44x44px. Use padding.
-- [ ] `aria-labels` (CRITICAL) - Chip `×` buttons (`aria-label="Remove [name]"`), color picker trigger, filter popover trigger all need aria-labels.
-- [ ] `loading-states` (HIGH) - Spinner during label create, rename, and delete operations in LabelsClient.
-- [ ] `error-placement` (HIGH) - Inline error below the rename input if submitted empty.
-- [ ] `disable-during-async` (MEDIUM) - Create and delete buttons disabled while a request is in flight.
-- [ ] `cursor-pointer` (MEDIUM) - Color swatches, chip `×` buttons, all clickable label elements show pointer cursor.
-- [ ] `animation-duration` (MEDIUM) - Filter popover open/close uses 150-200ms transition.
-- [ ] `no-emoji-icons` (MEDIUM) - Use Lucide icons (`MoreHorizontal`, `Trash2`, `Tag`, `Check`) throughout.
+- [x] `color-contrast` (CRITICAL) - White text on each of the 10 label color backgrounds must pass 4.5:1. Verify all swatches.
+- [x] `focus-states` (CRITICAL) - Label chips, color picker swatches, inline edit inputs, and filter popover trigger all need visible focus rings.
+- [x] `touch-targets` (CRITICAL) - Color swatch circles, chip `×` buttons, and filter trigger must meet 44x44px. Use padding.
+- [x] `aria-labels` (CRITICAL) - Chip `×` buttons, color picker trigger, filter popover trigger all need aria-labels.
+- [x] `loading-states` (HIGH) - Spinner during label create, rename, and delete operations in LabelsClient.
+- [x] `error-placement` (HIGH) - Inline error below the rename input if submitted empty.
+- [x] `disable-during-async` (MEDIUM) - Create and delete buttons disabled while a request is in flight.
+- [x] `cursor-pointer` (MEDIUM) - Color swatches, chip `×` buttons, all clickable label elements show pointer cursor.
+- [x] `animation-duration` (MEDIUM) - Filter popover open/close uses 150-200ms transition.
+- [x] `no-emoji-icons` (MEDIUM) - Use Lucide icons (`MoreHorizontal`, `Trash2`, `Tag`, `Check`) throughout.
 
 ---
 
 ## Tasks
 
-- [ ] 🟥 **Step 1: Backend data model** `[sequential]` → delivers: Label entity, TaskLabel join table, EF config, migration
-  - [ ] 🟥 Create `Models/Label.cs` with `Id`, `Name`, `ColorIndex` (int 0-9), `CreatedAt`, and `ICollection<TaskModel> Tasks` nav property
-  - [ ] 🟥 Add `ICollection<Label> Labels` nav property to `Models/TaskModel.cs`
-  - [ ] 🟥 Register `DbSet<Label> Labels` in `TasklogDbContext.cs` and configure many-to-many with `HasMany/WithMany`
-  - [ ] 🟥 Run `dotnet ef migrations add AddLabels` and verify the generated migration
+- [x] 🟩 **Step 1: Backend data model** `[sequential]` → delivers: Label entity, TaskLabel join table, EF config, migration
+  - [x] 🟩 Create `Models/Label.cs` with `Id`, `Name`, `ColorIndex` (int 0-9), `CreatedAt`, and `ICollection<TaskModel> Tasks` nav property
+  - [x] 🟩 Add `ICollection<Label> Labels` nav property to `Models/TaskModel.cs`
+  - [x] 🟩 Register `DbSet<Label> Labels` in `TasklogDbContext.cs` and configure many-to-many with `HasMany/WithMany`
+  - [x] 🟩 Run `dotnet ef migrations add AddLabels` and verify the generated migration
 
-- [ ] 🟥 **Step 2: Backend API** `[sequential]` → depends on: Step 1
-  - [ ] 🟥 Create `Controllers/LabelsController.cs` with: `GET /api/labels`, `POST /api/labels`, `PATCH /api/labels/{id}`, `DELETE /api/labels/{id}`
-  - [ ] 🟥 Add request records: `CreateLabelRequest(string Name, int ColorIndex)`, `RenameLabelRequest(string Name, int ColorIndex)`
-  - [ ] 🟥 `DELETE /api/labels/{id}` - removes the label and unlinks it from all tasks (EF join table cleanup). Does NOT delete tasks.
-  - [ ] 🟥 Update `TasksController.GetAll()` and `GetById()` to `.Include(t => t.Labels)`
-  - [ ] 🟥 Add `PATCH /api/tasks/{id}/labels` - accepts `{ labelIds: int[] }`, replaces the task's label set, returns updated task
-  - [ ] 🟥 Add `SetTaskLabelsRequest(int[] LabelIds)` record
+- [x] 🟩 **Step 2: Backend API** `[sequential]` → depends on: Step 1
+  - [x] 🟩 Create `Controllers/LabelsController.cs` with: `GET /api/labels`, `POST /api/labels`, `PATCH /api/labels/{id}`, `DELETE /api/labels/{id}`
+  - [x] 🟩 Add request records: `CreateLabelRequest(string Name, int ColorIndex)`, `RenameLabelRequest(string Name, int ColorIndex)`
+  - [x] 🟩 `DELETE /api/labels/{id}` - removes the label and unlinks it from all tasks (EF join table cleanup). Does NOT delete tasks.
+  - [x] 🟩 Update `TasksController.GetAll()` and `GetById()` to `.Include(t => t.Labels)`
+  - [x] 🟩 Add `PATCH /api/tasks/{id}/labels` - accepts `{ labelIds: int[] }`, replaces the task's label set, returns updated task
+  - [x] 🟩 Add `SetTaskLabelsRequest(int[] LabelIds)` record
 
-- [ ] 🟥 **Step 3: Frontend API layer** `[sequential]` → depends on: Step 2
-  - [ ] 🟥 Add `Label` interface to `api.ts`: `{ id: number; name: string; colorIndex: number; createdAt: string }`
-  - [ ] 🟥 Add `labels: Label[]` to the `Task` interface in `api.ts`
-  - [ ] 🟥 Add `getLabels()`, `createLabel(name, colorIndex)`, `updateLabel(id, name, colorIndex)`, `deleteLabel(id)`, `setTaskLabels(taskId, labelIds[])` to `api.ts`
-  - [ ] 🟥 Add `LABEL_COLORS` constant array (10 hex strings) to `lib/format.ts` for shared use across components
+- [x] 🟩 **Step 3: Frontend API layer** `[sequential]` → depends on: Step 2
+  - [x] 🟩 Add `Label` interface to `api.ts`: `{ id: number; name: string; colorIndex: number; createdAt: string }`
+  - [x] 🟩 Add `labels: Label[]` to the `Task` interface in `api.ts`
+  - [x] 🟩 Add `getLabels()`, `createLabel(name, colorIndex)`, `updateLabel(id, name, colorIndex)`, `deleteLabel(id)`, `setTaskLabels(taskId, labelIds[])` to `api.ts`
+  - [x] 🟩 Add `LABEL_COLORS` constant array (10 hex strings) to `lib/format.ts` for shared use across components
 
-- [ ] 🟥 **Step 4: Labels dashboard** `[UI]` `[parallel]` → depends on: Step 3 - delivers: /labels route + sidebar nav link + CRUD UI
-  - [ ] 🟥 Create `app/labels/page.tsx` - Server Component that renders `<LabelsClient />`
-  - [ ] 🟥 Create `components/LabelsClient.tsx` - desktop table (Color swatch column + Label name column + Delete column), mobile card list. Inline name editing, color swatch picker popover, delete with confirmation. Same feedback pattern as the rest of the app.
-  - [ ] 🟥 Create `components/ColorPicker.tsx` - small popover showing 10 colored circles in a grid. Selected color gets a ring. No color names.
-  - [ ] 🟥 Update `ProjectSidebar.tsx` to add a "Labels" nav link as a separate section below the project list
+- [x] 🟩 **Step 4: Labels dashboard** `[UI]` `[parallel]` → depends on: Step 3 - delivers: /labels route + sidebar nav link + CRUD UI
+  - [x] 🟩 Create `app/labels/page.tsx` - Server Component that renders `<LabelsClient />`
+  - [x] 🟩 Create `components/LabelsClient.tsx` - desktop table, mobile card list, inline name editing, color swatch picker, delete with confirmation
+  - [x] 🟩 Create `components/ColorPicker.tsx` - small popover showing 10 colored circles in a grid
+  - [x] 🟩 Update `ProjectSidebar.tsx` to add a "Labels" nav link as a separate section below the project list
 
-- [ ] 🟥 **Step 5: Task labels UI** `[UI]` `[parallel]` → depends on: Step 3 - delivers: labels field in AddTaskForm + labels row on task detail page + label chips in TaskCard
-  - [ ] 🟥 Create `components/LabelChip.tsx` - shared chip component: colored pill with label name, optional `×` remove button
-  - [ ] 🟥 Create `components/AssignLabelsButton.tsx` - shows current label chips with `×`, plus combobox to add from existing labels. Calls `setTaskLabels` on each change, then `router.refresh()`.
-  - [ ] 🟥 Update `tasks/[id]/page.tsx` to fetch labels (`getLabels()`) and render a Labels row in the detail card using `AssignLabelsButton`
-  - [ ] 🟥 Update `AddTaskForm.tsx`: add labels field with autocomplete, chip display, auto-create on Enter if label not found (assigns next cycling color). Pass selected label IDs to parent `onAdd`.
-  - [ ] 🟥 Update `TasksClient.handleAdd` to accept `labelIds`, call `setTaskLabels` after task creation
-  - [ ] 🟥 Update `TaskCard.tsx` to show `#labelname` chips in bottom-right using label's hex as text color
+- [x] 🟩 **Step 5: Task labels UI** `[UI]` `[parallel]` → depends on: Step 3 - delivers: labels field in AddTaskForm + labels row on task detail page + label chips in TaskCard
+  - [x] 🟩 Create `components/LabelChip.tsx` - shared chip component: colored pill with label name, optional `×` remove button
+  - [x] 🟩 Create `components/AssignLabelsButton.tsx` - shows current label chips with `×`, plus combobox to add from existing labels
+  - [x] 🟩 Update `tasks/[id]/page.tsx` to fetch labels (`getLabels()`) and render a Labels row in the detail card
+  - [x] 🟩 Update `AddTaskForm.tsx`: add labels field with autocomplete, chip display, auto-create on Enter if label not found
+  - [x] 🟩 Update `TasksClient.handleAdd` to accept `labelIds`, call `setTaskLabels` after task creation
+  - [x] 🟩 Update `TaskCard.tsx` to show `#labelname` chips in bottom-right using label's hex as text color
 
-- [ ] 🟥 **Step 6: Filter panel** `[UI]` `[parallel]` → depends on: Step 3 - delivers: FilterPanel component + filterState in ProjectLayout + extended task filtering
-  - [ ] 🟥 Define `FilterState` type: `{ labelIds: number[]; projectIds: number[]; dateFilter: "none" | "today" | "this-week" | "overdue" }`
-  - [ ] 🟥 Create `components/FilterPanel.tsx` - popover from three-dot menu in task list header. Sections: Labels (chip multi-select), Project (checkboxes), Date (radio). Footer: "Apply" + "Clear filters".
-  - [ ] 🟥 Update `ProjectLayout.tsx` to own `filterState` alongside `activeView`, pass both to `TasksClient`
-  - [ ] 🟥 Update `TasksClient.tsx` to: accept `filterState` prop, extend filter logic to apply label/project/date on top of `activeView`, render three-dot menu + `FilterPanel` in the task list header
-  - [ ] 🟥 Show active filter count as an accent-blue badge on the filter button when filters are applied
+- [x] 🟩 **Step 6: Filter panel** `[UI]` `[parallel]` → depends on: Step 3 - delivers: FilterPanel component + filterState in ProjectLayout + extended task filtering
+  - [x] 🟩 Define `FilterState` type: `{ labelIds: number[]; projectIds: number[]; dateFilter: "none" | "today" | "this-week" | "overdue" }`
+  - [x] 🟩 Create `components/FilterPanel.tsx` - popover from three-dot button in task list header. Sections: Labels (chip multi-select), Project (checkboxes), Date (radio). Footer: "Apply" + "Clear filters".
+  - [x] 🟩 Update `ProjectLayout.tsx` to own `filterState` alongside `activeView`, pass both to `TasksClient`
+  - [x] 🟩 Update `TasksClient.tsx` to: accept `filterState` prop, extend filter logic, render three-dot button + `FilterPanel` in task list header
+  - [x] 🟩 Show active filter count as an accent-blue badge on the filter button when filters are applied
 
-- [ ] 🟥 **Step 7: Documentation** `[sequential]` → depends on: Steps 4, 5, 6
-  - [ ] 🟥 Update `docs/architecture.md`: data model (Labels, ColorIndex, join table), new API endpoints, new/updated components
-  - [ ] 🟥 Update `docs/product-design.md`: add Labels and Filtering to "How features currently work"
-  - [ ] 🟥 Update `docs/engineering-guidelines.md`: note `.Include()` pattern for nav properties
+- [x] 🟩 **Step 7: Documentation** `[sequential]` → depends on: Steps 4, 5, 6
+  - [x] 🟩 Update `docs/architecture.md`: data model (Labels, ColorIndex, join table), new API endpoints, new/updated components
+  - [x] 🟩 Update `docs/product-design.md`: add Labels and Filtering to "How features currently work"
+  - [x] 🟩 Update `docs/engineering-guidelines.md`: note `.Include()` pattern for nav properties
 
 ---
 
 ## Outcomes
-<!-- Fill in after execution: decision-relevant deltas only. What changed vs. planned? Key decisions made? Assumptions invalidated? -->
+
+**All steps completed as planned.**
+
+- EF Core implicit join table worked cleanly - no explicit join entity needed. Migration generated `Labels` + `LabelTaskModel` tables with correct cascade behavior.
+- `FindAsync` does not support `.Include()` - switched `GetById` to `FirstOrDefaultAsync` with include. Minor deviation, noted in code.
+- `AddTaskForm.test.tsx` required one update: `onAdd` now takes a 4th `labelIds?` argument, so the test expectation was updated to include `undefined` as the 4th arg.
+- Step 6 was downgraded from parallel to sequential (after Steps 4 and 5) because it shares `TasksClient.tsx` with Step 5. No impact on final output.
+- Label filter uses OR logic: a task passes the label filter if it has at least one of the selected labels.
+- Filter panel uses draft state - changes are not committed until "Apply" is clicked.

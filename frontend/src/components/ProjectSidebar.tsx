@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Pencil, Trash2, Plus } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Pencil, Trash2, Plus, Tag } from "lucide-react";
 import { Project } from "@/lib/api";
 
 interface Props {
@@ -27,6 +29,7 @@ export default function ProjectSidebar({
   onEditProject,
   onDeleteProject,
 }: Props) {
+  const pathname = usePathname();
   const [showNewInput, setShowNewInput] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [editingProject, setEditingProject] = useState<{
@@ -146,6 +149,21 @@ export default function ProjectSidebar({
             </div>
           ))}
         </div>
+
+        <hr className="my-3 border-zinc-200" />
+
+        {/* Labels link */}
+        <Link
+          href="/labels"
+          className={`flex items-center gap-2 w-full text-left text-sm px-4 py-2 transition-colors duration-150 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-600 ${
+            pathname === "/labels" ? activeNavClass : inactiveNavClass
+          }`}
+        >
+          <Tag size={16} aria-hidden="true" />
+          Labels
+        </Link>
+
+        <hr className="my-3 border-zinc-200" />
 
         {/* Inline new project input */}
         {showNewInput && (

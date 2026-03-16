@@ -4,7 +4,7 @@ import { useRef, useEffect, useState } from "react";
 import Link from "next/link";
 import { MoreVertical, Trash2, Loader2 } from "lucide-react";
 import { Task, Project } from "@/lib/api";
-import { formatDate, deadlineColorClass, projectName } from "@/lib/format";
+import { formatDate, deadlineColorClass, projectName, labelColor } from "@/lib/format";
 
 interface Props {
   task: Task;
@@ -90,17 +90,36 @@ export default function TaskCard({
           {task.title}
         </Link>
 
-        {/* Footer row: project name and deadline */}
-        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0 text-xs">
-          {showProject && (
-            <span className="text-zinc-500">{projectName(task.projectId, projects)}</span>
-          )}
-          {task.deadline ? (
-            <span className={deadlineColorClass(task.deadline)}>
-              {formatDate(task.deadline)}
-            </span>
-          ) : (
-            <span className="text-zinc-300">No deadline</span>
+        {/* Footer row: project name, deadline, and labels */}
+        <div className="mt-0.5 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-xs">
+          {/* Left side: project name + deadline */}
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0">
+            {showProject && (
+              <span className="text-zinc-500">{projectName(task.projectId, projects)}</span>
+            )}
+            {task.deadline ? (
+              <span className={deadlineColorClass(task.deadline)}>
+                {formatDate(task.deadline)}
+              </span>
+            ) : (
+              <span className="text-zinc-300">No deadline</span>
+            )}
+          </div>
+
+          {/* Right side: label names shown as #labelname in the label's color.
+              Only rendered when the task has at least one label. */}
+          {task.labels && task.labels.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1 justify-end">
+              {task.labels.map((label) => (
+                <span
+                  key={label.id}
+                  className="text-xs font-medium"
+                  style={{ color: labelColor(label.colorIndex) }}
+                >
+                  #{label.name}
+                </span>
+              ))}
+            </div>
           )}
         </div>
       </div>

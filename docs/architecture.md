@@ -109,6 +109,16 @@ Tasks
   IsCompleted INTEGER  not null  default 0  (boolean: 0 = pending, 1 = complete)
   CompletedAt TEXT     nullable  (ISO 8601 datetime string, set when marked complete, cleared on un-complete)
   ProjectId   INTEGER  nullable  foreign key -> Projects.Id (null = Inbox)
+
+Labels
+  Id          INTEGER  primary key, autoincrement
+  Name        TEXT     not null
+  ColorIndex  INTEGER  not null  (0-9, maps to VIBGYOR palette in frontend)
+  CreatedAt   TEXT     not null  (ISO 8601 datetime string)
+
+LabelTaskModel  (join table - implicit many-to-many)
+  LabelsId    INTEGER  not null  foreign key -> Labels.Id  (cascade delete)
+  TasksId     INTEGER  not null  foreign key -> Tasks.Id   (cascade delete)
 ```
 
 ### API endpoints
@@ -125,6 +135,11 @@ Tasks
 | POST | `/api/projects` | Create project. Body: `{ name: string }`. Returns created project |
 | PATCH | `/api/projects/{id}` | Rename project. Body: `{ name: string }`. Returns updated project |
 | DELETE | `/api/projects/{id}` | Delete project and cascade delete all its tasks. 204 on success |
+| GET | `/api/labels` | All labels, ordered by name |
+| POST | `/api/labels` | Create label. Body: `{ name, colorIndex }`. Returns created label |
+| PATCH | `/api/labels/{id}` | Update label name and/or color. Body: `{ name, colorIndex }`. Returns updated label |
+| DELETE | `/api/labels/{id}` | Delete label. Unlinks from all tasks (does not delete tasks). 204 on success |
+| PATCH | `/api/tasks/{id}/labels` | Replace task's label set. Body: `{ labelIds: int[] }`. Returns updated task |
 
 ### CORS
 
@@ -213,6 +228,31 @@ AssignProjectButton.tsx Client Component.
                         - Dropdown to reassign task to a project or Inbox
                         - Calls PATCH /api/tasks/{id}/project, then router.refresh()
                         - State only updates after API confirms (no optimistic update)
+
+LabelChip.tsx           Client Component.
+                        - Shared colored pill chip for label display
+                        - Optional onRemove callback renders an × button
+                        - Background color derived from label.colorIndex via labelColor()
+
+AssignLabelsButton.tsx  Client Component.
+                        - Used only on the task detail page
+                        - Shows current labels as LabelChip components with remove buttons
+                        - Select dropdown to add unassigned labels
+                        - Calls PATCH /api/tasks/{id}/labels on each change, then router.refresh()
+
+LabelsClient.tsx        Client Component.
+                        - Used on the /labels page
+                        - Full CRUD: fetch, create, inline rename, color picker, delete
+                        - Desktop: table layout. Mobile: card list.
+
+ColorPicker.tsx         Client Component.
+                        - 10-color swatch grid popover
+                        - Used by LabelsClient for color assignment/editing
+
+FilterPanel.tsx         Client Component.
+                        - Popover opened from the task list header three-dot button
+                        - Filter sections: Labels (multi-select chips), Project (checkboxes), Date (radio)
+                        - Apply and Clear buttons; draft state committed only on Apply
 ```
 
 ### API calls
@@ -298,6 +338,6 @@ These are tracked as GitHub issues:
 
 These are planned but not built:
 
-- Filtering and pagination
+- Pagination
 - Authentication
 - Production deployment configuration
