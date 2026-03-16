@@ -33,13 +33,17 @@ export default function AssignLabelsButton({ taskId, currentLabels, allLabels }:
 
   // Call the API with the new set of label IDs, then revalidate page data.
   async function saveLabels(newIds: number[]) {
+    // Optimistic update: apply immediately so the UI responds without waiting for the API.
+    const previousIds = assignedIds;
+    setAssignedIds(newIds);
     setSaving(true);
     setError("");
     try {
       await setTaskLabels(taskId, newIds);
-      setAssignedIds(newIds);
       router.refresh();
     } catch (err) {
+      // Revert to previous state if the request fails.
+      setAssignedIds(previousIds);
       setError(err instanceof Error ? err.message : "Failed to update labels.");
     } finally {
       setSaving(false);

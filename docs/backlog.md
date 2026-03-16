@@ -23,6 +23,7 @@ What is currently being planned or built:
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
 | P30-labels-and-filtering.md | #30 | feature/labels-#30 | In Progress |
+| P30-review-fixes.md | #31-#36 | feature/labels-#30 | In Progress |
 
 ---
 

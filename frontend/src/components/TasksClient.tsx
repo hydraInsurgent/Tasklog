@@ -160,8 +160,11 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
     }
 
     // 3. Project filter from the filter panel (only meaningful in "all" view).
+    // projectId is null for Inbox tasks - check explicitly rather than using a sentinel value.
     if (filterState.projectIds.length > 0 && activeView === "all") {
-      if (!filterState.projectIds.includes(t.projectId ?? -1)) return false;
+      const pid = t.projectId;
+      const matches = pid !== null && filterState.projectIds.includes(pid);
+      if (!matches) return false;
     }
 
     // 4. Date filter.
@@ -180,6 +183,9 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
         if (!deadline) return false;
         if (deadline < todayStart || deadline >= weekEnd) return false;
       }
+      // Overdue: deadline is before today's midnight in the browser's local time.
+      // Deadlines are stored as date-only strings (YYYY-MM-DD) from the backend,
+      // so timezone ambiguity is minimal - the filter matches user-local calendar dates.
       if (filterState.dateFilter === "overdue") {
         if (!deadline || t.isCompleted) return false;
         if (deadline >= todayStart) return false;
@@ -224,7 +230,7 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
       )}
 
       {/* Task list panel */}
-      <div className="bg-white border border-zinc-200 rounded-lg overflow-hidden">
+      <div className="bg-white border border-zinc-200 rounded-lg">
         <div className="px-6 py-4 border-b border-zinc-200 flex items-center justify-between">
           <h1
             className="text-lg font-semibold text-zinc-900"
@@ -307,7 +313,7 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
         ) : (
           <>
           {/* Desktop table - hidden on mobile to avoid horizontal scroll. */}
-          <div className="hidden md:block overflow-x-auto">
+          <div className="hidden md:block overflow-x-auto overflow-hidden rounded-b-lg">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-zinc-100 text-left">
@@ -427,7 +433,7 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
           </div>
 
           {/* Mobile card list - shown below md: breakpoint, hidden on desktop. */}
-          <div className="md:hidden">
+          <div className="md:hidden overflow-hidden rounded-b-lg">
             {visibleTasks.map((task) => (
               <TaskCard
                 key={task.id}

@@ -106,23 +106,25 @@ export default function FilterPanel({
     onClose();
   }
 
+  // Close when the user clicks outside the panel (same pattern as ColorPicker).
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [onClose]);
+
   return (
-    // Overlay backdrop that closes the panel on outside click.
+    // Panel is absolutely positioned by the trigger's relative container in TasksClient.
     <div
-      className="fixed inset-0 z-30"
-      onMouseDown={(e) => {
-        if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-          onClose();
-        }
-      }}
+      ref={panelRef}
+      role="dialog"
+      aria-label="Filter tasks"
+      className="absolute right-0 top-full mt-1 w-72 bg-white border border-zinc-200 rounded-lg shadow-lg z-40 overflow-hidden"
     >
-      {/* Panel itself - absolutely positioned by parent, so we just style the box here. */}
-      <div
-        ref={panelRef}
-        role="dialog"
-        aria-label="Filter tasks"
-        className="absolute right-0 top-full mt-1 w-72 bg-white border border-zinc-200 rounded-lg shadow-lg z-40 overflow-hidden"
-      >
         {/* Header */}
         <div className="px-4 py-3 border-b border-zinc-100 flex items-center justify-between">
           <span
@@ -140,7 +142,7 @@ export default function FilterPanel({
           </button>
         </div>
 
-        <div className="px-4 py-3 space-y-4 max-h-[70vh] overflow-y-auto">
+        <div className="px-4 py-3 space-y-4 max-h-64 overflow-y-auto">
           {/* Labels section */}
           {allLabels.length > 0 && (
             <section>
@@ -242,6 +244,5 @@ export default function FilterPanel({
           </button>
         </div>
       </div>
-    </div>
   );
 }

@@ -57,10 +57,10 @@ export default function ColorPicker({ selectedIndex, onSelect, onClose }: Props)
       ref={ref}
       role="dialog"
       aria-label="Pick a label color"
-      className="absolute z-50 top-full mt-1 left-0 bg-white border border-zinc-200 rounded-lg shadow-lg p-2"
+      className="absolute z-50 top-full mt-1 left-0 bg-white border border-zinc-200 rounded-lg shadow-lg p-3"
     >
-      {/* 5x2 grid of color circles */}
-      <div className="grid grid-cols-5 gap-1.5">
+      {/* 5x2 grid of color circles - 36px each for comfortable tap targets */}
+      <div className="grid grid-cols-5 gap-2">
         {LABEL_COLORS.map((hex, index) => (
           <button
             key={index}
@@ -70,17 +70,13 @@ export default function ColorPicker({ selectedIndex, onSelect, onClose }: Props)
             }}
             aria-label={`Select ${COLOR_NAMES[index]}`}
             aria-pressed={index === selectedIndex}
-            className={`w-6 h-6 rounded-full cursor-pointer transition-transform duration-100 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-1 ${
-              index === selectedIndex
-                ? "ring-2 ring-white ring-offset-1"
-                : ""
-            }`}
+            className="w-9 h-9 rounded-full cursor-pointer transition-transform duration-100 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600"
             style={{
               backgroundColor: hex,
-              // When selected, add a contrasting box-shadow to make the white ring visible.
+              // Multi-layer box-shadow creates the selected ring: color border > white gap > color outer ring.
               boxShadow:
                 index === selectedIndex
-                  ? `0 0 0 1px ${hex}, 0 0 0 3px white, 0 0 0 4px ${hex}`
+                  ? `0 0 0 2px white, 0 0 0 4px ${hex}`
                   : undefined,
             }}
           />

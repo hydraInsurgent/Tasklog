@@ -39,9 +39,17 @@ namespace Tasklog.Api.Controllers
             if (request.ColorIndex < 0 || request.ColorIndex > 9)
                 return BadRequest(new { message = "ColorIndex must be between 0 and 9." });
 
+            // Reject the request if a label with the same name already exists (case-insensitive).
+            var trimmedName = request.Name.Trim();
+            var nameExists = await _context.Labels
+                .AnyAsync(l => l.Name.ToLower() == trimmedName.ToLower());
+
+            if (nameExists)
+                return Conflict(new { message = $"A label named \"{trimmedName}\" already exists." });
+
             var label = new Label
             {
-                Name = request.Name.Trim(),
+                Name = trimmedName,
                 ColorIndex = request.ColorIndex,
                 CreatedAt = DateTime.UtcNow
             };
@@ -68,7 +76,16 @@ namespace Tasklog.Api.Controllers
             if (label is null)
                 return NotFound(new { message = $"Label {id} not found." });
 
-            label.Name = request.Name.Trim();
+            // Reject the rename if another label already has the same name (case-insensitive).
+            // The current label is excluded from the check so saving with no name change still works.
+            var trimmedName = request.Name.Trim();
+            var nameConflict = await _context.Labels
+                .AnyAsync(l => l.Id != id && l.Name.ToLower() == trimmedName.ToLower());
+
+            if (nameConflict)
+                return Conflict(new { message = $"A label named \"{trimmedName}\" already exists." });
+
+            label.Name = trimmedName;
             label.ColorIndex = request.ColorIndex;
             await _context.SaveChangesAsync();
 

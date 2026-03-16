@@ -12,6 +12,8 @@ namespace Tasklog.Api.Models
         public DateTime CreatedAt { get; set; }
 
         // Navigation property - tasks that carry this label.
+        // JsonIgnore prevents circular serialization: Task -> Labels -> Label.Tasks -> Task -> ...
+        [JsonIgnore]
         public ICollection<TaskModel> Tasks { get; set; } = new List<TaskModel>();
     }
 }

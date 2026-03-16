@@ -136,10 +136,20 @@ namespace Tasklog.Api.Controllers
             if (task is null)
                 return NotFound(new { message = $"Task {id} not found." });
 
-            // Load the requested labels. Unknown IDs are silently ignored.
+            // Load the requested labels and reject the request if any IDs don't exist.
+            // An empty array is valid - it clears all labels from the task.
             var newLabels = await _context.Labels
                 .Where(l => request.LabelIds.Contains(l.Id))
                 .ToListAsync();
+
+            if (request.LabelIds.Length > 0)
+            {
+                var foundIds = newLabels.Select(l => l.Id).ToHashSet();
+                var invalidIds = request.LabelIds.Where(id => !foundIds.Contains(id)).ToList();
+
+                if (invalidIds.Any())
+                    return BadRequest(new { message = $"Label IDs not found: {string.Join(", ", invalidIds)}." });
+            }
 
             // Replace the current label collection. EF Core handles join table updates.
             task.Labels.Clear();

@@ -31,8 +31,9 @@ export default function LabelsClient() {
   // Inline color picking: which label's color picker is open.
   const [colorPickerId, setColorPickerId] = useState<number | null>(null);
 
-  // Track which label has an async request in-flight for disabling.
-  const [pendingId, setPendingId] = useState<number | null>(null);
+  // Track which labels have async requests in-flight for disabling.
+  // Using a Set allows color-change and rename to be tracked independently.
+  const [pendingIds, setPendingIds] = useState<Set<number>>(new Set());
 
   // Ref to the edit input so we can auto-focus it.
   const editInputRef = useRef<HTMLInputElement>(null);
@@ -98,7 +99,7 @@ export default function LabelsClient() {
       setEditingId(null);
       return;
     }
-    setPendingId(label.id);
+    setPendingIds((prev) => new Set(prev).add(label.id));
     try {
       const updated = await updateLabel(label.id, trimmed, label.colorIndex);
       setLabels((prev) => prev.map((l) => (l.id === label.id ? updated : l)));
@@ -106,7 +107,11 @@ export default function LabelsClient() {
     } catch {
       showFeedback("error", "Failed to rename label. Please try again.");
     } finally {
-      setPendingId(null);
+      setPendingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(label.id);
+        return next;
+      });
       setEditingId(null);
     }
   }
@@ -114,7 +119,7 @@ export default function LabelsClient() {
   // Update a label's color index via the color picker.
   async function handleColorChange(label: Label, colorIndex: number) {
     if (colorIndex === label.colorIndex) return;
-    setPendingId(label.id);
+    setPendingIds((prev) => new Set(prev).add(label.id));
     try {
       const updated = await updateLabel(label.id, label.name, colorIndex);
       setLabels((prev) => prev.map((l) => (l.id === label.id ? updated : l)));
@@ -122,7 +127,11 @@ export default function LabelsClient() {
     } catch {
       showFeedback("error", "Failed to update color. Please try again.");
     } finally {
-      setPendingId(null);
+      setPendingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(label.id);
+        return next;
+      });
     }
   }
 
@@ -132,7 +141,7 @@ export default function LabelsClient() {
       `Delete label "${label.name}"?\n\nThis label will be removed from all tasks. The tasks themselves will not be deleted.`
     );
     if (!confirmed) return;
-    setPendingId(label.id);
+    setPendingIds((prev) => new Set(prev).add(label.id));
     try {
       await deleteLabel(label.id);
       setLabels((prev) => prev.filter((l) => l.id !== label.id));
@@ -140,7 +149,11 @@ export default function LabelsClient() {
     } catch {
       showFeedback("error", "Failed to delete label. Please try again.");
     } finally {
-      setPendingId(null);
+      setPendingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(label.id);
+        return next;
+      });
     }
   }
 
@@ -219,7 +232,7 @@ export default function LabelsClient() {
                                 colorPickerId === label.id ? null : label.id
                               )
                             }
-                            disabled={pendingId === label.id}
+                            disabled={pendingIds.has(label.id)}
                             aria-label={`Change color for label: ${label.name}`}
                             className="w-5 h-5 rounded-full cursor-pointer transition-transform duration-100 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
                             style={{ backgroundColor: labelColor(label.colorIndex) }}
@@ -247,7 +260,7 @@ export default function LabelsClient() {
                               if (e.key === "Enter") handleRename(label);
                               if (e.key === "Escape") setEditingId(null);
                             }}
-                            disabled={pendingId === label.id}
+                            disabled={pendingIds.has(label.id)}
                             className="w-full px-2 py-1 border border-zinc-300 rounded text-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                           />
                         ) : (
@@ -264,11 +277,11 @@ export default function LabelsClient() {
                       <td className="px-6 py-4">
                         <button
                           onClick={() => handleDelete(label)}
-                          disabled={pendingId === label.id}
+                          disabled={pendingIds.has(label.id)}
                           aria-label={`Delete label: ${label.name}`}
                           className="flex items-center justify-center min-w-[44px] min-h-[44px] text-zinc-400 hover:text-red-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors duration-150 cursor-pointer"
                         >
-                          {pendingId === label.id ? (
+                          {pendingIds.has(label.id) ? (
                             <Loader2
                               size={16}
                               className="animate-spin"
@@ -300,7 +313,7 @@ export default function LabelsClient() {
                           colorPickerId === label.id ? null : label.id
                         )
                       }
-                      disabled={pendingId === label.id}
+                      disabled={pendingIds.has(label.id)}
                       aria-label={`Change color for label: ${label.name}`}
                       className="w-5 h-5 rounded-full cursor-pointer transition-transform duration-100 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
                       style={{ backgroundColor: labelColor(label.colorIndex) }}
@@ -327,7 +340,7 @@ export default function LabelsClient() {
                           if (e.key === "Enter") handleRename(label);
                           if (e.key === "Escape") setEditingId(null);
                         }}
-                        disabled={pendingId === label.id}
+                        disabled={pendingIds.has(label.id)}
                         className="w-full px-2 py-1 border border-zinc-300 rounded text-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                       />
                     ) : (
@@ -343,11 +356,11 @@ export default function LabelsClient() {
                   {/* Delete button */}
                   <button
                     onClick={() => handleDelete(label)}
-                    disabled={pendingId === label.id}
+                    disabled={pendingIds.has(label.id)}
                     aria-label={`Delete label: ${label.name}`}
                     className="shrink-0 flex items-center justify-center min-w-[44px] min-h-[44px] text-zinc-400 hover:text-red-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors duration-150 cursor-pointer"
                   >
-                    {pendingId === label.id ? (
+                    {pendingIds.has(label.id) ? (
                       <Loader2
                         size={16}
                         className="animate-spin"

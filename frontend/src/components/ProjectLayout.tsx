@@ -20,7 +20,17 @@ export default function ProjectLayout() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [activeView, setActiveView] = useState<"all" | "inbox" | number>("all");
-  const [filterState, setFilterState] = useState<FilterState>(EMPTY_FILTER);
+  const [filterState, setFilterState] = useState<FilterState>(() => {
+    // Restore filter state from sessionStorage so filters persist across
+    // navigation (e.g. going to /labels and coming back).
+    if (typeof window === "undefined") return EMPTY_FILTER;
+    try {
+      const saved = sessionStorage.getItem("tasklog_filter_state");
+      return saved ? JSON.parse(saved) : EMPTY_FILTER;
+    } catch {
+      return EMPTY_FILTER;
+    }
+  });
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
 
@@ -45,6 +55,15 @@ export default function ProjectLayout() {
   useEffect(() => {
     loadProjects();
   }, [loadProjects]);
+
+  // Persist filter state to sessionStorage so it survives navigation.
+  useEffect(() => {
+    try {
+      sessionStorage.setItem("tasklog_filter_state", JSON.stringify(filterState));
+    } catch {
+      // sessionStorage may be unavailable in some environments - fail silently.
+    }
+  }, [filterState]);
 
   // Create a project and append it to local state.
   // Re-throws on error so ProjectSidebar can clear its pending state.

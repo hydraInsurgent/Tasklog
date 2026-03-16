@@ -23,6 +23,9 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
   const [deadline, setDeadline] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // Separate error state for label creation so it doesn't interfere with
+  // the title validation error shown above the submit button.
+  const [labelError, setLabelError] = useState("");
   // "inbox" sentinel string represents null projectId (no project).
   const [selectedProjectId, setSelectedProjectId] = useState<string>(
     defaultProjectId != null ? String(defaultProjectId) : "inbox"
@@ -107,13 +110,24 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
       // First suggestion - select it directly.
       selectLabel(labelSuggestions[0]);
     } else {
-      // No match - create a new label. Color cycles through the 10-color palette.
-      const nextColorIndex = allLabels.length % 10;
-      try {
-        const created = await createLabel(trimmed, nextColorIndex);
-        selectLabel(created);
-      } catch {
-        // Silently ignore creation errors - don't interrupt the main form flow.
+      // Check if a label with this name already exists (case-insensitive match).
+      // This prevents duplicate labels when the user types a name that exists
+      // but wasn't shown in suggestions (e.g. different casing).
+      const existing = allLabels.find(
+        (l) => l.name.toLowerCase() === trimmed.toLowerCase()
+      );
+      if (existing) {
+        selectLabel(existing);
+      } else {
+        // No match - create a new label. Color cycles through the 10-color palette.
+        const nextColorIndex = allLabels.length % 10;
+        try {
+          const created = await createLabel(trimmed, nextColorIndex);
+          selectLabel(created);
+        } catch {
+          setLabelError("Couldn't create label. Try again.");
+          setTimeout(() => setLabelError(""), 3000);
+        }
       }
     }
   }
@@ -304,6 +318,14 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
                 </ul>
               )}
             </div>
+
+            {/* Inline error for label creation failures. Separate from the title
+                error so the two don't overwrite each other. Auto-clears after 3s. */}
+            {labelError && (
+              <p className="mt-1 text-xs text-red-500" role="alert">
+                {labelError}
+              </p>
+            )}
           </div>
         )}
 
