@@ -1,7 +1,19 @@
 // API client for the Tasklog .NET Web API.
-// All functions talk to the base URL defined in NEXT_PUBLIC_API_URL.
+// The base URL is resolved by getApiUrl():
+//   1. If NEXT_PUBLIC_API_URL is set (dev mode), use it directly.
+//   2. Client-side: derive from the browser's hostname with port 5115,
+//      so accessing the frontend from any device (e.g. phone on LAN) auto-targets the right backend.
+//   3. Server-side (SSR): fall back to localhost:5115 since both processes share a machine.
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+function getApiUrl(): string {
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  if (typeof window !== "undefined") {
+    return `http://${window.location.hostname}:5115`;
+  }
+  return "http://localhost:5115";
+}
 
 // The shape returned by the API for every project.
 export interface Project {
@@ -35,14 +47,14 @@ export interface Task {
 
 // GET /api/tasks - fetch all tasks ordered by creation date (newest first).
 export async function getTasks(): Promise<Task[]> {
-  const res = await fetch(`${API_URL}/api/tasks`, { cache: "no-store" });
+  const res = await fetch(`${getApiUrl()}/api/tasks`, { cache: "no-store" });
   if (!res.ok) throw new Error("Failed to fetch tasks.");
   return res.json();
 }
 
 // GET /api/tasks/:id - fetch a single task by ID.
 export async function getTask(id: number): Promise<Task> {
-  const res = await fetch(`${API_URL}/api/tasks/${id}`, { cache: "no-store" });
+  const res = await fetch(`${getApiUrl()}/api/tasks/${id}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`Task ${id} not found.`);
   return res.json();
 }
@@ -53,7 +65,7 @@ export async function createTask(
   deadline?: string,
   projectId?: number | null
 ): Promise<Task> {
-  const res = await fetch(`${API_URL}/api/tasks`, {
+  const res = await fetch(`${getApiUrl()}/api/tasks`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ title, deadline: deadline ?? null, projectId: projectId ?? null }),
@@ -67,14 +79,14 @@ export async function createTask(
 
 // DELETE /api/tasks/:id - delete a task. Returns nothing on success.
 export async function deleteTask(id: number): Promise<void> {
-  const res = await fetch(`${API_URL}/api/tasks/${id}`, { method: "DELETE" });
+  const res = await fetch(`${getApiUrl()}/api/tasks/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error(`Failed to delete task ${id}.`);
 }
 
 // PATCH /api/tasks/:id/complete - mark a task complete or incomplete.
 // Returns the updated task.
 export async function completeTask(id: number, isCompleted: boolean): Promise<Task> {
-  const res = await fetch(`${API_URL}/api/tasks/${id}/complete`, {
+  const res = await fetch(`${getApiUrl()}/api/tasks/${id}/complete`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ isCompleted }),
@@ -85,14 +97,14 @@ export async function completeTask(id: number, isCompleted: boolean): Promise<Ta
 
 // GET /api/projects - fetch all projects.
 export async function getProjects(): Promise<Project[]> {
-  const res = await fetch(`${API_URL}/api/projects`, { cache: "no-store" });
+  const res = await fetch(`${getApiUrl()}/api/projects`, { cache: "no-store" });
   if (!res.ok) throw new Error("Failed to fetch projects.");
   return res.json();
 }
 
 // POST /api/projects - create a new project. Returns the created project.
 export async function createProject(name: string): Promise<Project> {
-  const res = await fetch(`${API_URL}/api/projects`, {
+  const res = await fetch(`${getApiUrl()}/api/projects`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
@@ -103,7 +115,7 @@ export async function createProject(name: string): Promise<Project> {
 
 // PATCH /api/projects/:id - rename a project. Returns the updated project.
 export async function renameProject(id: number, name: string): Promise<Project> {
-  const res = await fetch(`${API_URL}/api/projects/${id}`, {
+  const res = await fetch(`${getApiUrl()}/api/projects/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
@@ -114,14 +126,14 @@ export async function renameProject(id: number, name: string): Promise<Project> 
 
 // DELETE /api/projects/:id - delete a project. Returns nothing on success.
 export async function deleteProject(id: number): Promise<void> {
-  const res = await fetch(`${API_URL}/api/projects/${id}`, { method: "DELETE" });
+  const res = await fetch(`${getApiUrl()}/api/projects/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error(`Failed to delete project ${id}.`);
 }
 
 // PATCH /api/tasks/:taskId/project - assign a task to a project (or null for Inbox).
 // Returns the updated task.
 export async function assignTaskProject(taskId: number, projectId: number | null): Promise<Task> {
-  const res = await fetch(`${API_URL}/api/tasks/${taskId}/project`, {
+  const res = await fetch(`${getApiUrl()}/api/tasks/${taskId}/project`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ projectId }),
@@ -133,7 +145,7 @@ export async function assignTaskProject(taskId: number, projectId: number | null
 // PATCH /api/tasks/:taskId/labels - replace the full label set on a task.
 // Pass an empty array to remove all labels. Returns the updated task.
 export async function setTaskLabels(taskId: number, labelIds: number[]): Promise<Task> {
-  const res = await fetch(`${API_URL}/api/tasks/${taskId}/labels`, {
+  const res = await fetch(`${getApiUrl()}/api/tasks/${taskId}/labels`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ labelIds }),
@@ -144,14 +156,14 @@ export async function setTaskLabels(taskId: number, labelIds: number[]): Promise
 
 // GET /api/labels - fetch all labels ordered alphabetically.
 export async function getLabels(): Promise<Label[]> {
-  const res = await fetch(`${API_URL}/api/labels`, { cache: "no-store" });
+  const res = await fetch(`${getApiUrl()}/api/labels`, { cache: "no-store" });
   if (!res.ok) throw new Error("Failed to fetch labels.");
   return res.json();
 }
 
 // POST /api/labels - create a new label. Returns the created label.
 export async function createLabel(name: string, colorIndex: number): Promise<Label> {
-  const res = await fetch(`${API_URL}/api/labels`, {
+  const res = await fetch(`${getApiUrl()}/api/labels`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, colorIndex }),
@@ -165,7 +177,7 @@ export async function createLabel(name: string, colorIndex: number): Promise<Lab
 
 // PATCH /api/labels/:id - update a label's name and/or color. Returns the updated label.
 export async function updateLabel(id: number, name: string, colorIndex: number): Promise<Label> {
-  const res = await fetch(`${API_URL}/api/labels/${id}`, {
+  const res = await fetch(`${getApiUrl()}/api/labels/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, colorIndex }),
@@ -176,6 +188,6 @@ export async function updateLabel(id: number, name: string, colorIndex: number):
 
 // DELETE /api/labels/:id - delete a label. Unlinks it from all tasks (tasks are not deleted).
 export async function deleteLabel(id: number): Promise<void> {
-  const res = await fetch(`${API_URL}/api/labels/${id}`, { method: "DELETE" });
+  const res = await fetch(`${getApiUrl()}/api/labels/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error(`Failed to delete label ${id}.`);
 }

@@ -2,6 +2,36 @@
 
 ---
 
+## v2.5 - Downloadable Package
+*March 2026*
+
+### What changed
+
+**Distributable package**
+- Tasklog can now be downloaded as a single zip and run on any Windows machine with no prerequisites
+- PowerShell build script (`scripts/Build-Distributable.ps1`) produces the distributable zip
+- C# launcher (`Tasklog.exe`) starts both backend and frontend, displays browser and LAN URLs, handles clean shutdown
+- .NET backend published as self-contained single-file exe (no .NET SDK needed on target)
+- Next.js frontend built in standalone mode with bundled portable Node.js binary
+- Sample database with 3 projects, 4 labels, and 12 tasks pre-loaded for demo purposes
+- README.txt with quick-start and troubleshooting instructions included in the zip
+
+**Backend**
+- CORS now works in all environments: `FrontendDev` policy for development, `Distributable` policy (any origin) for production
+- Database path resolves relative to the exe directory in production, fixing issue #3
+- HTTPS redirection disabled in production (distributable runs over HTTP on local network)
+
+**Frontend**
+- Dynamic API URL detection: uses `NEXT_PUBLIC_API_URL` if set (dev mode), otherwise derives from `window.location.hostname` (distributable mode)
+- This fixes issue #1 - the app now works on any device without hardcoded IPs
+- Next.js standalone output configured for self-contained builds
+
+**Issues resolved**
+- #1 - CORS and server-side fetch break outside localhost
+- #3 - Fragile database path
+
+---
+
 ## v2.4 - Labels and Filtering
 *March 2026*
 

@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| (none) | | | |
+| P37-downloadable-package.md | #37 | feature/downloadable-package-#37 | In Progress |
 
 ---
 
@@ -39,6 +39,9 @@ Future features - not yet started. Add GitHub issue number when created.
 | #27 | Add overflow guard to three-dot dropdown menu | low | from #22 review |
 | #28 | Align focus ring color to UI-SPEC accent token | low | from #22 review |
 | #29 | Increase three-dot button icon size to match UI-SPEC | low | from #22 review |
+| #39 | Show child process errors in launcher on failure | medium | from #37 review |
+| #40 | Detect port-in-use before starting services | medium | from #37 review |
+| #41 | Deduplicate seed logic between build scripts | low | from #37 review |
 
 ---
 
@@ -56,6 +59,7 @@ Known bugs not yet fixed. Add GitHub issue number when created.
 | #5 | Code cleanup - duplicated utils, UTC timestamps | low | |
 | #6 | Security hardening - CORS methods, AllowedHosts | low | |
 | #17 | CreatedAtAction in ProjectsController points to wrong route | low | from #12 review |
+| #38 | Incomplete RFC 1918 check for 172.x.x.x in launcher | low | from #37 review |
 | #18 | Inconsistent DateTime.Now vs UtcNow across controllers | low | from #12 review |
 | #19 | Assigning task to non-existent project returns 500 not 400 | low | from #12 review |
 | #21 | Add project button missing minimum touch target height | low | from #12 review |

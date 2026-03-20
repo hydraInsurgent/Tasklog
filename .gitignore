@@ -41,3 +41,7 @@ PLAN-*.md
 
 # IDE (local Cursor settings - shared commands are in .claude/commands/)
 .cursor/
+
+# Build artifacts (distributable package output)
+build/
+dist/sample/
