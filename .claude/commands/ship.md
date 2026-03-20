@@ -170,15 +170,25 @@ gh issue comment [N] --body "Release: [release URL]"
 
 ---
 
-## Step 8b: Update backlog.md
+## Step 8b: Update backlog and archive plan
 
-Remove the row from the **Active** section and add it to **Closed**:
+**Backlog:** Remove the row from the **Active** section and add it to **Closed**:
 
 ```
 | #[N] | [feature name] | feature | [today's date] |
 ```
 
 Keep Closed to the last 10 entries - remove the oldest if it exceeds that.
+
+**Archive plan:** Move any plan files associated with this feature from `docs/plans/`
+to `docs/plans/_archive/`:
+
+```bash
+git mv docs/plans/[plan-file].md docs/plans/_archive/
+```
+
+If there are related plan files (e.g. review-fixes plan), move those too.
+This keeps `docs/plans/` clean for the next feature.
 
 ---
 
