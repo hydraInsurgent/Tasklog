@@ -1,3 +1,26 @@
+// Shared date formatting, deadline coloring, and label color utilities.
+
+// 10-color VIBGYOR palette for labels. Index matches Label.colorIndex from the API.
+// Used by label chips, the color picker, and the labels dashboard.
+export const LABEL_COLORS: string[] = [
+  "#EF4444", // 0 - Red
+  "#F97316", // 1 - Orange
+  "#F59E0B", // 2 - Amber
+  "#EAB308", // 3 - Yellow
+  "#22C55E", // 4 - Green
+  "#14B8A6", // 5 - Teal
+  "#3B82F6", // 6 - Blue
+  "#6366F1", // 7 - Indigo
+  "#8B5CF6", // 8 - Violet
+  "#EC4899", // 9 - Pink
+];
+
+// Returns the hex color for a label's colorIndex (0-9).
+// Falls back to the first color if the index is out of range.
+export function labelColor(colorIndex: number): string {
+  return LABEL_COLORS[colorIndex] ?? LABEL_COLORS[0];
+}
+
 // Shared date formatting and deadline coloring utilities.
 // Extracted from TasksClient.tsx so both the desktop table and mobile card
 // views share the same logic without duplication.

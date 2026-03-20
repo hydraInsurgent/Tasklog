@@ -1,6 +1,6 @@
 # Test Coverage
 
-**Last updated:** 2026-03-14 (format.ts + TaskCard added)
+**Last updated:** 2026-03-17 (Labels and Filtering #30 - LabelsController, TasksController SetLabels, format.ts labelColor, AddTaskForm labels)
 
 ---
 

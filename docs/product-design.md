@@ -93,6 +93,21 @@ A more complex storage strategy would only make sense if the data model outgrows
 - Deleting a project also deletes all its tasks (cascade delete, always confirmed first).
 - Project names can be renamed after creation.
 
+**Labels**
+- Labels are user-created tags that can be applied to any task, regardless of project.
+- A task can have multiple labels. Labels are global - not scoped to a project.
+- Labels are created and managed from the Labels dashboard (sidebar nav link).
+- Each label has a name and a color (one of 10 pre-defined VIBGYOR shades).
+- Labels can be applied when creating a task or from the task detail page.
+- Deleting a label removes it from all tasks but does not delete those tasks.
+
+**Filtering**
+- A filter panel is available in the task list header (three-dot button).
+- Filters can be applied to any view: All Tasks, Inbox, or a specific project.
+- Available filter dimensions: by label (OR logic), by project, by deadline (today / this week / overdue).
+- Filters stack on top of the sidebar view selection.
+- Active filters are indicated by a count badge on the filter button.
+
 **Data**
 - All data is stored locally in `backend/Tasklog.Api/TasklogDatabase.db`.
 - Nothing is sent to external services.

@@ -22,7 +22,8 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| - | - | - | - |
+| P30-labels-and-filtering.md | #30 | feature/labels-#30 | In Progress |
+| P30-review-fixes.md | #31-#36 | feature/labels-#30 | In Progress |
 
 ---
 
@@ -82,9 +83,15 @@ Recently completed work (keep last 10):
 
 Untracked ideas - not estimated, not prioritized, not committed to. Just things worth remembering.
 
+- Project-level labels - a label auto-applied to all tasks in a specific project. Labels are currently global only. This would require a project-to-label association and apply logic on task creation.
+
 - Relative time display for completed date - show "just now", "2 hours ago", "3 days ago" instead of a formatted date. CompletedAt timestamp is already stored so this would be a UI-only change.
 - Cross-device sync / live updates - changes on one device reflect on another without a manual reload.
 - Distributable app - let other users download and run Tasklog on their own machine. Needs exploration: Docker Compose (two services, one command), single executable (.NET serves the Next.js build), or Electron wrapper (desktop app that manages both processes). Two-process architecture makes this non-trivial.
 - Project color codes - each project could have an assigned color shown as a swatch in the sidebar and next to tasks. The Edit Project dialog is already planned as a modal, making this a natural future addition (add a color picker field).
 - Task edit modal - inline modal popup for editing a task's title, deadline, and project without leaving the main view. Currently clicking a task navigates to /tasks/[id]. A modal would keep the user in context.
 - Task description field - add an optional description field to tasks. No UI for it currently exists; would require a backend migration, API update, and frontend form change.
+- Rich task detail - for long-running tasks with multiple milestones, add: (1) an optional description field, (2) subtasks (checklist items under a parent task), and (3) comments/progress notes to track how the work evolved. Each piece can be built incrementally. Description is the smallest change (migration + text field on detail page). Subtasks require a self-referencing or child-task model. Comments require a TaskComment table with timestamps. Would make the task detail page the natural home for complex work.
+- README as GitHub artifact - rewrite README.md as a proper project introduction: project vision, what problem it solves, tech stack, quick-start instructions, and a roadmap section. Should feel like a polished open-source project landing page.
+- Task priority - a priority field (P1/P2/P3 or High/Medium/Low) on each task. Adds a priority filter to the filter panel alongside labels/project/date.
+- Editable deadline - deadlines are currently set only at task creation. Add editable deadline to the task detail page (inline edit or date picker).

@@ -24,7 +24,7 @@ describe('AddTaskForm', () => {
     await userEvent.click(screen.getByRole('button', { name: /add task/i }))
 
     await waitFor(() => {
-      expect(onAdd).toHaveBeenCalledWith('Buy milk', undefined, 1)
+      expect(onAdd).toHaveBeenCalledWith('Buy milk', undefined, 1, undefined)
     })
   })
 

@@ -13,6 +13,7 @@ const baseTask: Task = {
   projectId: null,
   createdAt: '2026-03-14T00:00:00Z',
   completedAt: null,
+  labels: [],
 }
 
 const projects: Project[] = [

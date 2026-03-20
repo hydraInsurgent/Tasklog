@@ -2,6 +2,34 @@
 
 ---
 
+## v2.4 - Labels and Filtering
+*March 2026*
+
+### What changed
+
+**Backend**
+- New `Labels` table with many-to-many relationship to Tasks (implicit join table via EF Core)
+- New endpoints: `GET /api/labels`, `POST /api/labels`, `PATCH /api/labels/{id}`, `DELETE /api/labels/{id}`
+- New endpoint: `PATCH /api/tasks/{id}/labels` - replaces the full label set on a task
+- Label name uniqueness enforced (case-insensitive, returns 409 Conflict)
+- Label ID validation on assignment (returns 400 with invalid IDs)
+- Task queries now eager-load labels via `.Include(t => t.Labels)`
+
+**Frontend**
+- Labels dashboard page (`/labels`) accessible from the sidebar - full CRUD with inline rename, color picker, and delete with confirmation
+- 10-color VIBGYOR palette for label colors, auto-cycling on creation
+- Labels field in AddTaskForm with autocomplete, multi-select, and auto-create on Enter
+- Labels row on task detail page with add/remove via AssignLabelsButton (optimistic updates)
+- Label chips (`#labelname`) shown on mobile task cards
+- Filter panel popover (three-dot menu in task list header) with label, project, and date filters
+- Filter state persists across navigation via sessionStorage
+- New components: `LabelsClient`, `FilterPanel`, `ColorPicker`, `LabelChip`, `AssignLabelsButton`
+
+**Tests**
+- 15 new tests for `LabelsController` (CRUD, validation, uniqueness, color range)
+
+---
+
 ## v2.3 - Mobile Task Cards
 *March 2026*
 

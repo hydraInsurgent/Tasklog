@@ -15,5 +15,8 @@ namespace Tasklog.Api.Models
         // The project this task belongs to. Null means the task is in the Inbox (uncategorized).
         public int? ProjectId { get; set; }
         public Project? Project { get; set; }
+
+        // Labels applied to this task. Many-to-many - a task can have multiple labels.
+        public ICollection<Label> Labels { get; set; } = new List<Label>();
     }
 }

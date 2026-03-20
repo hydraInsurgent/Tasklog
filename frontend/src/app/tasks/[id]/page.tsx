@@ -3,12 +3,13 @@
 // DeleteTaskButton and CompleteTaskButton are Client Components for interactive actions.
 
 import Link from "next/link";
-import { getTask, getProjects } from "@/lib/api";
+import { getTask, getProjects, getLabels, type Project, type Label } from "@/lib/api";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import DeleteTaskButton from "@/components/DeleteTaskButton";
 import CompleteTaskButton from "@/components/CompleteTaskButton";
 import AssignProjectButton from "@/components/AssignProjectButton";
+import AssignLabelsButton from "@/components/AssignLabelsButton";
 
 // Format an ISO date string to a readable local date (e.g. "12 Mar 2026").
 function formatDate(iso: string): string {
@@ -49,11 +50,20 @@ export default async function TaskDetailPage({ params }: PageProps) {
 
   // Fetch projects for the assignment dropdown. If this fails, fall back to an
   // empty list so the task detail page still loads (assignment will be hidden).
-  let projects;
+  let projects: Project[] = [];
   try {
     projects = await getProjects();
   } catch {
     projects = [];
+  }
+
+  // Fetch all labels for the label assignment UI. Fall back to empty array on
+  // error so the rest of the page still renders.
+  let labels: Label[] = [];
+  try {
+    labels = await getLabels();
+  } catch {
+    labels = [];
   }
 
   return (
@@ -115,6 +125,17 @@ export default async function TaskDetailPage({ params }: PageProps) {
                 taskId={task.id}
                 currentProjectId={task.projectId}
                 projects={projects ?? []}
+              />
+            </dd>
+          </div>
+          {/* Label assignment - editable via chip + dropdown UI */}
+          <div className="px-6 py-4 flex justify-between items-start gap-4">
+            <dt className="text-sm font-medium text-zinc-500 pt-1">Labels</dt>
+            <dd>
+              <AssignLabelsButton
+                taskId={task.id}
+                currentLabels={task.labels}
+                allLabels={labels}
               />
             </dd>
           </div>
