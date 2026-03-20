@@ -22,8 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| P30-labels-and-filtering.md | #30 | feature/labels-#30 | In Progress |
-| P30-review-fixes.md | #31-#36 | feature/labels-#30 | In Progress |
+| (none) | | | |
 
 ---
 
@@ -69,6 +68,8 @@ Recently completed work (keep last 10):
 
 | # | Title | Type | Closed |
 |---|-------|------|--------|
+| #30 | Feature: Labels and Filtering | feature | 2026-03-20 |
+| #31-#36 | Review fixes for #30 | fix | 2026-03-20 |
 | #22 | Feature: Mobile Task Cards | feature | 2026-03-14 |
 | #12 | Feature: Projects and Inbox | feature | 2026-03-13 |
 | #9 | Feature: Task completion | feature | 2026-03-12 |
@@ -90,7 +91,6 @@ Untracked ideas - not estimated, not prioritized, not committed to. Just things 
 - Distributable app - let other users download and run Tasklog on their own machine. Needs exploration: Docker Compose (two services, one command), single executable (.NET serves the Next.js build), or Electron wrapper (desktop app that manages both processes). Two-process architecture makes this non-trivial.
 - Project color codes - each project could have an assigned color shown as a swatch in the sidebar and next to tasks. The Edit Project dialog is already planned as a modal, making this a natural future addition (add a color picker field).
 - Task edit modal - inline modal popup for editing a task's title, deadline, and project without leaving the main view. Currently clicking a task navigates to /tasks/[id]. A modal would keep the user in context.
-- Task description field - add an optional description field to tasks. No UI for it currently exists; would require a backend migration, API update, and frontend form change.
 - Rich task detail - for long-running tasks with multiple milestones, add: (1) an optional description field, (2) subtasks (checklist items under a parent task), and (3) comments/progress notes to track how the work evolved. Each piece can be built incrementally. Description is the smallest change (migration + text field on detail page). Subtasks require a self-referencing or child-task model. Comments require a TaskComment table with timestamps. Would make the task detail page the natural home for complex work.
 - README as GitHub artifact - rewrite README.md as a proper project introduction: project vision, what problem it solves, tech stack, quick-start instructions, and a roadmap section. Should feel like a polished open-source project landing page.
 - Task priority - a priority field (P1/P2/P3 or High/Medium/Low) on each task. Adds a priority filter to the filter panel alongside labels/project/date.
