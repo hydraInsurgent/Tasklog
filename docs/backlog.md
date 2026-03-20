@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| P37-downloadable-package.md | #37 | feature/downloadable-package-#37 | In Progress |
+| (none) | | | |
 
 ---
 
@@ -52,9 +52,9 @@ Known bugs not yet fixed. Add GitHub issue number when created.
 | # | Title | Priority | Notes |
 |---|-------|----------|-------|
 | #23 | Three-dot menu does not close on tap outside on mobile | high | from #22 review |
-| #1 | CORS and server-side fetch break outside localhost | high | |
+| #1 | CORS and server-side fetch break outside localhost | high | fixed in v2.5 |
 | #2 | State/UX bugs - feedback timer, optimistic delete | medium | |
-| #3 | Fragile DB path, silent API URL failure | medium | |
+| #3 | Fragile DB path, silent API URL failure | medium | fixed in v2.5 |
 | #4 | Accessibility - contrast and focus indicators | medium | |
 | #5 | Code cleanup - duplicated utils, UTC timestamps | low | |
 | #6 | Security hardening - CORS methods, AllowedHosts | low | |
@@ -72,6 +72,7 @@ Recently completed work (keep last 10):
 
 | # | Title | Type | Closed |
 |---|-------|------|--------|
+| #37 | Feature: Downloadable Package | feature | 2026-03-20 |
 | #30 | Feature: Labels and Filtering | feature | 2026-03-20 |
 | #31-#36 | Review fixes for #30 | fix | 2026-03-20 |
 | #22 | Feature: Mobile Task Cards | feature | 2026-03-14 |
@@ -92,7 +93,6 @@ Untracked ideas - not estimated, not prioritized, not committed to. Just things 
 
 - Relative time display for completed date - show "just now", "2 hours ago", "3 days ago" instead of a formatted date. CompletedAt timestamp is already stored so this would be a UI-only change.
 - Cross-device sync / live updates - changes on one device reflect on another without a manual reload.
-- Distributable app - let other users download and run Tasklog on their own machine. Needs exploration: Docker Compose (two services, one command), single executable (.NET serves the Next.js build), or Electron wrapper (desktop app that manages both processes). Two-process architecture makes this non-trivial.
 - Project color codes - each project could have an assigned color shown as a swatch in the sidebar and next to tasks. The Edit Project dialog is already planned as a modal, making this a natural future addition (add a color picker field).
 - Task edit modal - inline modal popup for editing a task's title, deadline, and project without leaving the main view. Currently clicking a task navigates to /tasks/[id]. A modal would keep the user in context.
 - Rich task detail - for long-running tasks with multiple milestones, add: (1) an optional description field, (2) subtasks (checklist items under a parent task), and (3) comments/progress notes to track how the work evolved. Each piece can be built incrementally. Description is the smallest change (migration + text field on detail page). Subtasks require a self-referencing or child-task model. Comments require a TaskComment table with timestamps. Would make the task detail page the natural home for complex work.
