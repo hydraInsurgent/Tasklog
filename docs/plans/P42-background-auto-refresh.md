@@ -1,6 +1,6 @@
 # Background Auto-Refresh Plan
 
-**Overall Progress:** `0%`
+**Overall Progress:** `83%`
 
 ## TLDR
 Add background polling so the task list, projects, and labels stay in sync across devices without disrupting the user. A custom `usePolling` hook fetches fresh data on an interval, pauses when the tab is hidden, and skips updates when in-flight operations (deleting, completing) are active.
@@ -20,28 +20,28 @@ Add background polling so the task list, projects, and labels stay in sync acros
 
 ## Tasks
 
-- [ ] :red_square: **Step 1: Create `usePolling` hook** `[parallel]` - delivers: reusable polling hook at `src/hooks/usePolling.ts`
-  - [ ] :red_square: Create `frontend/src/hooks/usePolling.ts`
-  - [ ] :red_square: Accept params: `fetchFn`, `intervalMs`, `enabled` (boolean to pause when in-flight)
-  - [ ] :red_square: Use `setInterval` to call `fetchFn` on the given interval
-  - [ ] :red_square: Use `document.visibilitychange` to pause/resume when tab is hidden/visible
-  - [ ] :red_square: Fire an immediate fetch when the tab becomes visible again (catch up after being hidden)
-  - [ ] :red_square: Clean up interval and event listener on unmount
+- [x] :green_square: **Step 1: Create `usePolling` hook** `[parallel]` - delivers: reusable polling hook at `src/hooks/usePolling.ts`
+  - [x] :green_square: Create `frontend/src/hooks/usePolling.ts`
+  - [x] :green_square: Accept params: `fetchFn`, `intervalMs`, `enabled` (boolean to pause when in-flight)
+  - [x] :green_square: Use `setInterval` to call `fetchFn` on the given interval
+  - [x] :green_square: Use `document.visibilitychange` to pause/resume when tab is hidden/visible
+  - [x] :green_square: Fire an immediate fetch when the tab becomes visible again (catch up after being hidden)
+  - [x] :green_square: Clean up interval and event listener on unmount
 
-- [ ] :red_square: **Step 2: Integrate polling into TasksClient** `[sequential]` - depends on: Step 1
-  - [ ] :red_square: Import and call `usePolling` to refresh tasks + labels together (same `Promise.all` pattern as `loadTasks`)
-  - [ ] :red_square: Pass `enabled: false` when `deletingId`, `completingId`, or `hidingIds.length > 0` to skip updates during in-flight operations
-  - [ ] :red_square: On poll success, update `tasks` and `allLabels` state - filters and view remain unchanged since they operate on derived data
+- [x] :green_square: **Step 2: Integrate polling into TasksClient** `[sequential]` - depends on: Step 1
+  - [x] :green_square: Import and call `usePolling` to refresh tasks + labels together (same `Promise.all` pattern as `loadTasks`)
+  - [x] :green_square: Pass `enabled: false` when `deletingId`, `completingId`, or `hidingIds.length > 0` to skip updates during in-flight operations
+  - [x] :green_square: On poll success, update `tasks` and `allLabels` state - filters and view remain unchanged since they operate on derived data
 
-- [ ] :red_square: **Step 3: Integrate polling into ProjectLayout** `[sequential]` - depends on: Step 1
-  - [ ] :red_square: Import and call `usePolling` to refresh projects
-  - [ ] :red_square: On poll success, update `projects` state - `activeView`, `filterState`, and `drawerOpen` remain unchanged
+- [x] :green_square: **Step 3: Integrate polling into ProjectLayout** `[sequential]` - depends on: Step 1
+  - [x] :green_square: Import and call `usePolling` to refresh projects
+  - [x] :green_square: On poll success, update `projects` state - `activeView`, `filterState`, and `drawerOpen` remain unchanged
 
-- [ ] :red_square: **Step 4: Integrate polling into LabelsClient** `[sequential]` - depends on: Step 1
-  - [ ] :red_square: Import and call `usePolling` to refresh labels on the labels management page
-  - [ ] :red_square: Pass `enabled: false` when any label operation is in-flight (`creating`, `editingId`, `pendingIds`)
+- [x] :green_square: **Step 4: Integrate polling into LabelsClient** `[sequential]` - depends on: Step 1
+  - [x] :green_square: Import and call `usePolling` to refresh labels on the labels management page
+  - [x] :green_square: Pass `enabled: false` when any label operation is in-flight (`creating`, `editingId`, `pendingIds`)
 
-- [ ] :red_square: **Step 5: Test and verify** `[sequential]` - depends on: Steps 2, 3, 4
+- [ ] :yellow_square: **Step 5: Test and verify** `[sequential]` - depends on: Steps 2, 3, 4
   - [ ] :red_square: Verify tasks added on one device appear on another within 30 seconds
   - [ ] :red_square: Verify open AddTaskForm is not cleared by a poll
   - [ ] :red_square: Verify active filters are preserved across polls
@@ -49,8 +49,8 @@ Add background polling so the task list, projects, and labels stay in sync acros
   - [ ] :red_square: Verify polling pauses when tab is hidden and resumes on focus
   - [ ] :red_square: Verify labels page also refreshes in background
 
-- [ ] :red_square: **Step 6: Update engineering guidelines** `[sequential]` - depends on: Step 5
-  - [ ] :red_square: Document the `usePolling` hook pattern in `docs/engineering-guidelines.md`
+- [x] :green_square: **Step 6: Update engineering guidelines** `[sequential]` - depends on: Step 5
+  - [x] :green_square: Document the `usePolling` hook pattern in `docs/engineering-guidelines.md`
 
 ## Outcomes
 <!-- Fill in after execution -->

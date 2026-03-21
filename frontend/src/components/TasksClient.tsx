@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { usePolling } from "@/hooks/usePolling";
 import Link from "next/link";
 import { Trash2, CheckCircle, XCircle, Loader2, MoreHorizontal } from "lucide-react";
 import { getTasks, createTask, deleteTask, completeTask, getLabels, setTaskLabels, Task, Project, Label } from "@/lib/api";
@@ -61,6 +62,23 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
   useEffect(() => {
     loadTasks();
   }, [loadTasks]);
+
+  // Background polling: refresh tasks and labels every 30 seconds.
+  // Pauses automatically when the tab is hidden or when the user has an
+  // in-flight operation (delete, complete, hide animation) to avoid
+  // overwriting optimistic state.
+  const pollEnabled =
+    deletingId === null && completingId === null && hidingIds.size === 0;
+
+  usePolling(
+    useCallback(async () => {
+      const [freshTasks, freshLabels] = await Promise.all([getTasks(), getLabels()]);
+      setTasks(freshTasks);
+      setAllLabels(freshLabels);
+    }, []),
+    30000,
+    pollEnabled,
+  );
 
   // Clear all pending hide timers on unmount to avoid state updates on unmounted component.
   useEffect(() => {

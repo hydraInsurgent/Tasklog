@@ -105,6 +105,16 @@ to have before adding ad-hoc fetch calls elsewhere.
 - Arbitrary values (e.g. `w-[137px]`) are a signal to check if a scale value would work instead.
 - Responsive: mobile-first. `sm:` prefix for desktop variants.
 
+### Custom hooks
+
+Reusable hooks live in `src/hooks/`. Current hooks:
+
+| Hook | Purpose |
+|------|---------|
+| `usePolling(fetchFn, intervalMs, enabled)` | Background data refresh on a timer. Pauses when the tab is hidden (Page Visibility API) and when `enabled` is false (e.g. during in-flight operations). Fires an immediate fetch when the tab becomes visible again. Used in TasksClient, ProjectLayout, and LabelsClient. |
+
+When adding a new hook, place it in `src/hooks/` and follow the same pattern: accept a callback, an interval or config, and an `enabled` flag for conditional execution.
+
 ### Shared utilities
 
 When the same logic appears in more than one place, extracting it to `src/lib/`

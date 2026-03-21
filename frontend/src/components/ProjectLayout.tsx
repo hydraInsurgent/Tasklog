@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { usePolling } from "@/hooks/usePolling";
 import { Menu, X } from "lucide-react";
 import {
   getProjects,
@@ -55,6 +56,18 @@ export default function ProjectLayout() {
   useEffect(() => {
     loadProjects();
   }, [loadProjects]);
+
+  // Background polling: refresh projects every 30 seconds.
+  // No in-flight guard needed here - project mutations (create/rename/delete)
+  // are awaited and update local state on completion, so a concurrent poll
+  // just brings in the latest server state.
+  usePolling(
+    useCallback(async () => {
+      const freshProjects = await getProjects();
+      setProjects(freshProjects);
+    }, []),
+    30000,
+  );
 
   // Persist filter state to sessionStorage so it survives navigation.
   useEffect(() => {
