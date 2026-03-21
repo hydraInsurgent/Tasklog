@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| (none) | | | |
+| P42-background-auto-refresh.md | #42 | feature/background-auto-refresh-#42 | In Progress |
 
 ---
 
@@ -98,4 +98,5 @@ Untracked ideas - not estimated, not prioritized, not committed to. Just things 
 - Rich task detail - for long-running tasks with multiple milestones, add: (1) an optional description field, (2) subtasks (checklist items under a parent task), and (3) comments/progress notes to track how the work evolved. Each piece can be built incrementally. Description is the smallest change (migration + text field on detail page). Subtasks require a self-referencing or child-task model. Comments require a TaskComment table with timestamps. Would make the task detail page the natural home for complex work.
 - README as GitHub artifact - rewrite README.md as a proper project introduction: project vision, what problem it solves, tech stack, quick-start instructions, and a roadmap section. Should feel like a polished open-source project landing page.
 - Task priority - a priority field (P1/P2/P3 or High/Medium/Low) on each task. Adds a priority filter to the filter panel alongside labels/project/date.
-- Editable deadline - deadlines are currently set only at task creation. Add editable deadline to the task detail page (inline edit or date picker).
+- Editable deadline / postpone - deadlines are currently set only at task creation. Add a small popup with a calendar to change the deadline from the task list. Include a quick "postpone to weekend" action alongside the full calendar picker for choosing a specific date.
+- Theme selection - allow the user to switch between light, dark, and high-contrast color themes. Theme changes affect overall background, header/navbar, and general UI chrome. Project colors, label colors, and other user-assigned colors remain unchanged.
