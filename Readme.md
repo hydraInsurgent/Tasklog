@@ -10,6 +10,14 @@ Rather than recreating an existing SaaS app, the goal was to build the **smalles
 
 ---
 
+## Download
+
+**[Download Tasklog-win-x64.zip](https://github.com/hydraInsurgent/Tasklog/releases/latest/download/Tasklog-win-x64.zip)** - ready-to-run package for Windows (no prerequisites needed).
+
+Extract, run `Tasklog.exe`, and open the URL shown in the console.
+
+---
+
 ## Architecture
 
 Tasklog is a separated client-server application:

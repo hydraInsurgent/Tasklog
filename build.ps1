@@ -1,4 +1,4 @@
-# Build-Distributable.ps1
+# build.ps1
 # Builds the Tasklog distributable zip for Windows x64.
 #
 # What it does:
@@ -15,8 +15,8 @@
 #   - Internet connection (first run only, to download portable Node.js)
 #
 # Usage:
-#   .\scripts\Build-Distributable.ps1
-#   .\scripts\Build-Distributable.ps1 -NodeVersion "22.16.0"
+#   .\build.ps1
+#   .\build.ps1 -NodeVersion "22.16.0"
 
 param(
     [string]$NodeVersion = "22.16.0",
@@ -27,14 +27,15 @@ $ErrorActionPreference = "Stop"
 
 # --- Paths ---
 
-$RepoRoot = Resolve-Path "$PSScriptRoot\.."
+$RepoRoot = $PSScriptRoot
 $BackendDir = "$RepoRoot\backend\Tasklog.Api"
 $FrontendDir = "$RepoRoot\frontend"
 $LauncherDir = "$RepoRoot\launcher\Tasklog.Launcher"
 $DistDir = "$RepoRoot\dist"
 $BuildDir = "$RepoRoot\build"
+$ReleaseDir = "$RepoRoot\release"
 $OutputDir = "$BuildDir\$OutputName"
-$ZipPath = "$BuildDir\$OutputName.zip"
+$ZipPath = "$ReleaseDir\$OutputName.zip"
 $NodeCacheDir = "$BuildDir\.node-cache"
 
 # --- Helper functions ---
@@ -277,6 +278,9 @@ Write-Host "README.txt created"
 
 Write-Step "Creating zip archive"
 
+if (-not (Test-Path $ReleaseDir)) {
+    New-Item -ItemType Directory -Path $ReleaseDir | Out-Null
+}
 Compress-Archive -Path "$OutputDir\*" -DestinationPath $ZipPath -Force
 $zipSize = [math]::Round((Get-Item $ZipPath).Length / 1MB, 1)
 Write-Host "Created: $ZipPath ($zipSize MB)" -ForegroundColor Green
