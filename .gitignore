@@ -44,4 +44,5 @@ PLAN-*.md
 
 # Build artifacts (distributable package output)
 build/
+release/
 dist/sample/

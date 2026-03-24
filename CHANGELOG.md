@@ -9,7 +9,7 @@
 
 **Distributable package**
 - Tasklog can now be downloaded as a single zip and run on any Windows machine with no prerequisites
-- PowerShell build script (`scripts/Build-Distributable.ps1`) produces the distributable zip
+- PowerShell build script (`build.ps1`) produces the distributable zip
 - C# launcher (`Tasklog.exe`) starts both backend and frontend, displays browser and LAN URLs, handles clean shutdown
 - .NET backend published as self-contained single-file exe (no .NET SDK needed on target)
 - Next.js frontend built in standalone mode with bundled portable Node.js binary
