@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| P42-background-auto-refresh.md | #42 | feature/background-auto-refresh-#42 | In Progress |
+| (none) | | | |
 
 ---
 
@@ -71,6 +71,7 @@ Recently completed work (keep last 10):
 
 | # | Title | Type | Closed |
 |---|-------|------|--------|
+| #42 | Feature: Background Auto-Refresh | feature | 2026-03-25 |
 | #37 | Feature: Downloadable Package | feature | 2026-03-20 |
 | #30 | Feature: Labels and Filtering | feature | 2026-03-20 |
 | #31-#36 | Review fixes for #30 | fix | 2026-03-20 |
@@ -80,7 +81,6 @@ Recently completed work (keep last 10):
 | #11 | Show/hide toggle during animation causes visual glitch | bug | 2026-03-12 |
 | #10 | Rapid task toggle orphans hide timer | bug | 2026-03-12 |
 | #8 | App not accessible from phone on local network | bug | 2026-03-11 |
-| #7 | Feature: v2 Architecture Migration | feature | 2026-03-11 |
 
 ---
 
