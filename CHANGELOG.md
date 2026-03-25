@@ -2,6 +2,27 @@
 
 ---
 
+## v2.6 - Background Auto-Refresh
+*March 2026*
+
+### What changed
+
+**Frontend**
+- The app now silently polls for changes every 30 seconds, keeping tasks, projects, and labels in sync across devices
+- New `usePolling` custom hook with `setInterval` and the Visibility API - pauses polling when the tab is hidden, fires an immediate fetch when the tab becomes visible again
+- Tasks page (`TasksClient`) polls tasks and labels together, skipping poll cycles during in-flight deletes or completions to avoid disrupting animations
+- Projects sidebar (`ProjectLayout`) polls for project list changes in the background
+- Labels management page (`LabelsClient`) polls for label changes, pausing during create/edit/delete operations
+- Open forms, active filters, and scroll position are preserved across polls
+
+**Documentation**
+- `usePolling` hook pattern documented in engineering guidelines
+
+**Issues resolved**
+- #42 - Background Auto-Refresh
+
+---
+
 ## v2.5 - Downloadable Package
 *March 2026*
 

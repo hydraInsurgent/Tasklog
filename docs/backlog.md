@@ -32,8 +32,6 @@ Future features - not yet started. Add GitHub issue number when created.
 
 | # | Title | Priority | Notes |
 |---|-------|----------|-------|
-| #20 | Extract shared date formatting helpers to lib/format.ts | low | from #12 review - completed in #22 |
-| #24 | Extract shared projectName helper to format.ts | medium | from #22 review |
 | #25 | Guard against invalid date strings in format.ts | low | from #22 review |
 | #26 | Simplify className construction in TaskCard | low | from #22 review |
 | #27 | Add overflow guard to three-dot dropdown menu | low | from #22 review |
@@ -42,6 +40,7 @@ Future features - not yet started. Add GitHub issue number when created.
 | #39 | Show child process errors in launcher on failure | medium | from #37 review |
 | #40 | Detect port-in-use before starting services | medium | from #37 review |
 | #41 | Deduplicate seed logic between build scripts | low | from #37 review |
+| #43 | Separate user data from app binaries for safe upgrades | high | enables real usage and safe version upgrades |
 
 ---
 

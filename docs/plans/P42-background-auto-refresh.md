@@ -1,6 +1,6 @@
 # Background Auto-Refresh Plan
 
-**Overall Progress:** `83%`
+**Overall Progress:** `100%`
 
 ## TLDR
 Add background polling so the task list, projects, and labels stay in sync across devices without disrupting the user. A custom `usePolling` hook fetches fresh data on an interval, pauses when the tab is hidden, and skips updates when in-flight operations (deleting, completing) are active.
@@ -41,16 +41,31 @@ Add background polling so the task list, projects, and labels stay in sync acros
   - [x] :green_square: Import and call `usePolling` to refresh labels on the labels management page
   - [x] :green_square: Pass `enabled: false` when any label operation is in-flight (`creating`, `editingId`, `pendingIds`)
 
-- [ ] :yellow_square: **Step 5: Test and verify** `[sequential]` - depends on: Steps 2, 3, 4
-  - [ ] :red_square: Verify tasks added on one device appear on another within 30 seconds
-  - [ ] :red_square: Verify open AddTaskForm is not cleared by a poll
-  - [ ] :red_square: Verify active filters are preserved across polls
-  - [ ] :red_square: Verify delete/complete animations are not interrupted
-  - [ ] :red_square: Verify polling pauses when tab is hidden and resumes on focus
-  - [ ] :red_square: Verify labels page also refreshes in background
+- [x] :green_square: **Step 5: Test and verify** `[sequential]` - depends on: Steps 2, 3, 4
+  - [x] :green_square: Verify tasks added on one device appear on another within 30 seconds
+  - [x] :green_square: Verify open AddTaskForm is not cleared by a poll
+  - [x] :green_square: Verify active filters are preserved across polls
+  - [x] :green_square: Verify delete/complete animations are not interrupted
+  - [x] :green_square: Verify polling pauses when tab is hidden and resumes on focus
+  - [x] :green_square: Verify labels page also refreshes in background
 
 - [x] :green_square: **Step 6: Update engineering guidelines** `[sequential]` - depends on: Step 5
   - [x] :green_square: Document the `usePolling` hook pattern in `docs/engineering-guidelines.md`
 
 ## Outcomes
-<!-- Fill in after execution -->
+
+**What was built:**
+- `usePolling` custom hook with interval polling, Visibility API pause/resume, and immediate fetch on tab focus
+- Background polling integrated into TasksClient (tasks + labels), ProjectLayout (projects), and LabelsClient (labels)
+- In-flight operation guards prevent polls from disrupting deletes, completions, or label edits
+- 30-second polling interval, configurable per consumer
+
+**Verified:**
+- Tasks added on one device appear on another within 30 seconds
+- Open AddTaskForm is not cleared by a poll
+- Active filters preserved across polls
+- Delete/complete animations not interrupted
+- Polling pauses when tab is hidden and resumes on focus
+- Labels page refreshes in background
+
+**Issues raised during this work:** None
