@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { usePolling } from "@/hooks/usePolling";
 import { Trash2, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import {
   getLabels,
@@ -52,6 +53,20 @@ export default function LabelsClient() {
     }
     load();
   }, []);
+
+  // Background polling: refresh labels every 30 seconds.
+  // Pauses when the user is creating, editing, or has pending async operations
+  // to avoid overwriting in-flight state.
+  const pollEnabled = !creating && editingId === null && pendingIds.size === 0;
+
+  usePolling(
+    useCallback(async () => {
+      const freshLabels = await getLabels();
+      setLabels(freshLabels);
+    }, []),
+    30000,
+    pollEnabled,
+  );
 
   // Auto-focus the rename input whenever a label enters edit mode.
   useEffect(() => {

@@ -32,8 +32,6 @@ Future features - not yet started. Add GitHub issue number when created.
 
 | # | Title | Priority | Notes |
 |---|-------|----------|-------|
-| #20 | Extract shared date formatting helpers to lib/format.ts | low | from #12 review - completed in #22 |
-| #24 | Extract shared projectName helper to format.ts | medium | from #22 review |
 | #25 | Guard against invalid date strings in format.ts | low | from #22 review |
 | #26 | Simplify className construction in TaskCard | low | from #22 review |
 | #27 | Add overflow guard to three-dot dropdown menu | low | from #22 review |
@@ -42,6 +40,7 @@ Future features - not yet started. Add GitHub issue number when created.
 | #39 | Show child process errors in launcher on failure | medium | from #37 review |
 | #40 | Detect port-in-use before starting services | medium | from #37 review |
 | #41 | Deduplicate seed logic between build scripts | low | from #37 review |
+| #43 | Separate user data from app binaries for safe upgrades | high | enables real usage and safe version upgrades |
 
 ---
 
@@ -72,6 +71,7 @@ Recently completed work (keep last 10):
 
 | # | Title | Type | Closed |
 |---|-------|------|--------|
+| #42 | Feature: Background Auto-Refresh | feature | 2026-03-25 |
 | #37 | Feature: Downloadable Package | feature | 2026-03-20 |
 | #30 | Feature: Labels and Filtering | feature | 2026-03-20 |
 | #31-#36 | Review fixes for #30 | fix | 2026-03-20 |
@@ -81,7 +81,6 @@ Recently completed work (keep last 10):
 | #11 | Show/hide toggle during animation causes visual glitch | bug | 2026-03-12 |
 | #10 | Rapid task toggle orphans hide timer | bug | 2026-03-12 |
 | #8 | App not accessible from phone on local network | bug | 2026-03-11 |
-| #7 | Feature: v2 Architecture Migration | feature | 2026-03-11 |
 
 ---
 
@@ -98,4 +97,6 @@ Untracked ideas - not estimated, not prioritized, not committed to. Just things 
 - Rich task detail - for long-running tasks with multiple milestones, add: (1) an optional description field, (2) subtasks (checklist items under a parent task), and (3) comments/progress notes to track how the work evolved. Each piece can be built incrementally. Description is the smallest change (migration + text field on detail page). Subtasks require a self-referencing or child-task model. Comments require a TaskComment table with timestamps. Would make the task detail page the natural home for complex work.
 - README as GitHub artifact - rewrite README.md as a proper project introduction: project vision, what problem it solves, tech stack, quick-start instructions, and a roadmap section. Should feel like a polished open-source project landing page.
 - Task priority - a priority field (P1/P2/P3 or High/Medium/Low) on each task. Adds a priority filter to the filter panel alongside labels/project/date.
-- Editable deadline - deadlines are currently set only at task creation. Add editable deadline to the task detail page (inline edit or date picker).
+- Editable deadline / postpone - deadlines are currently set only at task creation. Add a small popup with a calendar to change the deadline from the task list. Include a quick "postpone to weekend" action alongside the full calendar picker for choosing a specific date.
+- Theme selection - allow the user to switch between light, dark, and high-contrast color themes. Theme changes affect overall background, header/navbar, and general UI chrome. Project colors, label colors, and other user-assigned colors remain unchanged.
+- README overhaul - rewrite README.md as a proper GitHub project introduction: project vision, why it exists (the Todoist frustration origin), a feature showcase with screenshots, quick-start instructions, and a roadmap section showing where the project is heading. Goal is for someone landing on the repo to immediately understand what Tasklog is, why it matters, and how to run it.
