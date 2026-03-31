@@ -218,7 +218,14 @@ jobs:
         run: |
           PKG="${{ matrix.package-name }}"
 
-          # Copy the dev database (preserves schema and EF migrations history).
+          # The .db file is gitignored (local data only). In CI we create it fresh
+          # from the EF Core migrations, then fill it with sample data.
+          # This never touches the local developer's database.
+          dotnet tool install --global dotnet-ef --prerelease 2>/dev/null || true
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          (cd backend/Tasklog.Api && dotnet ef database update)
+
+          # Copy the migrated (empty schema) database to the package.
           cp "backend/Tasklog.Api/TasklogDatabase.db" "$PKG/backend/TasklogDatabase.db"
 
           # Create a temporary .NET project to run the SQL seed script.
