@@ -1,6 +1,6 @@
 # Feature Implementation Plan
 
-**Overall Progress:** `90%`
+**Overall Progress:** `100%`
 
 ## TLDR
 Add GitHub Actions CI that builds and releases Tasklog for all platforms (Windows, Mac arm64, Mac x64, Linux x64) on every release tag. Also adds `run.sh` for Mac/Linux contributors and fixes the two Windows-only hardcodings in the launcher.
@@ -40,7 +40,7 @@ Add GitHub Actions CI that builds and releases Tasklog for all platforms (Window
   - [x] 🟩 Trap `SIGINT`/`SIGTERM` to stop both cleanly on Ctrl+C
   - [x] 🟩 Line endings converted to LF for Unix compatibility
 
-- [ ] 🟨 **Step 4: GitHub Actions release workflow** `[sequential]` → depends on: Steps 1, 2
+- [x] 🟩 **Step 4: GitHub Actions release workflow** `[sequential]` → depends on: Steps 1, 2
   - [x] 🟩 Create `.github/workflows/release.yml` triggered on `v*` tag push
   - [x] 🟩 Job: `build-frontend` - runs on `ubuntu-latest`, builds Next.js standalone, uploads as artifact
   - [x] 🟩 Job: `build-release` - matrix of 4 runners, downloads frontend artifact, publishes backend + launcher for the platform's RID, downloads correct Node.js binary, assembles package directory, archives (zip on Windows, tar.gz on Mac/Linux), uploads to GitHub Release
@@ -49,7 +49,20 @@ Add GitHub Actions CI that builds and releases Tasklog for all platforms (Window
   - [x] 🟩 Handle release timing: CI waits up to 5 minutes with retry loop for release to exist before uploading
   - [x] 🟩 Update `/ship` command Step 9 output: add note that CI is building packages, check release page in ~10 minutes
   - [x] 🟩 Add `workflow_dispatch` as a secondary trigger (manual "Run workflow" button in GitHub Actions tab - reusable, no junk tags)
-  - [ ] 🟥 Dry-run verification: trigger the workflow manually via `workflow_dispatch`, confirm all 4 packages are built correctly
+  - [x] 🟩 Dry-run verification: all 4 packages built and verified via `workflow_dispatch` (run 23794886574)
 
 ## Outcomes
-<!-- Fill in after execution: decision-relevant deltas only. What changed vs. planned? Key decisions made? Assumptions invalidated? -->
+
+**What was built:**
+- `.github/workflows/release.yml` - CI workflow with `v*` tag and `workflow_dispatch` triggers
+- 6 new publish profiles (osx-arm64, osx-x64, linux-x64 for both backend and launcher)
+- `launcher/Program.cs` - platform-aware exe paths using `OperatingSystem.IsWindows()`
+- `run.sh` - bash dev script for Mac/Linux contributors
+- `frontend/src/hooks/usePolling.ts` - was missing from git (unblocked CI frontend build)
+- `/ship` command updated with CI status note
+
+**Deviations from plan:**
+- `macos-13` runner (for Mac x64) is discontinued - switched to cross-compiling `osx-x64` from `ubuntu-latest`. Identical output, no runtime difference.
+- `frontend/src/hooks/usePolling.ts` was never committed to git - discovered when CI ran `npm run build` (local dev mode doesn't require it to exist). Recreated from documented behaviour in `engineering-guidelines.md`.
+- `upload-artifact@v4` strips the leading path segment from uploaded paths - fixed assemble step to use `frontend-artifact/.next/` not `frontend-artifact/frontend/.next/`.
+- The `.db` file is gitignored so CI cannot copy it - added `dotnet ef database update` step to create a fresh migrated database in CI before seeding.
