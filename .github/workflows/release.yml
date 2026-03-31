@@ -181,17 +181,19 @@ jobs:
           cp "$LAUNCHER_PUBLISH/${{ matrix.launcher-src }}" "$PKG/${{ matrix.launcher-dest }}"
 
           # Copy frontend standalone output.
-          cp -r frontend-artifact/frontend/.next/standalone/. "$PKG/frontend/"
+          # Note: upload-artifact@v4 strips the leading path segment (frontend/),
+          # so the artifact is rooted at .next/ and public/ directly.
+          cp -r frontend-artifact/.next/standalone/. "$PKG/frontend/"
 
           # Copy static assets (Next.js requires these alongside standalone server).
-          if [ -d "frontend-artifact/frontend/.next/static" ]; then
-            cp -r frontend-artifact/frontend/.next/static/. "$PKG/frontend/.next/static/"
+          if [ -d "frontend-artifact/.next/static" ]; then
+            cp -r frontend-artifact/.next/static/. "$PKG/frontend/.next/static/"
           fi
 
           # Copy public assets if they exist.
-          if [ -d "frontend-artifact/frontend/public" ]; then
+          if [ -d "frontend-artifact/public" ]; then
             mkdir -p "$PKG/frontend/public"
-            cp -r frontend-artifact/frontend/public/. "$PKG/frontend/public/"
+            cp -r frontend-artifact/public/. "$PKG/frontend/public/"
           fi
 
           # Copy Node.js portable binary.
