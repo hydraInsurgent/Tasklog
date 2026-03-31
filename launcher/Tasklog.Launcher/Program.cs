@@ -12,8 +12,9 @@ const int FrontendPort = 3000;
 var appDir = AppContext.BaseDirectory;
 
 // Resolve paths to the backend exe and Node.js + frontend server.
-var backendExe = Path.Combine(appDir, "backend", "Tasklog.Api.exe");
-var nodeExe = Path.Combine(appDir, "node", "node.exe");
+var isWindows = OperatingSystem.IsWindows();
+var backendExe = Path.Combine(appDir, "backend", isWindows ? "Tasklog.Api.exe" : "Tasklog.Api");
+var nodeExe = Path.Combine(appDir, "node", isWindows ? "node.exe" : "node");
 var frontendServer = Path.Combine(appDir, "frontend", "server.js");
 
 // Validate that required files exist before starting.

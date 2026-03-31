@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| (none) | | | |
+| [P44-ci-cross-platform.md](plans/P44-ci-cross-platform.md) | #44 | main | In Progress |
 
 ---
 

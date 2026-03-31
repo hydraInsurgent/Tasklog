@@ -202,6 +202,9 @@ Tag:      [version]
 Branch:   [branch-name] → merged to main
 Issue:    #N closed
 
+CI: GitHub Actions is now building platform packages (Win, Mac, Linux).
+     Check the release page in ~10 minutes for download links.
+
 Next: start the next feature with /start-feature, or fix open issues.
 ```
 

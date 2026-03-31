@@ -1,0 +1,459 @@
+# Builds and packages Tasklog for all platforms when a version tag is pushed.
+#
+# Triggers:
+#   - Automatic: push a tag matching v* (e.g. v2.7, v3.0.1)
+#   - Manual: "Run workflow" button in GitHub Actions tab (for testing)
+#
+# Produces 4 packages uploaded to the GitHub Release:
+#   - Tasklog-win-x64.zip
+#   - Tasklog-mac-arm64.tar.gz
+#   - Tasklog-mac-x64.tar.gz
+#   - Tasklog-linux-x64.tar.gz
+
+name: Build Release Packages
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+# Shared versions used across jobs.
+env:
+  DOTNET_VERSION: "10.0.x"
+  NODE_VERSION: "22"
+  PORTABLE_NODE_VERSION: "22.16.0"
+
+jobs:
+  # ----------------------------------------------------------------
+  # Job 1: Build the Next.js frontend (platform-independent).
+  # The standalone output is pure JS - only needs to be built once.
+  # ----------------------------------------------------------------
+  build-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build standalone
+        working-directory: frontend
+        run: npm run build
+
+      - name: Upload standalone output
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-standalone
+          path: |
+            frontend/.next/standalone/
+            frontend/.next/static/
+            frontend/public/
+          retention-days: 1
+
+  # ----------------------------------------------------------------
+  # Job 2: Build platform-specific packages.
+  # Runs on 4 different OS runners in parallel.
+  # ----------------------------------------------------------------
+  build-release:
+    needs: build-frontend
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+            package-name: Tasklog-win-x64
+            archive-ext: zip
+            node-archive: node-v$PORTABLE_NODE_VERSION-win-x64.zip
+            node-platform: win-x64
+            node-bin-path: node.exe
+            launcher-src: Tasklog.Launcher.exe
+            launcher-dest: Tasklog.exe
+            backend-bin: Tasklog.Api.exe
+
+          - os: macos-latest
+            rid: osx-arm64
+            package-name: Tasklog-mac-arm64
+            archive-ext: tar.gz
+            node-archive: node-v$PORTABLE_NODE_VERSION-darwin-arm64.tar.gz
+            node-platform: darwin-arm64
+            node-bin-path: bin/node
+            launcher-src: Tasklog.Launcher
+            launcher-dest: Tasklog
+            backend-bin: Tasklog.Api
+
+          - os: macos-13
+            rid: osx-x64
+            package-name: Tasklog-mac-x64
+            archive-ext: tar.gz
+            node-archive: node-v$PORTABLE_NODE_VERSION-darwin-x64.tar.gz
+            node-platform: darwin-x64
+            node-bin-path: bin/node
+            launcher-src: Tasklog.Launcher
+            launcher-dest: Tasklog
+            backend-bin: Tasklog.Api
+
+          - os: ubuntu-latest
+            rid: linux-x64
+            package-name: Tasklog-linux-x64
+            archive-ext: tar.gz
+            node-archive: node-v$PORTABLE_NODE_VERSION-linux-x64.tar.gz
+            node-platform: linux-x64
+            node-bin-path: bin/node
+            launcher-src: Tasklog.Launcher
+            launcher-dest: Tasklog
+            backend-bin: Tasklog.Api
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      # --- Publish .NET backend ---
+      - name: Publish backend
+        working-directory: backend/Tasklog.Api
+        run: dotnet publish -p:PublishProfile=${{ matrix.rid }}-distributable
+
+      # --- Publish launcher ---
+      - name: Publish launcher
+        working-directory: launcher/Tasklog.Launcher
+        run: dotnet publish -p:PublishProfile=${{ matrix.rid }}-distributable
+
+      # --- Download frontend artifact ---
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-standalone
+          path: frontend-artifact
+
+      # --- Download portable Node.js ---
+      - name: Download portable Node.js
+        shell: bash
+        run: |
+          NODE_VER="${{ env.PORTABLE_NODE_VERSION }}"
+          PLATFORM="${{ matrix.node-platform }}"
+
+          if [[ "$PLATFORM" == "win-x64" ]]; then
+            ARCHIVE="node-v${NODE_VER}-win-x64.zip"
+          else
+            ARCHIVE="node-v${NODE_VER}-${PLATFORM}.tar.gz"
+          fi
+
+          URL="https://nodejs.org/dist/v${NODE_VER}/${ARCHIVE}"
+          echo "Downloading $URL"
+          curl -fSL -o "$ARCHIVE" "$URL"
+
+          # Extract just the node binary.
+          mkdir -p node-extracted
+          if [[ "$ARCHIVE" == *.zip ]]; then
+            unzip -q "$ARCHIVE" -d node-extracted
+          else
+            tar xzf "$ARCHIVE" -C node-extracted
+          fi
+
+      # --- Assemble package directory ---
+      - name: Assemble package
+        shell: bash
+        run: |
+          PKG="${{ matrix.package-name }}"
+          RID="${{ matrix.rid }}"
+          NODE_VER="${{ env.PORTABLE_NODE_VERSION }}"
+          PLATFORM="${{ matrix.node-platform }}"
+
+          mkdir -p "$PKG/backend"
+          mkdir -p "$PKG/frontend/.next/static"
+          mkdir -p "$PKG/node"
+
+          # Copy backend.
+          cp -r "backend/Tasklog.Api/bin/publish/${RID}/." "$PKG/backend/"
+
+          # Copy launcher to package root.
+          LAUNCHER_PUBLISH="launcher/Tasklog.Launcher/bin/publish/${RID}"
+          cp "$LAUNCHER_PUBLISH/${{ matrix.launcher-src }}" "$PKG/${{ matrix.launcher-dest }}"
+
+          # Copy frontend standalone output.
+          cp -r frontend-artifact/frontend/.next/standalone/. "$PKG/frontend/"
+
+          # Copy static assets (Next.js requires these alongside standalone server).
+          if [ -d "frontend-artifact/frontend/.next/static" ]; then
+            cp -r frontend-artifact/frontend/.next/static/. "$PKG/frontend/.next/static/"
+          fi
+
+          # Copy public assets if they exist.
+          if [ -d "frontend-artifact/frontend/public" ]; then
+            mkdir -p "$PKG/frontend/public"
+            cp -r frontend-artifact/frontend/public/. "$PKG/frontend/public/"
+          fi
+
+          # Copy Node.js portable binary.
+          if [[ "$PLATFORM" == "win-x64" ]]; then
+            NODE_DIR="node-extracted/node-v${NODE_VER}-win-x64"
+            cp "$NODE_DIR/node.exe" "$PKG/node/node.exe"
+          else
+            NODE_DIR="node-extracted/node-v${NODE_VER}-${PLATFORM}"
+            cp "$NODE_DIR/bin/node" "$PKG/node/node"
+            chmod +x "$PKG/node/node"
+          fi
+
+          # Set execute permissions on Mac/Linux binaries.
+          if [[ "$RID" != "win-x64" ]]; then
+            chmod +x "$PKG/${{ matrix.launcher-dest }}"
+            chmod +x "$PKG/backend/${{ matrix.backend-bin }}"
+          fi
+
+      # --- Seed sample database ---
+      - name: Seed sample database
+        shell: bash
+        run: |
+          PKG="${{ matrix.package-name }}"
+
+          # Copy the dev database (preserves schema and EF migrations history).
+          cp "backend/Tasklog.Api/TasklogDatabase.db" "$PKG/backend/TasklogDatabase.db"
+
+          # Create a temporary .NET project to run the SQL seed script.
+          # Uses Microsoft.Data.Sqlite - the same library the backend uses.
+          SEED_DIR=$(mktemp -d)
+          DB_PATH="$(pwd)/$PKG/backend/TasklogDatabase.db"
+          SQL_PATH="$(pwd)/dist/seed-sample-data.sql"
+
+          cat > "$SEED_DIR/SeedDb.csproj" << 'CSPROJ'
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup>
+              <OutputType>Exe</OutputType>
+              <TargetFramework>net10.0</TargetFramework>
+              <ImplicitUsings>enable</ImplicitUsings>
+            </PropertyGroup>
+            <ItemGroup>
+              <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.12" />
+            </ItemGroup>
+          </Project>
+          CSPROJ
+
+          cat > "$SEED_DIR/Program.cs" << 'PROGRAM'
+          using Microsoft.Data.Sqlite;
+
+          var dbPath = args[0];
+          var sqlPath = args[1];
+          var sql = File.ReadAllText(sqlPath);
+
+          using var connection = new SqliteConnection("Data Source=" + dbPath);
+          connection.Open();
+
+          using var command = connection.CreateCommand();
+          command.CommandText = sql;
+          command.ExecuteNonQuery();
+
+          string[] tables = ["Projects", "Tasks", "Labels", "LabelTaskModel"];
+          foreach (var table in tables)
+          {
+              using var countCmd = connection.CreateCommand();
+              countCmd.CommandText = "SELECT COUNT(*) FROM " + table;
+              var count = countCmd.ExecuteScalar();
+              Console.WriteLine("  " + table + ": " + count);
+          }
+          PROGRAM
+
+          dotnet run --project "$SEED_DIR" -- "$DB_PATH" "$SQL_PATH"
+          rm -rf "$SEED_DIR"
+
+      # --- Generate platform-specific README ---
+      - name: Generate README
+        shell: bash
+        run: |
+          PKG="${{ matrix.package-name }}"
+          RID="${{ matrix.rid }}"
+
+          if [[ "$RID" == "win-x64" ]]; then
+            cat > "$PKG/README.txt" << 'EOF'
+          ========================================
+            Tasklog - Quick Start (Windows)
+          ========================================
+
+          1. Double-click "Tasklog.exe" to start the application.
+
+          2. A console window will appear showing:
+             - The local URL (http://localhost:3000) for this computer
+             - A LAN URL (http://192.168.x.x:3000) for your phone
+
+          3. Open the URL in your browser to use Tasklog.
+
+          4. To use on your phone: connect to the same Wi-Fi network
+             and open the LAN URL shown in the console.
+
+          5. Press any key in the console window to stop Tasklog.
+
+
+          TROUBLESHOOTING
+
+          - If Windows Firewall asks for permission, click "Allow access"
+            so your phone can connect over the local network.
+
+          - If the app does not start, make sure you extracted the
+            full zip before running (do not run from inside the zip).
+
+          - Tasklog stores its data in backend/TasklogDatabase.db.
+            Your changes are saved automatically.
+
+
+          ABOUT
+
+          Tasklog is a self-hosted task management app.
+          Built with .NET, Next.js, and SQLite.
+
+          Source: https://github.com/hydraInsurgent/Tasklog
+          EOF
+
+          elif [[ "$RID" == osx-* ]]; then
+            cat > "$PKG/README.txt" << 'EOF'
+          ========================================
+            Tasklog - Quick Start (Mac)
+          ========================================
+
+          FIRST-TIME SETUP
+
+          Mac blocks unsigned apps by default (Gatekeeper).
+          Before running Tasklog for the first time, open Terminal
+          in this folder and run:
+
+            xattr -rd com.apple.quarantine .
+
+          Or: right-click "Tasklog" > Open > click "Open" in the dialog.
+          You only need to do this once.
+
+
+          RUNNING TASKLOG
+
+          1. Open Terminal in this folder and run:
+
+               ./Tasklog
+
+          2. The console will show:
+             - The local URL (http://localhost:3000) for this computer
+             - A LAN URL (http://192.168.x.x:3000) for your phone
+
+          3. Open the URL in your browser to use Tasklog.
+
+          4. Press any key in the terminal to stop Tasklog.
+
+
+          TROUBLESHOOTING
+
+          - If you see "permission denied", run: chmod +x Tasklog
+
+          - Tasklog stores its data in backend/TasklogDatabase.db.
+            Your changes are saved automatically.
+
+
+          ABOUT
+
+          Tasklog is a self-hosted task management app.
+          Built with .NET, Next.js, and SQLite.
+
+          Source: https://github.com/hydraInsurgent/Tasklog
+          EOF
+
+          else
+            cat > "$PKG/README.txt" << 'EOF'
+          ========================================
+            Tasklog - Quick Start (Linux)
+          ========================================
+
+          1. Open a terminal in this folder and run:
+
+               ./Tasklog
+
+          2. The console will show:
+             - The local URL (http://localhost:3000) for this computer
+             - A LAN URL (http://192.168.x.x:3000) for your phone
+
+          3. Open the URL in your browser to use Tasklog.
+
+          4. Press any key in the terminal to stop Tasklog.
+
+
+          TROUBLESHOOTING
+
+          - If you see "permission denied", run: chmod +x Tasklog
+
+          - If your firewall blocks LAN connections, allow port 3000:
+              sudo ufw allow 3000
+
+          - Tasklog stores its data in backend/TasklogDatabase.db.
+            Your changes are saved automatically.
+
+
+          ABOUT
+
+          Tasklog is a self-hosted task management app.
+          Built with .NET, Next.js, and SQLite.
+
+          Source: https://github.com/hydraInsurgent/Tasklog
+          EOF
+          fi
+
+      # --- Create archive ---
+      - name: Create archive
+        shell: bash
+        run: |
+          PKG="${{ matrix.package-name }}"
+
+          if [[ "${{ matrix.archive-ext }}" == "zip" ]]; then
+            # Windows: zip (run from inside the package dir so paths are relative).
+            cd "$PKG"
+            7z a -tzip "../${PKG}.zip" .
+            cd ..
+          else
+            # Mac/Linux: tar.gz preserves execute permissions.
+            tar czf "${PKG}.tar.gz" -C "$PKG" .
+          fi
+
+      # --- Upload to GitHub Release ---
+      # Waits for the release to exist (it may be created by /ship shortly after the tag push).
+      - name: Upload to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          PKG="${{ matrix.package-name }}"
+          EXT="${{ matrix.archive-ext }}"
+          ARCHIVE="${PKG}.${EXT}"
+
+          echo "Waiting for release $TAG to exist..."
+
+          # Retry up to 30 times (5 minutes) waiting for the release to be created.
+          for i in $(seq 1 30); do
+            if gh release view "$TAG" > /dev/null 2>&1; then
+              echo "Release $TAG found. Uploading $ARCHIVE..."
+              gh release upload "$TAG" "$ARCHIVE" --clobber
+              echo "Uploaded $ARCHIVE to release $TAG"
+              exit 0
+            fi
+            echo "  Release not found yet, retrying in 10s... ($i/30)"
+            sleep 10
+          done
+
+          echo "ERROR: Release $TAG was not created within 5 minutes."
+          echo "Upload the archive manually: $ARCHIVE"
+          exit 1
+
+      # --- Upload as artifact (for workflow_dispatch runs without a release) ---
+      - name: Upload build artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.package-name }}
+          path: |
+            ${{ matrix.package-name }}.zip
+            ${{ matrix.package-name }}.tar.gz
+          retention-days: 7
