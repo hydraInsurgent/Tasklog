@@ -87,7 +87,9 @@ jobs:
             launcher-dest: Tasklog
             backend-bin: Tasklog.Api
 
-          - os: macos-13
+          # Mac x64 (Intel) cross-compiled from Ubuntu - macos-13 runner is discontinued.
+          # dotnet publish supports cross-compilation for osx-x64 from any platform.
+          - os: ubuntu-latest
             rid: osx-x64
             package-name: Tasklog-mac-x64
             archive-ext: tar.gz
