@@ -2,6 +2,33 @@
 
 ---
 
+## v2.7 - CI and Cross-Platform Distribution
+*March 2026*
+
+### What changed
+
+**CI / Build**
+- GitHub Actions release workflow builds all 4 platform packages automatically when a version tag is pushed
+- Packages are uploaded directly to the GitHub Release: `Tasklog-win-x64.zip`, `Tasklog-mac-arm64.tar.gz`, `Tasklog-mac-x64.tar.gz`, `Tasklog-linux-x64.tar.gz`
+- `workflow_dispatch` trigger allows manual test builds without creating a tag
+- Frontend built once on Ubuntu (platform-independent); backend and launcher compiled per platform
+- Node.js portable binary verified against official SHA-256 checksums before bundling
+
+**Cross-platform**
+- Launcher now detects the OS at runtime - no hardcoded `.exe` extensions on Mac/Linux
+- New publish profiles for `osx-arm64`, `osx-x64`, and `linux-x64` (backend and launcher)
+- Mac packages include Gatekeeper workaround instructions in README.txt
+- `run.sh` added for Mac/Linux contributors as a bash equivalent of `run.ps1`
+
+**Fixed**
+- `usePolling` hook was referenced in components but missing from git - committed and verified
+- Mac Intel (`osx-x64`) cross-compiled from Ubuntu after `macos-13` runner was discontinued
+
+**Issues resolved**
+- #44 - CI with GitHub Actions and cross-platform distribution
+
+---
+
 ## v2.6 - Background Auto-Refresh
 *March 2026*
 

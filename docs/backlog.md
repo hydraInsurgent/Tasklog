@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| [P44-ci-cross-platform.md](plans/P44-ci-cross-platform.md) | #44 | main | In Progress |
+| - | - | - | - |
 
 ---
 
@@ -71,6 +71,7 @@ Recently completed work (keep last 10):
 
 | # | Title | Type | Closed |
 |---|-------|------|--------|
+| #44 | CI and Cross-Platform Distribution | feature | 2026-03-31 |
 | #42 | Feature: Background Auto-Refresh | feature | 2026-03-25 |
 | #37 | Feature: Downloadable Package | feature | 2026-03-20 |
 | #30 | Feature: Labels and Filtering | feature | 2026-03-20 |
@@ -80,7 +81,6 @@ Recently completed work (keep last 10):
 | #9 | Feature: Task completion | feature | 2026-03-12 |
 | #11 | Show/hide toggle during animation causes visual glitch | bug | 2026-03-12 |
 | #10 | Rapid task toggle orphans hide timer | bug | 2026-03-12 |
-| #8 | App not accessible from phone on local network | bug | 2026-03-11 |
 
 ---
 
