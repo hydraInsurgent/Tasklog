@@ -51,5 +51,18 @@ BACKEND_PID=$!
 (cd "$FRONTEND_DIR" && npm run dev) &
 FRONTEND_PID=$!
 
+# Give both processes a moment to start, then verify they are still running.
+sleep 3
+if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
+    echo "ERROR: Backend failed to start. Check output above."
+    kill "$FRONTEND_PID" 2>/dev/null
+    exit 1
+fi
+if ! kill -0 "$FRONTEND_PID" 2>/dev/null; then
+    echo "ERROR: Frontend failed to start. Check output above."
+    kill "$BACKEND_PID" 2>/dev/null
+    exit 1
+fi
+
 # Keep the script alive until interrupted.
 wait
