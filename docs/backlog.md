@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| - | - | - | - |
+| P47-readme-overhaul.md (pending) | #47 | feature/readme-overhaul-#47 | Planning |
 
 ---
 
@@ -71,6 +71,7 @@ Recently completed work (keep last 10):
 
 | # | Title | Type | Closed |
 |---|-------|------|--------|
+| #46 | Labels column missing from desktop task table | bug | 2026-04-03 |
 | #45 | Frontend .next dir missing from distributable | bug | 2026-04-03 |
 | #44 | CI and Cross-Platform Distribution | feature | 2026-03-31 |
 | #42 | Feature: Background Auto-Refresh | feature | 2026-03-25 |
