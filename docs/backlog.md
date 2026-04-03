@@ -51,7 +51,6 @@ Known bugs not yet fixed. Add GitHub issue number when created.
 
 | # | Title | Priority | Notes |
 |---|-------|----------|-------|
-| #46 | Labels column missing from desktop task table | high | visible in mobile card view only |
 | #23 | Three-dot menu does not close on tap outside on mobile | high | from #22 review |
 | #1 | CORS and server-side fetch break outside localhost | high | fixed in v2.5 |
 | #2 | State/UX bugs - feedback timer, optimistic delete | medium | |
