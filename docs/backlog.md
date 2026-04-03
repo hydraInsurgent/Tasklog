@@ -41,6 +41,7 @@ Future features - not yet started. Add GitHub issue number when created.
 | #40 | Detect port-in-use before starting services | medium | from #37 review |
 | #41 | Deduplicate seed logic between build scripts | low | from #37 review |
 | #43 | Separate user data from app binaries for safe upgrades | high | enables real usage and safe version upgrades |
+| #47 | README overhaul and MIT license file | medium | rewrite as project landing page, add LICENSE |
 
 ---
 
@@ -50,6 +51,7 @@ Known bugs not yet fixed. Add GitHub issue number when created.
 
 | # | Title | Priority | Notes |
 |---|-------|----------|-------|
+| #46 | Labels column missing from desktop task table | high | visible in mobile card view only |
 | #23 | Three-dot menu does not close on tap outside on mobile | high | from #22 review |
 | #1 | CORS and server-side fetch break outside localhost | high | fixed in v2.5 |
 | #2 | State/UX bugs - feedback timer, optimistic delete | medium | |
