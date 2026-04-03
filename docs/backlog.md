@@ -71,6 +71,7 @@ Recently completed work (keep last 10):
 
 | # | Title | Type | Closed |
 |---|-------|------|--------|
+| #45 | Frontend .next dir missing from distributable | bug | 2026-04-03 |
 | #44 | CI and Cross-Platform Distribution | feature | 2026-03-31 |
 | #42 | Feature: Background Auto-Refresh | feature | 2026-03-25 |
 | #37 | Feature: Downloadable Package | feature | 2026-03-20 |
