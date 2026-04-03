@@ -5,7 +5,7 @@ import { usePolling } from "@/hooks/usePolling";
 import Link from "next/link";
 import { Trash2, CheckCircle, XCircle, Loader2, MoreHorizontal } from "lucide-react";
 import { getTasks, createTask, deleteTask, completeTask, getLabels, setTaskLabels, Task, Project, Label } from "@/lib/api";
-import { formatDate, deadlineColorClass, projectName } from "@/lib/format";
+import { formatDate, deadlineColorClass, projectName, labelColor } from "@/lib/format";
 import AddTaskForm from "./AddTaskForm";
 import TaskCard from "./TaskCard";
 import FilterPanel, { FilterState, EMPTY_FILTER, hasActiveFilters, activeFilterCount } from "./FilterPanel";
@@ -354,6 +354,9 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
                     Created
                   </th>
                   <th className="px-6 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">
+                    Labels
+                  </th>
+                  <th className="px-6 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">
                     Completed
                   </th>
                   <th className="px-6 py-3 w-12">
@@ -413,6 +416,25 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
                       {/* Creation date */}
                       <td className="px-6 py-4 text-zinc-500">
                         {formatDate(task.createdAt)}
+                      </td>
+
+                      {/* Labels - shown as #labelname in the label's color */}
+                      <td className="px-6 py-4">
+                        {task.labels && task.labels.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {task.labels.map((label) => (
+                              <span
+                                key={label.id}
+                                className="text-xs font-medium"
+                                style={{ color: labelColor(label.colorIndex) }}
+                              >
+                                #{label.name}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-zinc-300">--</span>
+                        )}
                       </td>
 
                       {/* Completion date - shown when task is done, dash otherwise */}
