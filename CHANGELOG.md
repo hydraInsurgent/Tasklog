@@ -2,6 +2,15 @@
 
 ---
 
+## v2.7.1 - Bug Fix
+*April 2026*
+
+### Fixed
+
+- Frontend fails to start in downloaded package - the inner `.next/` directory inside the Next.js standalone output was silently excluded from the CI artifact because `upload-artifact@v4` skips hidden directories by default. Added `include-hidden-files: true` to the upload step. (#45)
+
+---
+
 ## v2.7 - CI and Cross-Platform Distribution
 *March 2026*
 

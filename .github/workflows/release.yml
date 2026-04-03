@@ -60,6 +60,7 @@ jobs:
             frontend/.next/standalone/
             frontend/.next/static/
             frontend/public/
+          include-hidden-files: true
           retention-days: 1
 
   # ----------------------------------------------------------------
