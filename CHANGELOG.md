@@ -2,6 +2,22 @@
 
 ---
 
+## v2.8 - README Overhaul and MIT License
+*April 2026*
+
+### Added
+
+- MIT license file (`LICENSE`) added to the repo root (#47)
+- README rewritten as a proper GitHub project landing page: badges, screenshots placeholder, scannable feature list, all-platform download links, Windows first-run notes, Quick Start for users, and Run from Source for contributors (#47)
+- Dark mode and custom themes added to the roadmap
+
+### Changed
+
+- API endpoints table removed from README - it lives in `docs/architecture.md`
+- `Readme.md` renamed to `README.md` (standard casing)
+
+---
+
 ## v2.7.1 - Bug Fix
 *April 2026*
 

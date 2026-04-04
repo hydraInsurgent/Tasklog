@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| P47-readme-overhaul.md (pending) | #47 | feature/readme-overhaul-#47 | Planning |
+| [P47-readme-overhaul.md](plans/P47-readme-overhaul.md) | #47 | feature/readme-overhaul-#47 | In Progress |
 
 ---
 
