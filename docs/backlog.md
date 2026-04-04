@@ -41,6 +41,7 @@ Future features - not yet started. Add GitHub issue number when created.
 | #40 | Detect port-in-use before starting services | medium | from #37 review |
 | #41 | Deduplicate seed logic between build scripts | low | from #37 review |
 | #43 | Separate user data from app binaries for safe upgrades | high | enables real usage and safe version upgrades |
+| #47 | README overhaul and MIT license file | medium | rewrite as project landing page, add LICENSE |
 
 ---
 

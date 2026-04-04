@@ -2,6 +2,15 @@
 
 ---
 
+## v2.8.1 - Bug Fix
+*April 2026*
+
+### Fixed
+
+- Labels column missing from desktop task table - labels were only rendered in the mobile card view. Added a Labels column between Created and Completed in the desktop table. (#46)
+
+---
+
 ## v2.8 - README Overhaul and MIT License
 *April 2026*
 
