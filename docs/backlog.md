@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| [P47-readme-overhaul.md](plans/P47-readme-overhaul.md) | #47 | feature/readme-overhaul-#47 | In Progress |
+| - | - | - | - |
 
 ---
 
@@ -71,6 +71,7 @@ Recently completed work (keep last 10):
 
 | # | Title | Type | Closed |
 |---|-------|------|--------|
+| #47 | README overhaul and MIT license file | feature | 2026-04-04 |
 | #46 | Labels column missing from desktop task table | bug | 2026-04-03 |
 | #45 | Frontend .next dir missing from distributable | bug | 2026-04-03 |
 | #44 | CI and Cross-Platform Distribution | feature | 2026-03-31 |
@@ -80,9 +81,6 @@ Recently completed work (keep last 10):
 | #31-#36 | Review fixes for #30 | fix | 2026-03-20 |
 | #22 | Feature: Mobile Task Cards | feature | 2026-03-14 |
 | #12 | Feature: Projects and Inbox | feature | 2026-03-13 |
-| #9 | Feature: Task completion | feature | 2026-03-12 |
-| #11 | Show/hide toggle during animation causes visual glitch | bug | 2026-03-12 |
-| #10 | Rapid task toggle orphans hide timer | bug | 2026-03-12 |
 
 ---
 
