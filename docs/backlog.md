@@ -42,6 +42,7 @@ Future features - not yet started. Add GitHub issue number when created.
 | #41 | Deduplicate seed logic between build scripts | low | from #37 review |
 | #43 | Separate user data from app binaries for safe upgrades | high | enables real usage and safe version upgrades |
 | #47 | README overhaul and MIT license file | medium | rewrite as project landing page, add LICENSE |
+| - | ARM64 Linux support: pre-built release + Termux hosting | medium | enable self-hosting on Android/ARM64 devices; add arm64 target to CI release pipeline |
 
 ---
 
