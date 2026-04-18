@@ -73,7 +73,7 @@ Tasklog/
 
 ## Backend
 
-**Runtime:** .NET 9 / ASP.NET Core Web API
+**Runtime:** .NET 10 / ASP.NET Core Web API
 **Database:** SQLite via Entity Framework Core 9
 **Default ports:** HTTP `5115`, HTTPS `7243` (see `launchSettings.json`)
 

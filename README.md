@@ -157,7 +157,7 @@ For full detail see [docs/architecture.md](docs/architecture.md).
 
 ## Tech Stack
 
-- **Backend:** ASP.NET Core 9 Web API, Entity Framework Core, SQLite
+- **Backend:** ASP.NET Core 10 Web API, Entity Framework Core, SQLite
 - **Frontend:** Next.js 16 (App Router), React 19, Tailwind CSS v4
 - **Icons:** Lucide React
 - **Fonts:** Space Grotesk (headings), DM Sans (body)

@@ -2,6 +2,23 @@
 
 ---
 
+## v2.9 - Deploy Tasklog to GCP
+*April 2026*
+
+### Added
+
+- Tasklog is now publicly hosted at `https://tasklog.manudubey.in` - a live demo on a GCP Compute Engine e2-micro VM (always-free tier) (#48)
+- `scripts/deploy-gcp.ps1` - one-command deploy script: builds locally, transfers to VM, restarts services
+- `guides/gcp-server-setup.md` - full one-time VM setup walkthrough (nginx, systemd, certbot, cron)
+- `guides/gcp-deploying-updates.md` - guide for pushing future releases using the deploy script
+- Demo database resets every 6 hours from a seed copy so the live demo stays clean
+
+### Changed
+
+- `api.ts` URL resolution now splits SSR and browser paths - server-side uses `API_URL` (private, direct to backend), browser uses `NEXT_PUBLIC_API_URL` (through nginx). Local dev behaviour unchanged.
+
+---
+
 ## v2.8.1 - Bug Fix
 *April 2026*
 

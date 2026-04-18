@@ -22,7 +22,6 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| - | - | - | - |
 
 ---
 
@@ -43,6 +42,7 @@ Future features - not yet started. Add GitHub issue number when created.
 | #43 | Separate user data from app binaries for safe upgrades | high | enables real usage and safe version upgrades |
 | #47 | README overhaul and MIT license file | medium | rewrite as project landing page, add LICENSE |
 | - | ARM64 Linux support: pre-built release + Termux hosting | medium | enable self-hosting on Android/ARM64 devices; add arm64 target to CI release pipeline |
+| #49 | CD pipeline - auto-deploy to GCP via GitHub Actions | medium | complete the CI/CD loop; trigger on release tag |
 
 ---
 
@@ -73,6 +73,7 @@ Recently completed work (keep last 10):
 
 | # | Title | Type | Closed |
 |---|-------|------|--------|
+| #48 | Deploy Tasklog to GCP | feature | 2026-04-18 |
 | #47 | README overhaul and MIT license file | feature | 2026-04-04 |
 | #46 | Labels column missing from desktop task table | bug | 2026-04-03 |
 | #45 | Frontend .next dir missing from distributable | bug | 2026-04-03 |
