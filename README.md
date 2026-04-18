@@ -7,6 +7,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-blue)
 
+**[Live demo](https://tasklog.manudubey.in)** - try it without installing anything.
+
 ---
 
 **Tasklog is a self-hosted task manager. Tasks, projects, labels, and deadlines - runs on your machine, accessible from any browser on your network.**
