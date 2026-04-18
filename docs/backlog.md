@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| - | - | - | - |
+| P48-deploy-gcp.md | #48 | feature/deploy-gcp-#48 | Planning |
 
 ---
 
@@ -43,6 +43,7 @@ Future features - not yet started. Add GitHub issue number when created.
 | #43 | Separate user data from app binaries for safe upgrades | high | enables real usage and safe version upgrades |
 | #47 | README overhaul and MIT license file | medium | rewrite as project landing page, add LICENSE |
 | - | ARM64 Linux support: pre-built release + Termux hosting | medium | enable self-hosting on Android/ARM64 devices; add arm64 target to CI release pipeline |
+| #48 | Deploy Tasklog to GCP | medium | e2-micro VM, tasklog.manudubey.in, nginx + systemd + HTTPS + 6h DB reset |
 
 ---
 

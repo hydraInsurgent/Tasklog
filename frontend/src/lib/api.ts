@@ -1,18 +1,21 @@
 // API client for the Tasklog .NET Web API.
-// The base URL is resolved by getApiUrl():
-//   1. If NEXT_PUBLIC_API_URL is set (dev mode), use it directly.
-//   2. Client-side: derive from the browser's hostname with port 5115,
-//      so accessing the frontend from any device (e.g. phone on LAN) auto-targets the right backend.
-//   3. Server-side (SSR): fall back to localhost:5115 since both processes share a machine.
+// The base URL is resolved by getApiUrl() differently for server and browser:
+//
+// Server-side (SSR/Next.js Node process):
+//   Uses API_URL env var if set (production: http://localhost:5115 on the VM),
+//   otherwise falls back to localhost:5115. Server-to-server call - never goes through nginx.
+//
+// Client-side (browser):
+//   Uses NEXT_PUBLIC_API_URL env var if set (production: https://tasklog.manudubey.in),
+//   otherwise derives from the browser's hostname with port 5115 (dev LAN access from phone).
 
 function getApiUrl(): string {
-  if (process.env.NEXT_PUBLIC_API_URL) {
-    return process.env.NEXT_PUBLIC_API_URL;
+  if (typeof window === "undefined") {
+    // Server-side: API_URL is a private env var set on the VM; not exposed to the browser.
+    return process.env.API_URL ?? "http://localhost:5115";
   }
-  if (typeof window !== "undefined") {
-    return `http://${window.location.hostname}:5115`;
-  }
-  return "http://localhost:5115";
+  // Client-side: NEXT_PUBLIC_API_URL is baked into the browser bundle at build time.
+  return process.env.NEXT_PUBLIC_API_URL ?? `http://${window.location.hostname}:5115`;
 }
 
 // The shape returned by the API for every project.
