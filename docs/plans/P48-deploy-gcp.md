@@ -1,6 +1,6 @@
 # Deploy Tasklog to GCP
 
-**Overall Progress:** `25%`
+**Overall Progress:** `90%` (Steps 1-8 done; Step 9 smoke test final checks pending /ship)
 
 ## TLDR
 Deploy Tasklog to a GCP Compute Engine e2-micro VM (free tier) at `tasklog.manudubey.in`.
@@ -27,42 +27,48 @@ Stage 1: bare VM deploy - no Docker. Both processes run directly on the VM, mana
   - [x] 🟩 Build command on VM uses `NEXT_PUBLIC_API_URL=https://tasklog.manudubey.in npm run build` (env file gitignored - set inline at build time)
 
 - [x] 🟩 **Step 2: Prepare seed database** `[parallel]` → delivers: clean demo DB + reset script
-  - [ ] 🟥 Populate a clean demo state in the local app (a few example projects, tasks, labels) ← manual step, see note below
-  - [ ] 🟥 Copy `TasklogDatabase.db` to `TasklogDatabase.seed.db` in the same directory ← after above
+  - [x] 🟩 Populate a clean demo state using existing `dist/Create-SampleDb.ps1` script
+  - [x] 🟩 Transfer `TasklogDatabase.seed.db` to VM alongside reset script
   - [x] 🟩 Write `scripts/reset-demo-db.sh` - copies seed file over live file and restarts the backend service
 
-- [ ] 🟥 **Step 3: GCP VM setup** `[sequential]` → depends on: Steps 1, 2
-  - [ ] 🟥 Create e2-micro VM in us-central1 (Ubuntu 24.04 LTS), enable HTTP/HTTPS firewall rules
-  - [ ] 🟥 Install .NET 9 runtime on the VM
-  - [ ] 🟥 Install Node.js 20 LTS on the VM
-  - [ ] 🟥 Install nginx and certbot on the VM
+- [x] 🟩 **Step 3: GCP VM setup** `[sequential]` → depends on: Steps 1, 2
+  - [x] 🟩 Create e2-micro VM in us-central1-f (Ubuntu 24.04 LTS x86/64), enable HTTP/HTTPS firewall rules
+  - [x] 🟩 Install .NET 10 ASP.NET Core runtime on the VM (via dotnet-install.sh - not in apt)
+  - [x] 🟩 Install Node.js 20 LTS on the VM
+  - [x] 🟩 Install nginx and certbot on the VM
 
-- [ ] 🟥 **Step 4: Build and deploy** `[sequential]` → depends on: Step 3
-  - [ ] 🟥 Run `dotnet publish -c Release` for the backend; copy output to VM
-  - [ ] 🟥 Run `npm run build` for the frontend (standalone output); copy `.next/standalone` to VM
-  - [ ] 🟥 Copy `TasklogDatabase.seed.db` and `reset-demo-db.sh` to VM
-  - [ ] 🟥 Create `API_URL=http://localhost:5115` server-side env on the VM
+- [x] 🟩 **Step 4: Build and deploy** `[sequential]` → depends on: Step 3
+  - [x] 🟩 Run `dotnet publish -c Release -r linux-x64 --no-self-contained` for the backend; copy output to VM
+  - [x] 🟩 Run `npm run build` for the frontend (standalone output); copy `.next/standalone` and static files to VM
+  - [x] 🟩 Copy `TasklogDatabase.seed.db` and `reset-demo-db.sh` to VM
 
-- [ ] 🟥 **Step 5: nginx + HTTPS** `[sequential]` → depends on: Step 3
-  - [ ] 🟥 Add DNS A record: `tasklog.manudubey.in` -> VM external IP
-  - [ ] 🟥 Write nginx server block: proxy `tasklog.manudubey.in` to `localhost:3000`, proxy `/api/` to `localhost:5115`
-  - [ ] 🟥 Run certbot to issue Let's Encrypt cert for `tasklog.manudubey.in`
-  - [ ] 🟥 Verify HTTPS redirect works
+- [x] 🟩 **Step 5: nginx + HTTPS** `[sequential]` → depends on: Step 3
+  - [x] 🟩 Add DNS A record: `tasklog.manudubey.in` -> VM external IP (34.29.85.225) at Porkbun
+  - [x] 🟩 Write nginx server block: proxy `tasklog.manudubey.in` to `localhost:3000`, proxy `/api/` to `localhost:5115`
+  - [x] 🟩 Run certbot to issue Let's Encrypt cert for `tasklog.manudubey.in`
+  - [x] 🟩 Verify HTTPS redirect works
 
-- [ ] 🟥 **Step 6: systemd services** `[sequential]` → depends on: Step 4
-  - [ ] 🟥 Write `tasklog-api.service` systemd unit file (runs dotnet, restarts on failure)
-  - [ ] 🟥 Write `tasklog-frontend.service` systemd unit file (runs node server.js, restarts on failure)
-  - [ ] 🟥 Enable and start both services; verify they survive a VM reboot
+- [x] 🟩 **Step 6: systemd services** `[sequential]` → depends on: Step 4
+  - [x] 🟩 Write `tasklog-api.service` - runs dotnet, sets `ASPNETCORE_URLS` and `API_URL`, restarts on failure
+  - [x] 🟩 Write `tasklog-frontend.service` - runs node server.js, sets `NEXT_PUBLIC_API_URL`, restarts on failure
+  - [x] 🟩 Enable and start both services; verified they come back on VM reboot
 
-- [ ] 🟥 **Step 7: DB reset cron** `[sequential]` → depends on: Steps 4, 6
-  - [ ] 🟥 Add cron entry: run `reset-demo-db.sh` every 6 hours
-  - [ ] 🟥 Verify reset works: confirm live DB is replaced and backend restarts cleanly
+- [x] 🟩 **Step 7: DB reset cron** `[sequential]` → depends on: Steps 4, 6
+  - [x] 🟩 Add cron entry: run `reset-demo-db.sh` every 6 hours via `crontab -e`
+  - [x] 🟩 Verify reset works: confirmed live DB is replaced and backend restarts cleanly
 
-- [ ] 🟥 **Step 8: Smoke test** `[sequential]` → depends on: Steps 5, 6, 7
-  - [ ] 🟥 Open `https://tasklog.manudubey.in` in a browser - app loads
-  - [ ] 🟥 Create a task, assign a project, add a label - all persist
+- [x] 🟩 **Step 8: Documentation and deploy tooling** `[sequential]` → depends on: Steps 1-7
+  - [x] 🟩 Write `guides/gcp-server-setup.md` - full one-time VM setup walkthrough with explanations
+  - [x] 🟩 Write `guides/gcp-deploying-updates.md` - guide for deploying future releases
+  - [x] 🟩 Write `scripts/deploy-gcp.ps1` - automated build + transfer + restart script for future deploys
+  - [x] 🟩 Rename `notes/` folder to `guides/` for clarity
+  - [x] 🟩 Fix .NET version across docs (was incorrectly noted as .NET 9; csproj targets net10.0)
+
+- [ ] 🟥 **Step 9: Smoke test final checks** `[sequential]` → depends on: Steps 5, 6, 7
+  - [x] 🟩 App loads at `https://tasklog.manudubey.in`
+  - [x] 🟩 Create a task, assign a project, add a label - all persist
   - [ ] 🟥 Trigger a manual DB reset - data returns to seed state
-  - [ ] 🟥 Reboot the VM - both services come back automatically
+  - [ ] 🟥 Test deploy script (`scripts/deploy-gcp.ps1`) does a clean redeploy end to end
 
 ## Outcomes
-<!-- Fill in after execution -->
+<!-- Fill in after /ship -->

@@ -22,4 +22,4 @@ The SQLite database file is `Tasklog.Api/TasklogDatabase.db`.
 
 ## Stack
 
-.NET 9 · ASP.NET Core Web API · Entity Framework Core 9 · SQLite
+.NET 10 · ASP.NET Core Web API · Entity Framework Core 10 · SQLite
