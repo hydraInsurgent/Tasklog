@@ -15,20 +15,14 @@ var dbPath = builder.Environment.IsDevelopment()
 builder.Services.AddDbContext<TasklogDbContext>(opt =>
     opt.UseSqlite($"Data Source={dbPath}"));
 
-// Read allowed origins from config - defined in appsettings.Development.json.
-// Supports both localhost (PC browser) and the PC's LAN IP (phone/other devices).
-// If the PC's IP changes, update CorsAllowedOrigins in appsettings.Development.json.
-var allowedOrigins = builder.Configuration
-    .GetSection("CorsAllowedOrigins")
-    .Get<string[]>() ?? [];
-
 builder.Services.AddCors(options =>
 {
-    // Development policy - uses config-based origins from appsettings.Development.json.
+    // Development policy - allows any origin so LAN devices (phones, tablets) work
+    // without needing to update config when the PC's IP changes.
     options.AddPolicy("FrontendDev", policy =>
     {
         policy
-            .WithOrigins(allowedOrigins)
+            .AllowAnyOrigin()
             .AllowAnyHeader()
             .AllowAnyMethod();
     });
