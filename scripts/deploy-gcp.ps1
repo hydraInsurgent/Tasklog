@@ -19,6 +19,10 @@
 
 $ErrorActionPreference = "Stop"
 
+# Ensure gcloud is on the PATH (not added automatically on Windows after install).
+$GcloudBin = "C:\Program Files (x86)\Google\Cloud SDK\google-cloud-sdk\bin"
+if (Test-Path $GcloudBin) { $env:PATH += ";$GcloudBin" }
+
 $RepoRoot  = "$PSScriptRoot\.."
 $Zone      = "us-central1-f"
 $VMUser    = "manudubey77"
