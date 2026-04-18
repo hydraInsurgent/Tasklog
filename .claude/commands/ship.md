@@ -190,6 +190,15 @@ git mv docs/plans/[plan-file].md docs/plans/_archive/
 If there are related plan files (e.g. review-fixes plan), move those too.
 This keeps `docs/plans/` clean for the next feature.
 
+**Commit both together in a single commit:**
+
+```bash
+git add docs/backlog.md docs/plans/_archive/
+git commit -m "Ship [version]: close #[N] in backlog, archive [plan-file]"
+```
+
+Example: `Ship v2.9: close #48 in backlog, archive P48-deploy-gcp`
+
 ---
 
 ## Step 9: Final output
