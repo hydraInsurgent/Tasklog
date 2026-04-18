@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { usePolling } from "@/hooks/usePolling";
-import { Menu, X } from "lucide-react";
+import { Menu, Plus, X } from "lucide-react";
 import {
   getProjects,
   createProject,
@@ -142,14 +142,25 @@ export default function ProjectLayout() {
 
       {/* Main content area */}
       <div className="flex-1 min-w-0 px-4 py-8">
-        {/* Mobile hamburger button */}
-        <div className="md:hidden mb-4">
+        {/* Mobile header row: hamburger on left, Add Task on right */}
+        <div className="md:hidden mb-4 flex items-center justify-between">
           <button
             onClick={() => setDrawerOpen(true)}
             aria-label="Open navigation"
             className="flex items-center justify-center p-3 text-zinc-600 hover:text-zinc-900 border border-zinc-200 rounded-md bg-white cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-1"
           >
             <Menu size={20} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const el = document.getElementById("task-title") as HTMLInputElement | null;
+              if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); el.focus(); }
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-zinc-900 text-white text-sm font-medium rounded-md hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:ring-offset-2 transition-colors duration-150 cursor-pointer"
+          >
+            <Plus size={16} aria-hidden="true" />
+            Add Task
           </button>
         </div>
 

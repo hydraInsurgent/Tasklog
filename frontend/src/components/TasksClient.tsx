@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { usePolling } from "@/hooks/usePolling";
 import Link from "next/link";
-import { Trash2, CheckCircle, XCircle, Loader2, MoreHorizontal } from "lucide-react";
+import { Trash2, CheckCircle, XCircle, Loader2, MoreHorizontal, Plus } from "lucide-react";
 import { getTasks, createTask, deleteTask, completeTask, getLabels, setTaskLabels, Task, Project, Label } from "@/lib/api";
 import { formatDate, deadlineColorClass, projectName, labelColor } from "@/lib/format";
 import AddTaskForm from "./AddTaskForm";
@@ -261,8 +261,19 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
               : projects.find((p) => p.id === activeView)?.name ?? "Tasks"}
           </h1>
 
-          {/* Right side: show completed toggle + filter button */}
+          {/* Right side: add task shortcut + show completed toggle + filter button */}
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                const el = document.getElementById("task-title") as HTMLInputElement | null;
+                if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); el.focus(); }
+              }}
+              className="hidden md:flex items-center gap-2 px-4 py-2 bg-zinc-900 text-white text-sm font-medium rounded-md hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:ring-offset-2 transition-colors duration-150 cursor-pointer"
+            >
+              <Plus size={16} aria-hidden="true" />
+              Add Task
+            </button>
             {hasCompleted && (
               <button
                 onClick={() => {
