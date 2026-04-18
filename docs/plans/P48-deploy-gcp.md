@@ -1,6 +1,6 @@
 # Deploy Tasklog to GCP
 
-**Overall Progress:** `90%` (Steps 1-8 done; Step 9 smoke test final checks pending /ship)
+**Overall Progress:** `100%`
 
 ## TLDR
 Deploy Tasklog to a GCP Compute Engine e2-micro VM (free tier) at `tasklog.manudubey.in`.
@@ -64,11 +64,15 @@ Stage 1: bare VM deploy - no Docker. Both processes run directly on the VM, mana
   - [x] 🟩 Rename `notes/` folder to `guides/` for clarity
   - [x] 🟩 Fix .NET version across docs (was incorrectly noted as .NET 9; csproj targets net10.0)
 
-- [ ] 🟥 **Step 9: Smoke test final checks** `[sequential]` → depends on: Steps 5, 6, 7
+- [x] 🟩 **Step 9: Smoke test final checks** `[sequential]` → depends on: Steps 5, 6, 7
   - [x] 🟩 App loads at `https://tasklog.manudubey.in`
   - [x] 🟩 Create a task, assign a project, add a label - all persist
-  - [ ] 🟥 Trigger a manual DB reset - data returns to seed state
-  - [ ] 🟥 Test deploy script (`scripts/deploy-gcp.ps1`) does a clean redeploy end to end
+  - [x] 🟩 Trigger a manual DB reset - data returns to seed state
+  - [x] 🟩 Test deploy script (`scripts/deploy-gcp.ps1`) does a clean redeploy end to end
 
 ## Outcomes
-<!-- Fill in after /ship -->
+- Deployed at `https://tasklog.manudubey.in` on GCP e2-micro VM (us-central1-f, Ubuntu 24.04 LTS)
+- .NET 10 backend + Next.js 16 frontend running as systemd services behind nginx with Let's Encrypt HTTPS
+- Demo DB resets every 6 hours via cron using `reset-demo-db.sh`
+- `deploy-gcp.ps1` verified working for future releases - builds locally, transfers via gcloud scp, restarts services
+- Key deviations from plan: .NET version was 10 not 9 (docs updated); gcloud scp copies directory itself not contents (handled with mv cleanup in script); hidden `.next` dir required explicit transfer; node_modules needed rm -rf before mv on re-deploy; sudoers rule required for reset script to control systemd without password
