@@ -4,6 +4,10 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Workstation GC: phone/proot can't reserve the 256 GiB virtual address range
+         that Server GC requires. This bakes System.GC.Server=false into the published
+         runtimeconfig.json so the setting survives regardless of env var stripping. -->
+    <ServerGarbageCollection>false</ServerGarbageCollection>
   </PropertyGroup>
 
   <ItemGroup>

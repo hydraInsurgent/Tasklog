@@ -27,7 +27,7 @@ The project began from a simple frustration: paying for a Todoist subscription f
 
 Rather than recreating a full productivity platform, Tasklog focuses on building a **simple, understandable task system** that evolves over time.
 
-The project is also intended to demonstrate **iterative software evolution** — starting from a minimal system and gradually expanding its capabilities.
+The project is also intended to demonstrate **iterative software evolution**, starting from a minimal system and gradually expanding its capabilities.
 
 ---
 
@@ -42,7 +42,7 @@ The goals were:
 - build something understandable end-to-end
 - evolve the system gradually rather than designing everything upfront
 
-The system is now on v2 - a .NET Web API backend and Next.js frontend.
+The system is now on v2, a .NET Web API backend and Next.js frontend.
 See `CHANGELOG.md` for history and `docs/architecture.md` for current structure.
 
 ---
@@ -148,6 +148,31 @@ Also read before making changes:
 
 - `docs/product-design.md` - what the product is, who it's for, feature rules
 - `docs/engineering-guidelines.md` - patterns to follow, patterns to avoid
+
+---
+
+# Documentation Map
+
+The project uses a layered documentation structure. Each folder has a specific role:
+
+| Folder / file | Purpose | Updated by |
+|---|---|---|
+| `docs/architecture.md` | How the system is structured | `/document` |
+| `docs/engineering-guidelines.md` | Patterns to follow, patterns to avoid | `/document` |
+| `docs/product-design.md` | What the product is, who it's for, feature rules | `/document` |
+| `docs/plans/` | What we're going to do (per feature) | `/create-plan`, `/execute` |
+| `guides/` | How specific things were done, end to end | `/guides` |
+| `docs/learnings/` | Timeless concepts that apply across projects | `/learnings` |
+| `CHANGELOG.md` | User-facing changes per version | `/document`, `/ship` |
+| `LESSONS.md` | What was learned during sessions, what to avoid | manual |
+| `README.md` | Project overview for humans visiting the repo | `/document` |
+
+**Rule of thumb when documenting work:**
+- If it's project-specific and walks through how something was done, it's a **guide** in `guides/`.
+- If it's a timeless concept that could apply to other projects (CORS, networking, build systems), it's a **learning** in `docs/learnings/`.
+- If it's about the current system structure itself, it goes in `docs/architecture.md`.
+
+`/document` is responsible for syncing the architecture/product/engineering docs and identifying when guides or learnings should be written. It does not write guides or learnings itself; it recommends them.
 
 ---
 

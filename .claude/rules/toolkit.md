@@ -10,7 +10,7 @@
 2. **Ask questions** - If something is unclear, ask before assuming
 3. **Explain simply** - Use plain English, avoid jargon
 4. **Show your work** - Tell me what you're doing and why
-5. **Use the Skill tool for slash commands** - Never manually replicate /start-feature, /explore, /create-plan, /review, /fix, /ship, /document, or /unit-test. Always invoke them via the Skill tool so the template is followed.
+5. **Use the Skill tool for slash commands** - Never manually replicate /start-feature, /explore, /create-plan, /review, /fix, /ship, /document, /guides, /learnings, or /unit-test. Always invoke them via the Skill tool so the template is followed.
 6. **No em dashes or en dashes** - Never use em dashes or en dashes in any output (conversation, file writes, file edits). Use regular hyphens or rewrite the sentence.
 7. **Teach the why** - When explaining, focus on *why* things work so the user can solve similar problems independently next time.
 
@@ -24,13 +24,16 @@
 5. `/execute` - Build it, updating the plan as we go
 6. `/unit-test` - Write and run unit tests for what was just built
 7. `/review` - Code review (report only, don't fix)
-8. `/document` - Update documentation
-9. `/ship` - Close tracking issue, merge branch, tag version, create release
+8. `/document` - Sync existing docs + identify follow-up guides/learnings
+9. `/guides <name>` - (when /document recommends) Write a structured walkthrough
+10. `/learnings <concept>` - (when /document recommends) Capture a timeless concept
+11. `/ship` - Close tracking issue, merge branch, tag version, create release
 
 #### Bug fix workflow
 1. `/create-issue` - Capture the bug
 2. `/pair-debug` - (optional) Investigate root cause if not already known
 3. `/fix` - Branch-aware fix: apply, verify, close issue, PATCH release
+4. `/learnings <concept>` - (optional) If a non-obvious concept came up while debugging
 
 #### Additional commands
 Use these when needed - not part of the standard flow:
@@ -59,8 +62,22 @@ Use these when needed - not part of the standard flow:
 | `/execute` | Build the feature, updating the plan as you go |
 | `/unit-test` | Write and run unit tests for a feature, component, or the whole project |
 | `/review` | Review code - report issues only, don't fix |
-| `/document` | Update documentation after changes |
+| `/document` | Sync existing docs + recommend guides/learnings to write |
+| `/guides <name>` | Generate or update a structured walkthrough in `guides/` |
+| `/learnings <concept>` | Capture a timeless concept in `docs/learnings/` |
 | `/ship` | Close tracking issue, merge branch, tag with semver, create GitHub release |
+
+### Documentation Architecture
+
+| Folder | Purpose | Updated by |
+|---|---|---|
+| `docs/plans/` | What we're going to do (per feature) | `/create-plan`, `/execute` |
+| `docs/architecture.md` | How the system is structured | `/document` |
+| `docs/engineering-guidelines.md` | Patterns to follow, patterns to avoid | `/document` |
+| `docs/product-design.md` | What the product is, who it's for, feature rules | `/document` |
+| `guides/` | How specific things were done, end to end | `/guides` |
+| `docs/learnings/` | Timeless concepts that apply across projects | `/learnings` |
+| `docs/research/` | Verified external facts (API docs, etc.) | manual |
 
 ### Bug fix workflow
 
@@ -101,6 +118,24 @@ Use these when needed - not part of the standard flow:
 - Check for test infrastructure first - set it up if missing (ask before creating anything)
 - Show the list of test targets and wait for confirmation before writing tests
 - Do not move past Step 6 if tests are failing - diagnose first
+
+**When Running /document:**
+- Sync existing docs (README, CLAUDE.md, architecture.md, etc.)
+- DO NOT write guides or learnings - recommend them instead
+- End with explicit recommendations: "Run `/guides X`" or "Run `/learnings Y`"
+- If no guides/learnings warranted, say so
+
+**When Running /guides:**
+- One file per topic, not per plan step
+- Cross-link to `docs/learnings/` instead of inlining theory
+- Scaffold incomplete sections with `<!-- TODO Stage X: ... -->` markers
+- Update `Last updated` date at the top of the guide
+
+**When Running /learnings:**
+- Concept must be project-independent (otherwise it's a guide section)
+- If file already exists, update rather than recreate
+- Update the `docs/learnings/README.md` index table
+- Cross-link from any guide that touched the concept
 
 ### Subagent Strategy
 

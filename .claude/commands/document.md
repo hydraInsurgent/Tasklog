@@ -76,7 +76,33 @@ If you're unsure about intent behind a change or user-facing impact, **ask the u
 
 ---
 
-## 6. GitHub Integration
+## 6. Identify Follow-up Documentation (scope analyzer)
+
+`/document` is the entry point that decides what other documentation work is needed. After syncing the files in Section 3, analyze the work and **recommend** (do not run) follow-up commands.
+
+**Recommend `/guides <name>` when any of these are true:**
+- New deployment surface, environment, or runtime target was added (e.g. new VM, new device, new platform)
+- A multi-step setup process was completed for the first time
+- An existing setup walkthrough was made stale by the changes (e.g. structure changed, new prerequisites)
+- A migration from one approach to another was completed
+
+**Recommend `/learnings <concept>` when any of these are true:**
+- A non-obvious concept came up during the work that took explaining (CORS, networking, threading, auth flows, build systems, etc.)
+- A reusable mental model was developed that would apply to other projects
+- The concept already lives inline in a doc/comment and would be more useful as a standalone learning
+
+For each recommendation, output:
+- Command and arguments (e.g. ``/guides phone-server-setup``)
+- One sentence on why this guide/learning is warranted
+- Whether it's a new file or updates an existing one
+
+Do **not** invoke the recommended commands yourself. The user reviews and runs them.
+
+If no guides or learnings are warranted, say so explicitly. Not every change produces a guide.
+
+---
+
+## 7. GitHub Integration
 
 After documentation is updated, check if on a feature branch:
 
@@ -98,3 +124,23 @@ Ready for /ship."
 This is the last update to the tracking issue before it gets closed by `/ship`.
 
 If not on a feature branch, skip this section entirely.
+
+---
+
+## Output format at end of `/document`
+
+End every `/document` run with a clear summary the user can act on:
+
+```
+## Documented this session
+- README.md - <one-line summary of what changed>
+- docs/architecture.md - <one-line summary>
+- (etc.)
+
+## Recommended follow-ups
+- /guides phone-server-setup - new deployment target added, walkthrough warranted
+- /learnings cors-explained - CORS concept came up during deploy, worth capturing
+- (or "No guides or learnings warranted for this work.")
+```
+
+The recommendations are the contract: the user decides which to run.

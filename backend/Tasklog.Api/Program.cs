@@ -63,4 +63,11 @@ if (app.Environment.IsDevelopment())
 app.UseAuthorization();
 app.MapControllers();
 
+// Apply any pending EF Core migrations on startup.
+// Creates the SQLite file and schema on first run; no-op when already up to date.
+using (var scope = app.Services.CreateScope())
+{
+    scope.ServiceProvider.GetRequiredService<TasklogDbContext>().Database.Migrate();
+}
+
 app.Run();
