@@ -1,6 +1,6 @@
 # Feature Implementation Plan: MCP Server
 
-**Overall Progress:** `72%`
+**Overall Progress:** `82%`
 
 **Tracking issue:** [#50](https://github.com/hydraInsurgent/Tasklog/issues/50)
 **Branch:** `feature/mcp-server-#50`
@@ -150,12 +150,12 @@ No full UI spec needed. The only UI element is a single `/authorize` HTML page w
   - [x] 🟩 4.5 `bearerAuthMiddleware`: applied to `/mcp` only; calls into the 3.10 validator and 401s with WWW-Authenticate on failure.
   - [x] 🟩 4.6 End-to-end smoke test verified: register client → insert auth_code → /token (auth_code) → /mcp initialize → notifications/initialized → tools/list (16 tools) → /token (refresh) → old refresh rejected → bad PKCE rejected. All paths pass.
 
-- [ ] 🟥 **Step 5: Phone deployment - extend `deploy-phone.sh`** `[sequential]` → depends on: Step 4
-  - [ ] 🟥 5.1 In `scripts/deploy-phone.sh`: add a build step for `mcp/` mirroring the frontend pattern. Build TypeScript on laptop. Build arm64 `node_modules` via the existing Docker QEMU step (or a parallel one). Transfer to phone via rsync.
-  - [ ] 🟥 5.2 Add `tasklog-mcp` runit service. Env vars: `PORT=5180`, `TASKLOG_API_URL=http://localhost:5115`, `MCP_PUBLIC_URL=https://mcp.tasklog.manudubey.in`, `GITHUB_CLIENT_ID=<from 0.6>`, `GITHUB_CLIENT_SECRET=<from 0.6>`, `ALLOWED_GH_USERS=hydraInsurgent`, `SESSION_SECRET=<generate fresh>`, `NODE_ENV=production`. Secrets read from a `/data/data/com.termux/files/home/.tasklog-mcp.env` file (not committed; copied via scp once)
-  - [ ] 🟥 5.3 Add a placeholder `tasklog-tunnel` runit service file; the command field is `exec cloudflared tunnel run tasklog`. Service stays in "want up" state but will fail until Step 6 creates the tunnel; not a deploy blocker
-  - [ ] 🟥 5.4 Update the `sv restart` block at the end of the deploy script to include both new services
-  - [ ] 🟥 5.5 Smoke test on phone: services come up, `curl http://localhost:5180/.well-known/oauth-protected-resource` from inside the phone returns 200 with valid JSON
+- [ ] 🟨 **Step 5: Phone deployment - extend `deploy-phone.sh`** `[sequential]` → depends on: Step 4. Script changes done; live deploy is a user action (5.5).
+  - [x] 🟩 5.1 `scripts/deploy-phone.sh` extended with: TypeScript build (`npm run build --prefix mcp`), arm64 `node_modules` build via Docker QEMU (mirrors frontend pattern, needed for `better-sqlite3` native binding), and rsync transfer of `dist/`, `node_modules/`, `package.json` (with `--delete` scoped to subdirs so runtime `mcp/data/auth.db` survives).
+  - [x] 🟩 5.2 `tasklog-mcp` runit service added. Sources secrets from `/root/.tasklog-mcp.env` inside proot Ubuntu via `set -a; . file; set +a` then exec `node dist/server.js`. Env file template documented inline in the service script comment (user creates once with chmod 600).
+  - [x] 🟩 5.3 `tasklog-tunnel` runit service added. Runs `cloudflared tunnel run tasklog` in native Termux (NOT proot - cloudflared is a static Go binary). Will be down until Step 6 installs cloudflared and creates the tunnel; runit retries.
+  - [x] 🟩 5.4 `sv restart` and `sv status` lines updated to include both new services. Smoke-test curl at end of deploy adds an `/.well-known/oauth-protected-resource` probe.
+  - [ ] 🟨 5.5 Live deploy + smoke test on phone: USER ACTION. Run `./scripts/deploy-phone.sh` once env file is in place. Verify services with `ssh phone 'SVDIR=\$PREFIX/var/service sv status tasklog-mcp tasklog-tunnel'`. Defer to user; tracked separately from this step's script work.
 
 - [ ] 🟥 **Step 6: Cloudflare Tunnel** `[sequential]` → depends on: Step 0 (DNS migrated), Step 5 (service running on phone)
   - [ ] 🟥 6.1 Install `cloudflared` on the phone. Try Termux-native first: `curl -L -o cloudflared https://github.com/cloudflare/cloudflares/releases/latest/download/cloudflared-linux-arm64 && chmod +x cloudflared && mv cloudflared $PREFIX/bin/`. Fall back to inside proot if dynamic linker issues

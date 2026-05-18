@@ -54,6 +54,7 @@ BACKEND_OUT="backend/Tasklog.Api/bin/publish/linux-arm64"
 # the phone has. See docs/learnings/network-bind-addresses.md.
 BACKEND_PORT=5115
 FRONTEND_PORT=3000
+MCP_PORT=5180
 
 # runit service definitions live in Termux's $PREFIX/var/service/.
 # SVDIR has to point here for `sv` commands to find them.
@@ -137,11 +138,32 @@ docker run --rm \
     node:20-slim \
     sh -c 'npm install --omit=dev --no-audit --no-fund --no-progress'
 
+# --- Step 2.6: Build MCP TypeScript ---
+
+step "Building MCP server (TypeScript)"
+
+npm run build --prefix mcp
+
+# --- Step 2.7: Build arm64 node_modules for MCP ---
+# Same Docker QEMU pattern as the frontend. better-sqlite3 needs native
+# compilation per architecture, so we cannot reuse the laptop's x64 build.
+
+step "Building arm64 node_modules for MCP (Docker, QEMU emulation)"
+
+rm -rf "mcp/node_modules"
+
+docker run --rm \
+    --platform=linux/arm64 \
+    -v "${REPO_ROOT}/mcp:/app" \
+    -w /app \
+    node:20-slim \
+    sh -c 'npm ci --omit=dev --no-audit --no-fund --no-progress'
+
 # --- Step 3: Ensure target directory layout on phone ---
 
 step "Preparing target directories on phone"
 
-ssh "$PHONE_HOST" "mkdir -p '${TARGET_PATH}/backend' '${TARGET_PATH}/frontend/.next' '${TARGET_PATH}/frontend/public'"
+ssh "$PHONE_HOST" "mkdir -p '${TARGET_PATH}/backend' '${TARGET_PATH}/frontend/.next' '${TARGET_PATH}/frontend/public' '${TARGET_PATH}/mcp/dist' '${TARGET_PATH}/mcp/node_modules'"
 
 # --- Step 4: Transfer backend ---
 # Services keep running on the old files during the rsync (Linux replaces inodes
@@ -173,6 +195,24 @@ rsync -az --info=progress2 --delete \
 rsync -az --info=progress2 --delete \
     "frontend/public/" \
     "${PHONE_HOST}:${TARGET_PATH}/frontend/public/"
+
+# --- Step 5.5: Transfer MCP ---
+# --delete is scoped to dist/ and node_modules/ - the runtime data/ directory
+# (auth.db with OAuth state) lives in the parent mcp/ and is not touched.
+
+step "Transferring MCP (rsync)"
+
+rsync -az --info=progress2 --delete \
+    "mcp/dist/" \
+    "${PHONE_HOST}:${TARGET_PATH}/mcp/dist/"
+
+rsync -az --info=progress2 --delete \
+    "mcp/node_modules/" \
+    "${PHONE_HOST}:${TARGET_PATH}/mcp/node_modules/"
+
+rsync -az --info=progress2 \
+    "mcp/package.json" \
+    "${PHONE_HOST}:${TARGET_PATH}/mcp/"
 
 # --- Step 6: Setup runit services on phone (idempotent) ---
 # Writes the run + log/run scripts every deploy. Cheap, ensures any tweaks
@@ -218,6 +258,54 @@ exec svlogd -tt /data/data/com.termux/files/home/log/tasklog-web
 RUN
 chmod +x \$PREFIX/var/service/tasklog-web/log/run
 
+# Service: tasklog-mcp (Node MCP server, runs in proot Ubuntu)
+mkdir -p \$PREFIX/var/service/tasklog-mcp/log
+cat > \$PREFIX/var/service/tasklog-mcp/run <<'RUN'
+#!/data/data/com.termux/files/usr/bin/bash
+exec 2>&1
+# Sources secrets from /root/.tasklog-mcp.env (inside proot). Create this
+# file ONCE before first start:
+#   ssh phone -t 'proot-distro login ubuntu'
+#   cat > /root/.tasklog-mcp.env <<ENV
+#   PORT=5180
+#   TASKLOG_API_URL=http://localhost:5115
+#   MCP_PUBLIC_URL=https://mcp.tasklog.manudubey.in
+#   GITHUB_CLIENT_ID=<from github.com/settings/developers>
+#   GITHUB_CLIENT_SECRET=<from github.com/settings/developers>
+#   ALLOWED_GH_USERS=hydraInsurgent
+#   SESSION_SECRET=<openssl rand -hex 32>
+#   NODE_ENV=production
+#   ENV
+#   chmod 600 /root/.tasklog-mcp.env
+exec proot-distro login ubuntu -- bash -c 'set -a; [ -f /root/.tasklog-mcp.env ] && . /root/.tasklog-mcp.env; set +a; cd /root/tasklog/mcp && exec node dist/server.js'
+RUN
+chmod +x \$PREFIX/var/service/tasklog-mcp/run
+
+cat > \$PREFIX/var/service/tasklog-mcp/log/run <<'RUN'
+#!/data/data/com.termux/files/usr/bin/bash
+mkdir -p /data/data/com.termux/files/home/log/tasklog-mcp
+exec svlogd -tt /data/data/com.termux/files/home/log/tasklog-mcp
+RUN
+chmod +x \$PREFIX/var/service/tasklog-mcp/log/run
+
+# Service: tasklog-tunnel (cloudflared, runs natively in Termux not proot)
+# Expected to fail on first deploy until cloudflared is installed and a tunnel
+# is created. See guides/mcp-server-setup.md for the one-time setup.
+mkdir -p \$PREFIX/var/service/tasklog-tunnel/log
+cat > \$PREFIX/var/service/tasklog-tunnel/run <<'RUN'
+#!/data/data/com.termux/files/usr/bin/bash
+exec 2>&1
+exec cloudflared tunnel --config /data/data/com.termux/files/home/.cloudflared/config.yml run tasklog
+RUN
+chmod +x \$PREFIX/var/service/tasklog-tunnel/run
+
+cat > \$PREFIX/var/service/tasklog-tunnel/log/run <<'RUN'
+#!/data/data/com.termux/files/usr/bin/bash
+mkdir -p /data/data/com.termux/files/home/log/tasklog-tunnel
+exec svlogd -tt /data/data/com.termux/files/home/log/tasklog-tunnel
+RUN
+chmod +x \$PREFIX/var/service/tasklog-tunnel/log/run
+
 # Start runsvdir (the supervisor) if not already running.
 # Single instance only - second runsvdir would chaos the supervise dir.
 if ! pgrep -x runsvdir >/dev/null 2>&1; then
@@ -237,13 +325,13 @@ step "Restarting services (sv restart)"
 
 ssh "$PHONE_HOST" bash <<EOF
 export SVDIR=${PHONE_SVDIR}
-sv restart tasklog-api tasklog-web
+sv restart tasklog-api tasklog-web tasklog-mcp tasklog-tunnel
 
 echo "--- waiting 35s for services to come up ---"
 sleep 35
 
 echo "--- sv status ---"
-sv status tasklog-api tasklog-web
+sv status tasklog-api tasklog-web tasklog-mcp tasklog-tunnel
 
 echo
 echo "--- backend log tail ---"
@@ -253,6 +341,7 @@ echo
 echo "--- smoke test (from inside the phone) ---"
 curl -sS -o /dev/null -w "  backend  /api/tasks  -> HTTP %{http_code}\n" http://localhost:${BACKEND_PORT}/api/tasks  || echo "  backend curl failed"
 curl -sS -o /dev/null -w "  frontend /            -> HTTP %{http_code}\n" http://localhost:${FRONTEND_PORT}/            || echo "  frontend curl failed"
+curl -sS -o /dev/null -w "  mcp      /.well-known/oauth-protected-resource -> HTTP %{http_code}\n" http://localhost:${MCP_PORT}/.well-known/oauth-protected-resource || echo "  mcp curl failed (expected if env not configured)"
 EOF
 
 # --- Done ---
