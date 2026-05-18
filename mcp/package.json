@@ -1,0 +1,27 @@
+{
+  "name": "tasklog-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MCP server exposing the Tasklog API as MCP tools for claude.ai custom connectors. See docs/plans/P50-mcp-server.md.",
+  "type": "module",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.0.2",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "better-sqlite3": "^12.10.0",
+    "hono": "^4.12.19",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^25.8.0",
+    "tsx": "^4.22.1",
+    "typescript": "^6.0.3"
+  }
+}

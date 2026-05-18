@@ -1,6 +1,6 @@
 # Feature Implementation Plan: MCP Server
 
-**Overall Progress:** `13%`
+**Overall Progress:** `28%`
 
 **Tracking issue:** [#50](https://github.com/hydraInsurgent/Tasklog/issues/50)
 **Branch:** `feature/mcp-server-#50`
@@ -108,25 +108,25 @@ No full UI spec needed. The only UI element is a single `/authorize` HTML page w
     - [x] 🟩 0.7.5 Update [docs/learnings/README.md](../learnings/README.md) index
     - [x] 🟩 0.7.6 Add deviation entry to [docs/workflow-notes.md](../workflow-notes.md) capturing the periodic-capture pattern
 
-- [ ] 🟥 **Step 1: Scaffold the `mcp/` service** `[parallel]` → delivers: `mcp/` directory with build, lint, type-check, hello-world server on port 5180
-  - [ ] 🟥 1.1 Create `mcp/` at repo root with `package.json`, `tsconfig.json`, `.gitignore`
-  - [ ] 1.2 Install runtime deps: `@modelcontextprotocol/sdk`, `better-sqlite3`, `zod` (input validation), `hono` or `express` (HTTP framework, decide in 1.2)
-  - [ ] 🟥 1.3 Install dev deps: `typescript`, `tsx`, `eslint`, `prettier`, type definitions
-  - [ ] 🟥 1.4 Build script: `npm run build` compiles to `mcp/dist/`. Dev script: `npm run dev` runs with tsx
-  - [ ] 🟥 1.5 Hello-world `src/server.ts`: HTTP server listening on `process.env.PORT || 5180`, returns `200 OK` on `/`
-  - [ ] 🟥 1.6 Verify `npm run dev` locally; `curl http://localhost:5180/` returns 200
+- [x] 🟩 **Step 1: Scaffold the `mcp/` service** `[parallel]` → delivered: `mcp/` directory with build, type-check, hello-world server on port 5180
+  - [x] 🟩 1.1 Created `mcp/` with `package.json`, `tsconfig.json`, `.gitignore`
+  - [x] 🟩 1.2 Installed runtime deps: `@modelcontextprotocol/sdk@1.29`, `better-sqlite3@12`, `zod@4`, `hono@4`, `@hono/node-server@2`. **Chose Hono over Express** (modern TypeScript-native, smaller deps, same capability).
+  - [x] 🟩 1.3 Installed dev deps: `typescript@6`, `tsx@4`, `@types/node`, `@types/better-sqlite3`. **Skipped ESLint and Prettier** (no project-wide lint convention; add later if friction emerges).
+  - [x] 🟩 1.4 Scripts: `dev` (tsx), `build` (tsc), `start` (node dist), `typecheck` (tsc --noEmit)
+  - [x] 🟩 1.5 Hello-world `src/server.ts` listens on PORT env var (default 5180), returns service-identification JSON on `/`
+  - [x] 🟩 1.6 Verified locally: server starts, GET / returns 200, typecheck passes
 
-- [ ] 🟥 **Step 2: Tool layer wrapping the Tasklog API** `[sequential]` → depends on: Step 1
-  - [ ] 🟥 2.1 `src/api-client.ts`: typed HTTP client for the Tasklog API. Base URL from `TASKLOG_API_URL` env var (default `http://localhost:5115`). One function per endpoint per [docs/architecture.md](../architecture.md).
-  - [ ] 🟥 2.2 `src/tools/schemas.ts`: Zod schemas for each tool's input
-  - [ ] 🟥 2.3 `src/tools/tasks.ts`: 8 task tools - `list_tasks`, `get_task`, `create_task`, `delete_task`, `complete_task`, `uncomplete_task`, `assign_task_to_project`, `set_task_labels`
-  - [ ] 🟥 2.4 `src/tools/projects.ts`: 4 project tools - `list_projects`, `create_project`, `rename_project`, `delete_project`
-  - [ ] 🟥 2.5 `src/tools/labels.ts`: 4 label tools - `list_labels`, `create_label`, `update_label`, `delete_label`
-  - [ ] 🟥 2.6 `src/tools/registry.ts`: aggregate tool defs and handler dispatch
-  - [ ] 🟥 2.7 Wire `tools/list` and `tools/call` via `@modelcontextprotocol/sdk` server primitives
-  - [ ] 🟥 2.8 Map API errors to MCP tool execution errors (`isError: true` content blocks), not JSON-RPC protocol errors. Protocol errors reserved for unknown tool names and malformed input
-  - [ ] 🟥 2.9 Local sanity check: with `tasklog-api` running locally, exercise tools via curl or `mcp-inspector`. Create a task; verify it appears in the Tasklog web UI
-  - [ ] 🟥 2.10 Write [docs/learnings/mcp-protocol.md](../learnings/mcp-protocol.md): what MCP is, host/client/server roles, JSON-RPC framing, tools vs resources vs prompts, Streamable HTTP transport. Cross-link to [docs/research/mcp-spec-2025-06-18.md](../research/mcp-spec-2025-06-18.md). Add row to [docs/learnings/README.md](../learnings/README.md)
+- [ ] 🟨 **Step 2: Tool layer wrapping the Tasklog API** `[sequential]` → depends on: Step 1 (Step 2.9 pending live API verification)
+  - [x] 🟩 2.1 `src/api-client.ts`: typed HTTP client for the Tasklog API. Base URL from `TASKLOG_API_URL` (default `http://localhost:5115`). One function per endpoint per [docs/architecture.md](../architecture.md). Throws `ApiError` on non-2xx so handlers can render as `isError` tool results.
+  - [x] 🟩 2.2 Zod schemas: **inlined per tool family** in `src/tools/{tasks,projects,labels}.ts` instead of a separate `schemas.ts` file. With 16 tools spread across 3 small files, factoring out schemas adds indirection without benefit.
+  - [x] 🟩 2.3 `src/tools/tasks.ts`: 8 task tools - `list_tasks`, `get_task`, `create_task`, `delete_task`, `complete_task`, `uncomplete_task`, `assign_task_to_project`, `set_task_labels`
+  - [x] 🟩 2.4 `src/tools/projects.ts`: 4 project tools - `list_projects`, `create_project`, `rename_project`, `delete_project`
+  - [x] 🟩 2.5 `src/tools/labels.ts`: 4 label tools - `list_labels`, `create_label`, `update_label`, `delete_label`
+  - [x] 🟩 2.6 `src/tools/registry.ts`: aggregates the three register-functions and registers all on a given `McpServer` instance
+  - [x] 🟩 2.7 Wired `tools/list` and `tools/call` via `McpServer.registerTool` + `WebStandardStreamableHTTPServerTransport`. **Used stateful mode** with `randomUUID()` session id generator instead of the planned stateless mode (the SDK requires per-request transport construction in stateless mode, which is awkward with the high-level `McpServer` API).
+  - [x] 🟩 2.8 Error mapping verified: `tools/call list_tasks` with `tasklog-api` not running returned `isError: true` with `"list_tasks failed unexpectedly: fetch failed"` text content (instead of a JSON-RPC protocol error). Helper `runTool()` in `src/tools/result.ts` centralizes the pattern.
+  - [ ] 🟨 2.9 Local sanity check with live `tasklog-api`: pending. The error-path test above proves wiring is correct; success-path verification deferred until either (a) user starts `tasklog-api` locally on the laptop, or (b) we hit it on the phone post-deploy. Either gates only this checkbox; subsequent Steps 3-5 do not depend on it.
+  - [x] 🟩 2.10 Wrote [docs/learnings/mcp-protocol.md](../learnings/mcp-protocol.md): host/client/server roles, JSON-RPC framing, transports, stateful vs stateless, tool definition shape, error mechanisms. Cross-linked to [docs/research/mcp-spec-2025-06-18.md](../research/mcp-spec-2025-06-18.md). [docs/learnings/README.md](../learnings/README.md) index updated.
 
 - [ ] 🟥 **Step 3: OAuth 2.1 authorization server (in-process)** `[sequential]` → depends on: Step 1
   - [ ] 🟥 3.1 Evaluate `mcp-auth` library (or whatever the current best Node OAuth/MCP integration is). Decide library-vs-handroll. Document the call in the plan's `## Outcomes` section

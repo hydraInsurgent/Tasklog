@@ -1,0 +1,136 @@
+/**
+ * HTTP client for the Tasklog .NET API.
+ *
+ * One function per REST endpoint defined in docs/architecture.md. Throws
+ * ApiError on non-2xx responses so MCP tool handlers can render the failure
+ * to the LLM as an isError tool result instead of a JSON-RPC protocol error.
+ *
+ * Base URL is read from TASKLOG_API_URL env var (default localhost:5115 for
+ * dev). On the phone, the runit service sets this to http://localhost:5115
+ * because tasklog-mcp and tasklog-api share the same loopback.
+ */
+
+const API_BASE = process.env.TASKLOG_API_URL ?? 'http://localhost:5115';
+
+// Mirror the data model from docs/architecture.md. These types describe what
+// the .NET API returns, not what the MCP tools expose.
+
+export interface Project {
+  id: number;
+  name: string;
+  createdAt: string;
+}
+
+export interface Label {
+  id: number;
+  name: string;
+  colorIndex: number;
+  createdAt: string;
+}
+
+export interface Task {
+  id: number;
+  title: string;
+  deadline: string | null;
+  createdAt: string;
+  isCompleted: boolean;
+  completedAt: string | null;
+  projectId: number | null;
+  labels: Label[];
+}
+
+// ApiError carries the HTTP status and body so callers can decide whether to
+// surface a "not found" vs a generic failure to the LLM.
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly statusText: string,
+    body: string,
+  ) {
+    super(`HTTP ${status} ${statusText}${body ? ': ' + body : ''}`);
+    this.name = 'ApiError';
+  }
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(init?.headers ?? {}),
+    },
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new ApiError(res.status, res.statusText, body);
+  }
+  // DELETE returns 204 No Content; surface as undefined.
+  if (res.status === 204) return undefined as T;
+  return (await res.json()) as T;
+}
+
+// --- Tasks ---
+
+export const listTasks = (): Promise<Task[]> => request('/api/tasks');
+
+export const getTask = (id: number): Promise<Task> => request(`/api/tasks/${id}`);
+
+export const createTask = (body: {
+  title: string;
+  deadline?: string;
+  projectId?: number;
+}): Promise<Task> =>
+  request('/api/tasks', { method: 'POST', body: JSON.stringify(body) });
+
+export const deleteTask = (id: number): Promise<void> =>
+  request(`/api/tasks/${id}`, { method: 'DELETE' });
+
+export const setTaskComplete = (id: number, isCompleted: boolean): Promise<Task> =>
+  request(`/api/tasks/${id}/complete`, {
+    method: 'PATCH',
+    body: JSON.stringify({ isCompleted }),
+  });
+
+export const setTaskProject = (id: number, projectId: number | null): Promise<Task> =>
+  request(`/api/tasks/${id}/project`, {
+    method: 'PATCH',
+    body: JSON.stringify({ projectId }),
+  });
+
+export const setTaskLabels = (id: number, labelIds: number[]): Promise<Task> =>
+  request(`/api/tasks/${id}/labels`, {
+    method: 'PATCH',
+    body: JSON.stringify({ labelIds }),
+  });
+
+// --- Projects ---
+
+export const listProjects = (): Promise<Project[]> => request('/api/projects');
+
+export const createProject = (body: { name: string }): Promise<Project> =>
+  request('/api/projects', { method: 'POST', body: JSON.stringify(body) });
+
+export const renameProject = (id: number, body: { name: string }): Promise<Project> =>
+  request(`/api/projects/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+
+export const deleteProject = (id: number): Promise<void> =>
+  request(`/api/projects/${id}`, { method: 'DELETE' });
+
+// --- Labels ---
+
+export const listLabels = (): Promise<Label[]> => request('/api/labels');
+
+export const createLabel = (body: {
+  name: string;
+  colorIndex: number;
+}): Promise<Label> =>
+  request('/api/labels', { method: 'POST', body: JSON.stringify(body) });
+
+export const updateLabel = (
+  id: number,
+  body: { name: string; colorIndex: number },
+): Promise<Label> =>
+  request(`/api/labels/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+
+export const deleteLabel = (id: number): Promise<void> =>
+  request(`/api/labels/${id}`, { method: 'DELETE' });
