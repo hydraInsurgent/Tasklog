@@ -20,9 +20,10 @@ import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
+import { config } from './config.js';
 import { registerAllTools } from './tools/registry.js';
-
-const PORT = Number(process.env.PORT ?? 5180);
+import { mountWellKnown } from './oauth/well-known.js';
+import { mountRegister } from './oauth/register.js';
 
 const mcp = new McpServer({
   name: 'tasklog-mcp',
@@ -46,14 +47,21 @@ await mcp.connect(transport);
 
 const app = new Hono();
 
-// Service identification at the root for sanity-checking the scaffold is up.
+// Service identification at the root for sanity-checking the server is up.
 app.get('/', (c) =>
   c.json({
     service: 'tasklog-mcp',
     status: 'ok',
+    publicUrl: config.publicUrl,
     mcpEndpoint: '/mcp',
   }),
 );
+
+// OAuth discovery (RFC 9728 + RFC 8414) and Dynamic Client Registration
+// (RFC 7591). claude.ai hits these BEFORE attempting the actual OAuth
+// flow on /authorize and /token.
+mountWellKnown(app);
+mountRegister(app);
 
 // The MCP endpoint. POST is the JSON-RPC request channel per the spec.
 // The transport handles initialize, tools/list, tools/call, etc.
@@ -66,7 +74,9 @@ app.get('/mcp', () =>
   new Response(null, { status: 405, headers: { Allow: 'POST' } }),
 );
 
-serve({ fetch: app.fetch, port: PORT });
+serve({ fetch: app.fetch, port: config.port });
 
-console.log(`tasklog-mcp listening on http://localhost:${PORT}`);
-console.log(`MCP endpoint: POST http://localhost:${PORT}/mcp`);
+console.log(`tasklog-mcp listening on http://localhost:${config.port}`);
+console.log(`MCP endpoint:  POST ${config.publicUrl}/mcp`);
+console.log(`OAuth metadata: GET ${config.publicUrl}/.well-known/oauth-authorization-server`);
+console.log(`DCR endpoint:   POST ${config.publicUrl}/register`);
