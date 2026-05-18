@@ -22,6 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
+| [P50-mcp-server.md](plans/P50-mcp-server.md) | #50 | feature/mcp-server-#50 | In Progress |
 
 ---
 
