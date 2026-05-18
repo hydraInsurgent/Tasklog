@@ -1,6 +1,6 @@
 # Feature Implementation Plan: MCP Server
 
-**Overall Progress:** `44%`
+**Overall Progress:** `48%`
 
 **Tracking issue:** [#50](https://github.com/hydraInsurgent/Tasklog/issues/50)
 **Branch:** `feature/mcp-server-#50`
@@ -128,14 +128,14 @@ No full UI spec needed. The only UI element is a single `/authorize` HTML page w
   - [ ] 🟨 2.9 Local sanity check with live `tasklog-api`: pending. The error-path test above proves wiring is correct; success-path verification deferred until either (a) user starts `tasklog-api` locally on the laptop, or (b) we hit it on the phone post-deploy. Either gates only this checkbox; subsequent Steps 3-5 do not depend on it.
   - [x] 🟩 2.10 Wrote [docs/learnings/mcp-protocol.md](../learnings/mcp-protocol.md): host/client/server roles, JSON-RPC framing, transports, stateful vs stateless, tool definition shape, error mechanisms. Cross-linked to [docs/research/mcp-spec-2025-06-18.md](../research/mcp-spec-2025-06-18.md). [docs/learnings/README.md](../learnings/README.md) index updated.
 
-- [ ] 🟥 **Step 3: OAuth 2.1 authorization server (in-process)** `[sequential]` → depends on: Step 1
-  - [ ] 🟥 3.1 Evaluate `mcp-auth` library (or whatever the current best Node OAuth/MCP integration is). Decide library-vs-handroll. Document the call in the plan's `## Outcomes` section
-  - [ ] 🟥 3.2 SQLite store at `mcp/data/auth.db`. Tables: `clients` (DCR registrations), `auth_codes` (short-lived, with PKCE challenge), `access_tokens` (with audience claim, expiry), `refresh_tokens` (one-use rotation)
-  - [ ] 🟥 3.3 `/.well-known/oauth-protected-resource` endpoint (RFC 9728): returns the canonical resource URI and authorization server URL
-  - [ ] 🟥 3.4 `/.well-known/oauth-authorization-server` endpoint (RFC 8414): advertises `issuer`, `authorization_endpoint`, `token_endpoint`, `registration_endpoint`, `code_challenge_methods_supported: ["S256"]`, `grant_types_supported: ["authorization_code", "refresh_token"]`, `response_types_supported: ["code"]`, `token_endpoint_auth_methods_supported: ["none"]`
-  - [ ] 🟥 3.5 `POST /register` endpoint (RFC 7591 DCR): accept claude.ai's registration, persist client, return per-RFC fields. Allow-list redirect URI `https://claude.ai/api/mcp/auth_callback`
-  - [ ] 🟥 3.6 `GET /authorize` endpoint: render a simple HTML page with "Log in with GitHub" button. Store the original auth request (client_id, redirect_uri, state, code_challenge, code_challenge_method, resource) in a short-lived signed cookie
-  - [ ] 🟥 3.7 `GET /auth/github/callback`: receive GitHub code, exchange for GitHub user identity, verify `login` matches `ALLOWED_GH_USERS` env var allow-list. On success, generate our auth code and redirect to claude.ai's callback with `code` and `state`
+- [ ] 🟨 **Step 3: OAuth 2.1 authorization server (in-process)** `[sequential]` → depends on: Step 1. Foundation + metadata + DCR done; user-facing flow + token endpoint + middleware + tests still ahead.
+  - [x] 🟩 3.1 **Hand-roll over `mcp-auth` library.** Reason: the OAuth flow is one of the things the user wants to study, and hand-rolling makes every spec requirement visible in our code with no vendored opaqueness. Cost: ~500-800 lines of TS across well-named files.
+  - [x] 🟩 3.2 SQLite store at `mcp/data/auth.db` (`mcp/src/oauth/store.ts`). Four tables: `clients`, `auth_codes`, `access_tokens`, `refresh_tokens`. WAL mode, indexes on expiry columns. One-use semantics on `auth_codes.consume` and `refresh_tokens.consume` via transactions.
+  - [x] 🟩 3.3 `GET /.well-known/oauth-protected-resource` returns RFC 9728 metadata pointing at the auth server URL and listing supported scopes/bearer methods. Verified via curl.
+  - [x] 🟩 3.4 `GET /.well-known/oauth-authorization-server` returns RFC 8414 metadata: issuer, all four endpoints, scopes, grants, response_types, code_challenge_methods (`["S256"]`), `token_endpoint_auth_methods_supported: ["none"]`. Verified via curl.
+  - [x] 🟩 3.5 `POST /register` (RFC 7591 DCR) accepts a JSON registration, validates `redirect_uris` are https (or localhost loopback), inserts a client row, and returns 201 with the issued `client_id`. Verified end-to-end with a claude.ai-shaped request and a bad-URI 400.
+  - [x] 🟩 3.6 `GET /authorize` (`mcp/src/oauth/authorize.ts`): validates required OAuth params, response_type=code, code_challenge_method=S256, client_id exists, redirect_uri matches a registered URI. Stores flow state (params + CSRF token) in a 10-min signed cookie. Renders simple HTML with a "Log in with GitHub" button. Verified: missing-params, unknown-client, bad-redirect-uri all return 400 with descriptive messages; valid request returns HTML + cookie.
+  - [x] 🟩 3.7 `GET /auth/github/callback` (`mcp/src/oauth/github.ts`): reads cookie, CSRF-checks against GitHub state, exchanges code for GitHub access token, fetches user identity from `api.github.com/user`, validates `login` against `ALLOWED_GH_USERS`. On success mints our auth code, persists with all flow params, deletes cookie, 302-redirects to client's callback with `code`+`state`. Renders 403 page on allow-list miss. Verified rejection paths (missing-params, missing-cookie).
   - [ ] 🟥 3.8 `POST /token` endpoint: accept `application/x-www-form-urlencoded` per RFC 6749 4.1.3. Handle `grant_type=authorization_code` (verify PKCE `code_verifier` against stored `code_challenge` with S256) and `grant_type=refresh_token` (with refresh token rotation). RFC 6749 error codes only (`invalid_grant`, `invalid_request`, `invalid_client`, etc.)
   - [ ] 🟥 3.9 Access token includes the canonical MCP resource URI as audience. Token format: opaque random 32-byte hex string (stored in SQLite with metadata); simpler than JWT, easy to revoke
   - [ ] 🟥 3.10 Token validation middleware: reject tokens with wrong audience, expired tokens, or unknown tokens. Return 401 with `WWW-Authenticate: Bearer resource_metadata="..."` header per RFC 9728

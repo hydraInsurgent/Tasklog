@@ -24,6 +24,8 @@ import { config } from './config.js';
 import { registerAllTools } from './tools/registry.js';
 import { mountWellKnown } from './oauth/well-known.js';
 import { mountRegister } from './oauth/register.js';
+import { mountAuthorize } from './oauth/authorize.js';
+import { mountGithubCallback } from './oauth/github.js';
 
 const mcp = new McpServer({
   name: 'tasklog-mcp',
@@ -62,6 +64,8 @@ app.get('/', (c) =>
 // flow on /authorize and /token.
 mountWellKnown(app);
 mountRegister(app);
+mountAuthorize(app);
+mountGithubCallback(app);
 
 // The MCP endpoint. POST is the JSON-RPC request channel per the spec.
 // The transport handles initialize, tools/list, tools/call, etc.
