@@ -1,6 +1,6 @@
 # Feature Implementation Plan: MCP Server
 
-**Overall Progress:** `82%`
+**Overall Progress:** `90%`
 
 **Tracking issue:** [#50](https://github.com/hydraInsurgent/Tasklog/issues/50)
 **Branch:** `feature/mcp-server-#50`
@@ -173,7 +173,7 @@ No full UI spec needed. The only UI element is a single `/authorize` HTML page w
   - [ ] 🟥 6.5 `cloudflared tunnel route dns tasklog mcp.tasklog.manudubey.in` (creates CNAME record on Cloudflare DNS)
   - [ ] 🟥 6.6 Update the `tasklog-tunnel` runit service from 5.3 if needed (config path correct). `sv restart tasklog-tunnel`
   - [ ] 🟥 6.7 External verification: from a non-phone network (laptop on cellular hotspot or a remote server), `curl https://mcp.tasklog.manudubey.in/.well-known/oauth-protected-resource` returns 200
-  - [ ] 🟥 6.8 Write [docs/learnings/cloudflare-tunnel.md](../learnings/cloudflare-tunnel.md): tunnels vs port forwarding, outbound-only architecture, why this works behind NAT/firewall, free-tier scope. Cross-link to [docs/research/cloudflare-tunnel.md](../research/cloudflare-tunnel.md). Add row to [docs/learnings/README.md](../learnings/README.md)
+  - [x] 🟩 6.8 Wrote [docs/learnings/cloudflare-tunnel.md](../learnings/cloudflare-tunnel.md): tunnel pattern as a concept (outbound-only relay), vs port forwarding / VPN / reverse proxy, Cloudflare-specific architecture, trust model considerations, common misconceptions. Cross-linked to research + guides. README index updated.
 
 - [ ] 🟥 **Step 7: claude.ai connector setup and smoke test** `[sequential]` → depends on: Step 6
   - [ ] 🟥 7.1 In claude.ai web (Pro/Max): Customize > Connectors > Add custom connector. URL: `https://mcp.tasklog.manudubey.in/mcp`. Advanced settings: leave Client ID and Client Secret blank
