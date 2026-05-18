@@ -1,6 +1,6 @@
 # Feature Implementation Plan: MCP Server
 
-**Overall Progress:** `48%`
+**Overall Progress:** `65%`
 
 **Tracking issue:** [#50](https://github.com/hydraInsurgent/Tasklog/issues/50)
 **Branch:** `feature/mcp-server-#50`
@@ -136,19 +136,19 @@ No full UI spec needed. The only UI element is a single `/authorize` HTML page w
   - [x] 🟩 3.5 `POST /register` (RFC 7591 DCR) accepts a JSON registration, validates `redirect_uris` are https (or localhost loopback), inserts a client row, and returns 201 with the issued `client_id`. Verified end-to-end with a claude.ai-shaped request and a bad-URI 400.
   - [x] 🟩 3.6 `GET /authorize` (`mcp/src/oauth/authorize.ts`): validates required OAuth params, response_type=code, code_challenge_method=S256, client_id exists, redirect_uri matches a registered URI. Stores flow state (params + CSRF token) in a 10-min signed cookie. Renders simple HTML with a "Log in with GitHub" button. Verified: missing-params, unknown-client, bad-redirect-uri all return 400 with descriptive messages; valid request returns HTML + cookie.
   - [x] 🟩 3.7 `GET /auth/github/callback` (`mcp/src/oauth/github.ts`): reads cookie, CSRF-checks against GitHub state, exchanges code for GitHub access token, fetches user identity from `api.github.com/user`, validates `login` against `ALLOWED_GH_USERS`. On success mints our auth code, persists with all flow params, deletes cookie, 302-redirects to client's callback with `code`+`state`. Renders 403 page on allow-list miss. Verified rejection paths (missing-params, missing-cookie).
-  - [ ] 🟥 3.8 `POST /token` endpoint: accept `application/x-www-form-urlencoded` per RFC 6749 4.1.3. Handle `grant_type=authorization_code` (verify PKCE `code_verifier` against stored `code_challenge` with S256) and `grant_type=refresh_token` (with refresh token rotation). RFC 6749 error codes only (`invalid_grant`, `invalid_request`, `invalid_client`, etc.)
-  - [ ] 🟥 3.9 Access token includes the canonical MCP resource URI as audience. Token format: opaque random 32-byte hex string (stored in SQLite with metadata); simpler than JWT, easy to revoke
-  - [ ] 🟥 3.10 Token validation middleware: reject tokens with wrong audience, expired tokens, or unknown tokens. Return 401 with `WWW-Authenticate: Bearer resource_metadata="..."` header per RFC 9728
+  - [x] 🟩 3.8 `POST /token` (`mcp/src/oauth/token.ts`): form-encoded body per RFC 6749 4.1.3, handles `authorization_code` (one-shot consume, expiry+client_id+redirect_uri+PKCE check) and `refresh_token` (one-shot consume with rotation) grants. RFC 6749 error codes (`invalid_grant`, `invalid_request`, `unsupported_grant_type`). Token TTLs: access 1h, refresh 30d. Verified end-to-end including PKCE failure and rotation invalidating the prior refresh token.
+  - [x] 🟩 3.9 Access tokens include the resource URI from the auth code (defaulting to `MCP_PUBLIC_URL`) as `audience`. Opaque 32-byte hex strings, looked up in SQLite (no JWT).
+  - [x] 🟩 3.10 Bearer auth middleware (`mcp/src/oauth/middleware.ts`): rejects missing/malformed/unknown/expired/wrong-audience tokens with HTTP 401 and `WWW-Authenticate: Bearer resource_metadata="..."` per RFC 9728. Applied only to `/mcp`; OAuth endpoints stay open.
   - [ ] 🟥 3.11 Unit tests for: PKCE validation (correct verifier passes, wrong fails), refresh rotation (old refresh invalid after exchange), audience validation, RFC 6749 error code shape
   - [ ] 🟥 3.12 Write [docs/learnings/oauth-2-1-for-mcp.md](../learnings/oauth-2-1-for-mcp.md): OAuth 2.1 vs 2.0 (no implicit grant, PKCE mandatory), DCR mechanics, the three-party flow (user/client app/auth server), the upstream-IdP pattern (our server is both an OAuth server to claude.ai AND a client to GitHub). Cross-link to [docs/research/claude-ai-connector-oauth.md](../research/claude-ai-connector-oauth.md) and the MCP spec research. Add row to [docs/learnings/README.md](../learnings/README.md)
 
-- [ ] 🟥 **Step 4: MCP endpoint + middleware stack** `[sequential]` → depends on: Steps 2, 3
-  - [ ] 🟥 4.1 `POST /mcp` route: Streamable HTTP transport adapter. Accept JSON-RPC, dispatch to MCP SDK, return `application/json` for tool calls (single response, no SSE needed for short ops)
-  - [ ] 🟥 4.2 `GET /mcp` route: return `405 Method Not Allowed` (spec-compliant; we don't push server-initiated messages)
-  - [ ] 🟥 4.3 Origin header validation middleware: allow-list `https://claude.ai`; for local dev allow `http://localhost:*` only when `NODE_ENV !== "production"`
-  - [ ] 🟥 4.4 `MCP-Protocol-Version` header validation: accept `2025-06-18`; reject other versions with `400 Bad Request`
-  - [ ] 🟥 4.5 Authorization middleware: `/mcp` requires valid Bearer token (calls into 3.10 validator). Other endpoints (/authorize, /token, /register, /.well-known/*) are open per OAuth spec
-  - [ ] 🟥 4.6 End-to-end local test: simulate the full flow using `mcp-inspector` or a hand-rolled curl script. Initialize, list tools, call a tool, verify auth rejection on missing/bad token
+- [x] 🟩 **Step 4: MCP endpoint + middleware stack** `[sequential]` → depends on: Steps 2, 3. Completed alongside Step 3 chunks D-F.
+  - [x] 🟩 4.1 `POST /mcp` route wired via `WebStandardStreamableHTTPServerTransport` (done in Step 2)
+  - [x] 🟩 4.2 `GET /mcp` returns `405 Method Not Allowed` with `Allow: POST` header (done in Step 2)
+  - [x] 🟩 4.3 `originMiddleware` in `mcp/src/oauth/middleware.ts`: missing Origin = allowed (server-to-server); present Origin must match `https://claude.ai` or be `localhost/127.0.0.1` in dev; otherwise 403.
+  - [x] 🟩 4.4 `protocolVersionMiddleware`: missing header allowed (initialize itself omits it); present must equal `2025-06-18` else 400.
+  - [x] 🟩 4.5 `bearerAuthMiddleware`: applied to `/mcp` only; calls into the 3.10 validator and 401s with WWW-Authenticate on failure.
+  - [x] 🟩 4.6 End-to-end smoke test verified: register client → insert auth_code → /token (auth_code) → /mcp initialize → notifications/initialized → tools/list (16 tools) → /token (refresh) → old refresh rejected → bad PKCE rejected. All paths pass.
 
 - [ ] 🟥 **Step 5: Phone deployment - extend `deploy-phone.sh`** `[sequential]` → depends on: Step 4
   - [ ] 🟥 5.1 In `scripts/deploy-phone.sh`: add a build step for `mcp/` mirroring the frontend pattern. Build TypeScript on laptop. Build arm64 `node_modules` via the existing Docker QEMU step (or a parallel one). Transfer to phone via rsync.

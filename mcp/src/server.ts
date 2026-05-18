@@ -26,6 +26,12 @@ import { mountWellKnown } from './oauth/well-known.js';
 import { mountRegister } from './oauth/register.js';
 import { mountAuthorize } from './oauth/authorize.js';
 import { mountGithubCallback } from './oauth/github.js';
+import { mountToken } from './oauth/token.js';
+import {
+  originMiddleware,
+  protocolVersionMiddleware,
+  bearerAuthMiddleware,
+} from './oauth/middleware.js';
 
 const mcp = new McpServer({
   name: 'tasklog-mcp',
@@ -66,6 +72,15 @@ mountWellKnown(app);
 mountRegister(app);
 mountAuthorize(app);
 mountGithubCallback(app);
+mountToken(app);
+
+// MCP endpoint middleware chain: Origin validation -> Protocol-Version
+// check -> Bearer auth. Order chosen so the cheapest checks fail fastest
+// (Origin is a header lookup, version is a header lookup, bearer is a DB
+// query). All three apply only to /mcp; OAuth endpoints stay open.
+app.use('/mcp', originMiddleware);
+app.use('/mcp', protocolVersionMiddleware);
+app.use('/mcp', bearerAuthMiddleware);
 
 // The MCP endpoint. POST is the JSON-RPC request channel per the spec.
 // The transport handles initialize, tools/list, tools/call, etc.
