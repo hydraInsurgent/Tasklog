@@ -2,6 +2,36 @@
 
 ---
 
+## v2.10 - MCP server for claude.ai custom connector
+*May 2026*
+
+### Added
+
+- Tasklog now speaks the [Model Context Protocol](https://modelcontextprotocol.io/specification/2025-06-18). A new Node/TS service (`mcp/`) exposes all Tasklog operations as MCP tools so claude.ai can manage tasks on your behalf (#50)
+- 16 MCP tools: list/get/create/delete/complete/uncomplete tasks, assign tasks to projects, set task labels, list/create/rename/delete projects, list/create/update/delete labels
+- OAuth 2.1 authorization server with Dynamic Client Registration (RFC 7591), PKCE S256 (RFC 7636), Authorization Server Metadata (RFC 8414), Protected Resource Metadata (RFC 9728), and Resource Indicators (RFC 8707) - the full spec stack claude.ai's connector requires
+- GitHub OAuth upstream for user authentication: log in with GitHub, allow-listed by username (env var `ALLOWED_GH_USERS`), zero passwords managed by the server
+- Cloudflare Tunnel integration so the MCP endpoint is publicly reachable at `https://mcp.tasklog.manudubey.in` without exposing the phone's IP or opening any inbound ports
+- `scripts/deploy-phone.sh` extended to build, transfer, and supervise the new `tasklog-mcp` and `tasklog-tunnel` services via runit
+- `guides/mcp-server-setup.md` - top-level end-to-end walkthrough
+- `guides/cloudflare-tunnel-dns-setup.md` - prerequisite: migrating a domain to Cloudflare DNS
+- `guides/github-oauth-app-setup.md` - prerequisite: registering the upstream OAuth App
+- `docs/learnings/{mcp-protocol,oauth-2-1-for-mcp,cloudflare-tunnel,dns-and-nameservers,github-oauth-vs-github-apps}.md` - five new study docs covering the concepts behind this feature
+- `docs/research/{mcp-spec-2025-06-18,claude-ai-connector-oauth,cloudflare-tunnel}.md` - verified excerpts from canonical specs and vendor docs
+- `docs/workflow-notes.md` - new living doc for tracking workflow experiments and deviations across features
+
+### Changed
+
+- `manudubey.in` DNS migrated from Porkbun's nameservers to Cloudflare's (required for Tunnel; existing GCP + GitHub Pages records preserved)
+
+### Security notes
+
+- The Tasklog .NET API remains LAN-only with no authentication. The MCP server is the ONLY public surface; it gates access with OAuth + GitHub upstream + a one-name allow-list before forwarding any request to the API.
+- Access tokens are short-lived (1 hour) and audience-bound; refresh tokens (30 days) rotate on every use per OAuth 2.1 for public clients.
+- OAuth state lives in a separate SQLite file (`mcp/data/auth.db`); the Tasklog task DB is unchanged.
+
+---
+
 ## v2.9 - Deploy Tasklog to GCP
 *April 2026*
 

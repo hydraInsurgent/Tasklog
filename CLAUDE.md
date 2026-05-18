@@ -42,7 +42,7 @@ The goals were:
 - build something understandable end-to-end
 - evolve the system gradually rather than designing everything upfront
 
-The system is now on v2, a .NET Web API backend and Next.js frontend.
+The system has three components as of v2.10: a .NET Web API backend, a Next.js frontend, and a Node/TypeScript MCP server that exposes the API to claude.ai as a custom connector via OAuth 2.1 + Cloudflare Tunnel.
 See `CHANGELOG.md` for history and `docs/architecture.md` for current structure.
 
 ---
