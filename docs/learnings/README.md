@@ -37,6 +37,7 @@ Inspired by the split in [album-to-movies](https://github.com/...) which separat
 | [dns-and-nameservers.md](dns-and-nameservers.md) | Registrar vs nameservers vs DNS provider, "Powered by Cloudflare" trap, propagation, DoH, proxy vs DNS only | MCP server (2026-05) |
 | [github-oauth-vs-github-apps.md](github-oauth-vs-github-apps.md) | The two GitHub developer products under Settings > Developer Settings, when to use which | MCP server (2026-05) |
 | [mcp-protocol.md](mcp-protocol.md) | The Model Context Protocol: host/client/server roles, JSON-RPC base, Streamable HTTP transport, tools and how they're invoked | MCP server (2026-05) |
+| [oauth-2-1-for-mcp.md](oauth-2-1-for-mcp.md) | OAuth 2.1: the four roles, PKCE, DCR, the upstream-IdP pattern, audience binding, refresh rotation. What MCP servers must implement. | MCP server (2026-05) |
 
 <!--
 TODO future learnings, add as encountered:

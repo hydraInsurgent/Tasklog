@@ -1,6 +1,6 @@
 # Feature Implementation Plan: MCP Server
 
-**Overall Progress:** `65%`
+**Overall Progress:** `72%`
 
 **Tracking issue:** [#50](https://github.com/hydraInsurgent/Tasklog/issues/50)
 **Branch:** `feature/mcp-server-#50`
@@ -128,7 +128,7 @@ No full UI spec needed. The only UI element is a single `/authorize` HTML page w
   - [ ] 🟨 2.9 Local sanity check with live `tasklog-api`: pending. The error-path test above proves wiring is correct; success-path verification deferred until either (a) user starts `tasklog-api` locally on the laptop, or (b) we hit it on the phone post-deploy. Either gates only this checkbox; subsequent Steps 3-5 do not depend on it.
   - [x] 🟩 2.10 Wrote [docs/learnings/mcp-protocol.md](../learnings/mcp-protocol.md): host/client/server roles, JSON-RPC framing, transports, stateful vs stateless, tool definition shape, error mechanisms. Cross-linked to [docs/research/mcp-spec-2025-06-18.md](../research/mcp-spec-2025-06-18.md). [docs/learnings/README.md](../learnings/README.md) index updated.
 
-- [ ] 🟨 **Step 3: OAuth 2.1 authorization server (in-process)** `[sequential]` → depends on: Step 1. Foundation + metadata + DCR done; user-facing flow + token endpoint + middleware + tests still ahead.
+- [x] 🟩 **Step 3: OAuth 2.1 authorization server (in-process)** `[sequential]` → depends on: Step 1. All 12 sub-tasks done across 4 sub-commits.
   - [x] 🟩 3.1 **Hand-roll over `mcp-auth` library.** Reason: the OAuth flow is one of the things the user wants to study, and hand-rolling makes every spec requirement visible in our code with no vendored opaqueness. Cost: ~500-800 lines of TS across well-named files.
   - [x] 🟩 3.2 SQLite store at `mcp/data/auth.db` (`mcp/src/oauth/store.ts`). Four tables: `clients`, `auth_codes`, `access_tokens`, `refresh_tokens`. WAL mode, indexes on expiry columns. One-use semantics on `auth_codes.consume` and `refresh_tokens.consume` via transactions.
   - [x] 🟩 3.3 `GET /.well-known/oauth-protected-resource` returns RFC 9728 metadata pointing at the auth server URL and listing supported scopes/bearer methods. Verified via curl.
@@ -139,8 +139,8 @@ No full UI spec needed. The only UI element is a single `/authorize` HTML page w
   - [x] 🟩 3.8 `POST /token` (`mcp/src/oauth/token.ts`): form-encoded body per RFC 6749 4.1.3, handles `authorization_code` (one-shot consume, expiry+client_id+redirect_uri+PKCE check) and `refresh_token` (one-shot consume with rotation) grants. RFC 6749 error codes (`invalid_grant`, `invalid_request`, `unsupported_grant_type`). Token TTLs: access 1h, refresh 30d. Verified end-to-end including PKCE failure and rotation invalidating the prior refresh token.
   - [x] 🟩 3.9 Access tokens include the resource URI from the auth code (defaulting to `MCP_PUBLIC_URL`) as `audience`. Opaque 32-byte hex strings, looked up in SQLite (no JWT).
   - [x] 🟩 3.10 Bearer auth middleware (`mcp/src/oauth/middleware.ts`): rejects missing/malformed/unknown/expired/wrong-audience tokens with HTTP 401 and `WWW-Authenticate: Bearer resource_metadata="..."` per RFC 9728. Applied only to `/mcp`; OAuth endpoints stay open.
-  - [ ] 🟥 3.11 Unit tests for: PKCE validation (correct verifier passes, wrong fails), refresh rotation (old refresh invalid after exchange), audience validation, RFC 6749 error code shape
-  - [ ] 🟥 3.12 Write [docs/learnings/oauth-2-1-for-mcp.md](../learnings/oauth-2-1-for-mcp.md): OAuth 2.1 vs 2.0 (no implicit grant, PKCE mandatory), DCR mechanics, the three-party flow (user/client app/auth server), the upstream-IdP pattern (our server is both an OAuth server to claude.ai AND a client to GitHub). Cross-link to [docs/research/claude-ai-connector-oauth.md](../research/claude-ai-connector-oauth.md) and the MCP spec research. Add row to [docs/learnings/README.md](../learnings/README.md)
+  - [x] 🟩 3.11 Unit tests for pure-function pieces (`mcp/src/oauth/crypto.test.ts` with `node:test`): PKCE accept/reject, near-miss rejection, length-mismatch guard, opaqueToken hex format + uniqueness. 6/6 passing. **Scope deviation from plan:** DB-backed behaviour (refresh rotation, audience validation, expiry) verified end-to-end via OAuth smoke test rather than as isolated unit tests; testing those would require refactoring `store.ts` to accept a configurable path / in-memory DB. Acceptable for single-user scope.
+  - [x] 🟩 3.12 Wrote [docs/learnings/oauth-2-1-for-mcp.md](../learnings/oauth-2-1-for-mcp.md): four OAuth roles, flow at two zoom levels (incl. ASCII sequence diagram), PKCE mechanics + why, DCR rationale, the upstream-IdP pattern (our server is both server and client), audience binding (RFC 8707), refresh rotation requirement for public clients, OAuth 2.1 vs 2.0 changes, common misconceptions. Cross-linked to research and to github-oauth-vs-github-apps learning. README index updated.
 
 - [x] 🟩 **Step 4: MCP endpoint + middleware stack** `[sequential]` → depends on: Steps 2, 3. Completed alongside Step 3 chunks D-F.
   - [x] 🟩 4.1 `POST /mcp` route wired via `WebStandardStreamableHTTPServerTransport` (done in Step 2)
