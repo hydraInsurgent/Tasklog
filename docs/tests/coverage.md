@@ -1,6 +1,6 @@
 # Test Coverage
 
-**Last updated:** 2026-03-17 (Labels and Filtering #30 - LabelsController, TasksController SetLabels, format.ts labelColor, AddTaskForm labels)
+**Last updated:** 2026-05-19 (MCP server #50 - oauth middleware/store/token + tools/result)
 
 ---
 
@@ -19,6 +19,25 @@
 | TasklogDbContext | 100% | 100% | |
 | Program.cs | 0% | - | Framework wiring - not a test target |
 | Migrations | 0% | - | Generated code - not a test target |
+
+### MCP Server (Node + TypeScript) - last run 2026-05-19
+
+| Module | Lines | Branches | Funcs | Notes |
+|---|---|---|---|---|
+| oauth/crypto.ts | 100% | 100% | 100% | |
+| oauth/middleware.ts | 100% | 90.32% | 100% | |
+| oauth/store.ts | 92.28% | 100% | 83.33% | Uncovered lines are TS interface declarations (no runtime code) |
+| oauth/token.ts | 99% | 87.18% | 100% | L22 + L65 (defensive content-type / grant_type checks not exercised) |
+| tools/result.ts | 100% | 100% | 100% | |
+| api-client.ts | 71% | 83% | 20% | Tested indirectly via runTool; timeout path is integration territory |
+| config.ts | 89.83% | 40% | 100% | Production-only validation branches not fired in tests |
+| oauth/authorize.ts | - | - | - | Not unit-tested; end-to-end smoke-tested via claude.ai connector |
+| oauth/github.ts | - | - | - | Same - integration territory (GitHub fetch + signed cookie + redirect chain) |
+| oauth/register.ts | - | - | - | Primary surface is Zod schema (statically typed) |
+| oauth/well-known.ts | - | - | - | Returns fixed JSON metadata |
+| server.ts | - | - | - | Hono mount order + request logger; covered by middleware tests + end-to-end smoke |
+
+**46 tests, 0 failures.** Run with: `npm test --prefix mcp` (auto-rebuilds better-sqlite3 for host arch via pretest hook if needed).
 
 ### Next.js Frontend - last run 2026-03-14
 
@@ -118,3 +137,73 @@
 - [x] 🟩 shows project name when activeView is "all"
 - [x] 🟩 hides project name when activeView is "inbox"
 - [x] 🟩 applies line-through to title when task is completed and not hiding
+
+## MCP Server (Node + TypeScript, node:test)
+
+Layer added in #50 (v2.10). Tests use an in-memory SQLite DB
+(`AUTH_DB_PATH=:memory:` set by the test script). Each test file runs in
+its own subprocess, so in-memory DBs are isolated across files.
+
+### oauth/crypto.ts
+- [x] 🟩 opaqueToken - returns a 64-char hex string
+- [x] 🟩 opaqueToken - successive calls return different values
+- [x] 🟩 pkceVerify - returns true when verifier matches the S256 challenge
+- [x] 🟩 pkceVerify - returns false on a mismatched verifier
+- [x] 🟩 pkceVerify - returns false on an empty verifier
+- [x] 🟩 pkceVerify - uses constant-time comparison
+
+### oauth/middleware.ts
+- [x] 🟩 bearerAuthMiddleware - 401 when Authorization header missing
+- [x] 🟩 bearerAuthMiddleware - 401 on non-Bearer scheme
+- [x] 🟩 bearerAuthMiddleware - 401 when token is empty
+- [x] 🟩 bearerAuthMiddleware - 401 when token not in DB
+- [x] 🟩 bearerAuthMiddleware - 401 when token expired
+- [x] 🟩 bearerAuthMiddleware - 401 when audience does not match publicUrl
+- [x] 🟩 bearerAuthMiddleware - passes for a valid token
+- [x] 🟩 bearerAuthMiddleware - audience trailing-slash normalization
+- [x] 🟩 originMiddleware - passes when Origin missing
+- [x] 🟩 originMiddleware - passes for https://claude.ai
+- [x] 🟩 originMiddleware - 403 for other origins
+- [x] 🟩 protocolVersionMiddleware - passes when header missing
+- [x] 🟩 protocolVersionMiddleware - passes for current spec version
+- [x] 🟩 protocolVersionMiddleware - passes for newer version (e.g. 2025-11-25)
+- [x] 🟩 protocolVersionMiddleware - 400 when malformed
+
+### oauth/store.ts
+- [x] 🟩 inTransaction - returns the function value on normal return
+- [x] 🟩 inTransaction - rolls back DB writes on throw
+- [x] 🟩 inTransaction - commits DB writes on normal return
+- [x] 🟩 authCodes.consume - returns and deletes (one-use)
+- [x] 🟩 authCodes.consume - returns null for unknown code
+- [x] 🟩 refreshTokens.consume - returns and deletes (rotation)
+- [x] 🟩 refreshTokens.consume - returns null for unknown token
+
+### oauth/token.ts
+- [x] 🟩 authorization_code - 400 invalid_request when required fields missing
+- [x] 🟩 authorization_code - 400 invalid_grant when code unknown
+- [x] 🟩 authorization_code - 400 invalid_grant when expired (and code is consumed)
+- [x] 🟩 authorization_code - 400 invalid_grant on PKCE mismatch (and code is consumed)
+- [x] 🟩 authorization_code - 400 invalid_grant on client_id mismatch
+- [x] 🟩 authorization_code - 400 invalid_grant on redirect_uri mismatch
+- [x] 🟩 authorization_code - success issues access + refresh, code consumed
+- [x] 🟩 refresh_token - 400 invalid_grant on unknown token
+- [x] 🟩 refresh_token - 400 invalid_grant on expired token
+- [x] 🟩 refresh_token - 400 invalid_grant on client_id mismatch
+- [x] 🟩 refresh_token - success rotates (new pair issued, old consumed)
+
+### tools/result.ts
+- [x] 🟩 ok - wraps text in content array
+- [x] 🟩 err - sets isError true
+- [x] 🟩 runTool - success path with custom formatter
+- [x] 🟩 runTool - success path without formatter JSON-stringifies
+- [x] 🟩 runTool - ApiError becomes structured tool error with status
+- [x] 🟩 runTool - generic Error becomes structured tool error
+- [x] 🟩 runTool - non-Error throws coerced to string
+
+### Not covered (and why)
+- `tools/tasks.ts`, `tools/projects.ts`, `tools/labels.ts` - thin api-client wrappers; behavior is exercised through `runTool` tests + the end-to-end smoke run with claude.ai.
+- `api-client.ts` - HTTP wrapper. Timeout path (R4 fix) is integration territory; would need a mocked .NET API to test cleanly.
+- `oauth/authorize.ts` and `oauth/github.ts` - the 302 redirect + signed cookie + GitHub fetch flow is integration territory and is end-to-end smoke-tested via the live claude.ai connector.
+- `oauth/register.ts` - DCR endpoint validation; primary surface is the Zod schema which is statically typed. Worth adding if/when #52 (rate limiting) lands.
+- `oauth/well-known.ts` - returns fixed JSON metadata.
+- `server.ts` - entry-point wiring (Hono mount order, request logger). Covered by middleware tests + end-to-end smoke.
