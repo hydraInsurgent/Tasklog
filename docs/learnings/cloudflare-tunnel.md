@@ -63,8 +63,8 @@ Specifically:
 
 1. You run `cloudflared` on your origin. It opens an outbound TCP connection to Cloudflare's edge.
 2. You create a "named tunnel" with a UUID. Cloudflare remembers that "this UUID belongs to me."
-3. You add a DNS record on your zone (e.g. `mcp.tasklog.manudubey.in`) that resolves to `<uuid>.cfargotunnel.com`. This is a CNAME-like target that Cloudflare resolves internally.
-4. Traffic arrives at Cloudflare's edge at `mcp.tasklog.manudubey.in`. Cloudflare terminates TLS (using its own certs - you do not manage them).
+3. You add a DNS record on your zone (e.g. `mcp-tasklog.manudubey.in`) that resolves to `<uuid>.cfargotunnel.com`. This is a CNAME-like target that Cloudflare resolves internally.
+4. Traffic arrives at Cloudflare's edge at `mcp-tasklog.manudubey.in`. Cloudflare terminates TLS (using its own certs - you do not manage them).
 5. Cloudflare looks up the hostname's tunnel UUID, finds the cloudflared instance with that UUID currently connected, and forwards the request over the existing tunnel.
 6. cloudflared receives the request and proxies it to the configured local service (e.g. `http://localhost:5180`).
 7. Your service responds. The response flows back the same path.

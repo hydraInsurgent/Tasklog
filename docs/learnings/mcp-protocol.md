@@ -1,6 +1,6 @@
 # The Model Context Protocol (MCP)
 
-**Last updated:** 2026-05-18 - first encountered in MCP server feature (P50, 2026-05)
+**Last updated:** 2026-05-19 - first encountered in MCP server feature (P50, 2026-05)
 
 MCP is a JSON-RPC-based protocol that lets LLM applications connect to external systems (data, tools, prompts) without writing custom integrations for each service. Think of it as the Language Server Protocol but for AI: one server implementation works with any compliant client (Claude Desktop, claude.ai, custom agents, etc.). This file is the conceptual overview; the canonical normative content lives in [docs/research/mcp-spec-2025-06-18.md](../research/mcp-spec-2025-06-18.md).
 
@@ -93,10 +93,33 @@ Each MCP server hosts a single endpoint path (commonly `/mcp`) that handles:
 
 Two flavors:
 
-- **Stateful**: server generates a session ID on initialize, returns it in the `Mcp-Session-Id` response header. Client must echo that header on every subsequent request. Server tracks per-session state (e.g. which capabilities were negotiated).
-- **Stateless**: no session ID, each request is self-contained. The SDK we use (`@modelcontextprotocol/sdk` for Node) requires creating a *new transport instance per request* in this mode, which makes the high-level `McpServer` API awkward.
+- **Stateful**: server generates a session ID on initialize, returns it in the `Mcp-Session-Id` response header. Client MUST echo that header on every subsequent request. Server tracks per-session state (e.g. which capabilities were negotiated).
+- **Stateless**: no session ID, each request is self-contained. The SDK we use (`@modelcontextprotocol/sdk` for Node) requires creating a *new transport instance per request* in this mode.
 
-Default to stateful unless you have a specific reason for stateless (typically: serving thousands of clients where session state is a scalability bottleneck).
+Per the spec: "Servers that require a session ID **SHOULD** respond to requests without an Mcp-Session-Id header (other than initialization) with HTTP 400 Bad Request." So if your client doesn't echo the session id and you're in stateful mode, every post-initialize call 400s.
+
+**Which to use for a claude.ai connector: stateless.** claude.ai's connector does not echo `Mcp-Session-Id`. A stateful server will accept the initialize (200) then 400 every tools/list, tools/call - the UI surfaces this as "Couldn't reload tools from the server." See the "Real-world claude.ai connector quirks" section in [oauth-2-1-for-mcp.md](oauth-2-1-for-mcp.md) for the full debugging trail and the per-request transport pattern.
+
+**The SDK refuses to share a stateless transport across requests** ("Stateless transport cannot be reused across requests. Create a new transport per request."). The correct pattern is to construct both `McpServer` AND transport inside the request handler, register tools, connect, handle, close. Cost is ~16 cheap function bindings per request, negligible.
+
+### Protocol version negotiation
+
+Two layers:
+
+1. **JSON-RPC body**: the client sends `protocolVersion` in the `initialize` request params. The server replies with the version it agrees to in the `result.protocolVersion`. This is the negotiation - the SDK handles it.
+2. **HTTP header**: on every request AFTER initialize, the client SHOULD include `MCP-Protocol-Version: <negotiated-version>`. Spec: "If the server receives a request with an invalid or unsupported MCP-Protocol-Version, it MUST respond with 400 Bad Request."
+
+**Trap:** "unsupported" is defined by what the SDK accepts, not by the spec version published on modelcontextprotocol.io at the time you build. claude.ai sends versions newer than the published spec (we saw `2025-11-25` when the published spec was `2025-06-18`). Validating the HTTP header against a hard-coded enum will 400 every legitimate request.
+
+**Fix:** at the HTTP layer, validate the *format* of the version string (regex `YYYY-MM-DD`) only. Let the SDK do the semantic decision in `initialize`. If the SDK accepted the version during initialize, the HTTP layer should accept it on subsequent requests.
+
+```typescript
+// HTTP middleware
+const VERSION_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+if (version && !VERSION_PATTERN.test(version)) {
+  return c.text(`Malformed MCP-Protocol-Version: ${version}`, 400);
+}
+```
 
 ### The lifecycle: initialize, then tools
 

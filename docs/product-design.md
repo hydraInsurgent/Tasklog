@@ -65,7 +65,7 @@ If multi-user or sharing becomes a real need, authentication on the web UI (curr
 
 **Web UI is local-network only** - no cloud hosting of the UI, no public web access. Exposing the web UI publicly would require adding authentication to the .NET API and re-thinking the CORS policy.
 
-**MCP endpoint is public** (as of v2.10) - `https://mcp.tasklog.manudubey.in` exposes Tasklog as a Model Context Protocol server for the claude.ai custom connector. The MCP endpoint is the ONLY public surface; it gates access via OAuth 2.1 + GitHub upstream + a one-name allow-list. The .NET API remains LAN-only and unauthenticated.
+**MCP endpoint is public** (as of v2.10) - `https://mcp-tasklog.manudubey.in` exposes Tasklog as a Model Context Protocol server for the claude.ai custom connector. The MCP endpoint is the ONLY public surface; it gates access via OAuth 2.1 + GitHub upstream + a one-name allow-list. The .NET API remains LAN-only and unauthenticated.
 
 **No notifications** - deadlines are informational. The app shows them; it does not act on them.
 A reminder or alert system would be a meaningful scope addition.

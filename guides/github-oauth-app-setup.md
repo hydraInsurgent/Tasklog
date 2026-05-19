@@ -44,7 +44,7 @@ See [docs/learnings/github-oauth-vs-github-apps.md](../docs/learnings/github-oau
 
 - A GitHub account.
 - A password manager to store the Client Secret (we used KeePassXC).
-- A planned MCP server URL (we used `https://mcp.tasklog.manudubey.in`). The URL does not need to be reachable at registration time; GitHub never visits it.
+- A planned MCP server URL (we used `https://mcp-tasklog.manudubey.in`). The URL does not need to be reachable at registration time; GitHub never visits it.
 
 ## Walkthrough
 
@@ -69,9 +69,9 @@ Five fields to fill:
 | Field | Value | Why |
 |---|---|---|
 | Application name | `Tasklog MCP` | Shown on the GitHub consent screen at login time. |
-| Homepage URL | `https://mcp.tasklog.manudubey.in` | Required field; displayed on the consent screen. Does not need to be reachable yet. |
+| Homepage URL | `https://mcp-tasklog.manudubey.in` | Required field; displayed on the consent screen. Does not need to be reachable yet. |
 | Application description | `Tasklog MCP server for claude.ai connector` (optional) | Also shown on the consent screen. |
-| Authorization callback URL | `https://mcp.tasklog.manudubey.in/auth/github/callback` | THE critical field. After GitHub finishes user auth, it redirects the browser to this URL with a code. Must match exactly what the MCP server expects. |
+| Authorization callback URL | `https://mcp-tasklog.manudubey.in/auth/github/callback` | THE critical field. After GitHub finishes user auth, it redirects the browser to this URL with a code. Must match exactly what the MCP server expects. |
 | Enable Device Flow | unchecked | We use the regular web auth code flow, not the device flow (which is for CLIs and devices without browsers). |
 
 Click **Register application**.

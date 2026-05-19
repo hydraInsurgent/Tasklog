@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-05-18
 
-How `manudubey.in` was migrated from Porkbun DNS to Cloudflare DNS so that Cloudflare Tunnel could later route `mcp.tasklog.manudubey.in` to the phone home-server. Done as Step 0 of the [MCP server feature plan](../docs/plans/P50-mcp-server.md).
+How `manudubey.in` was migrated from Porkbun DNS to Cloudflare DNS so that Cloudflare Tunnel could later route `mcp-tasklog.manudubey.in` to the phone home-server. Done as Step 0 of the [MCP server feature plan](../docs/plans/P50-mcp-server.md).
 
 ## How this all fits together
 

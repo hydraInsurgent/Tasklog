@@ -24,7 +24,7 @@ Browser (LAN-only)
 
 claude.ai (public, web + mobile)
   │
-  └── HTTPS https://mcp.tasklog.manudubey.in/mcp
+  └── HTTPS https://mcp-tasklog.manudubey.in/mcp
         │
         └── Cloudflare Tunnel  →  cloudflared (Termux)
                                        │
@@ -337,7 +337,7 @@ NEXT_PUBLIC_API_URL     Base URL for API calls. Defined in frontend/.env.local.
 **MCP SDK:** `@modelcontextprotocol/sdk` (Streamable HTTP transport, stateful mode)
 **OAuth:** hand-rolled, conforming to OAuth 2.1 + RFC 7591/7636/8414/8707/9728
 **Default port:** `5180`
-**Public URL (production):** `https://mcp.tasklog.manudubey.in` via Cloudflare Tunnel
+**Public URL (production):** `https://mcp-tasklog.manudubey.in` via Cloudflare Tunnel
 
 ### Endpoint surface
 
@@ -476,7 +476,7 @@ In production, `config.ts` throws on startup if any required var is missing or s
 ```
 1. User types in claude.ai mobile: "add task: review PR by Friday"
 2. claude.ai sends prompt to its LLM, which decides to invoke our connector
-3. claude.ai opens TLS connection to https://mcp.tasklog.manudubey.in/mcp
+3. claude.ai opens TLS connection to https://mcp-tasklog.manudubey.in/mcp
 4. Cloudflare edge terminates TLS, forwards over the tunnel to phone:5180
 5. tasklog-mcp middleware: Origin OK (claude.ai), Bearer token validated, audience matches
 6. McpServer routes tools/call -> create_task handler

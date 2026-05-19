@@ -1,6 +1,6 @@
 # OAuth 2.1 (especially for MCP servers)
 
-**Last updated:** 2026-05-18 - first encountered in MCP server feature (P50, 2026-05)
+**Last updated:** 2026-05-19 - first encountered in MCP server feature (P50, 2026-05)
 
 OAuth 2.1 is the protocol any MCP server that wants to be reached from claude.ai web/mobile must implement. It is also the same protocol behind "Sign in with Google", "Connect to GitHub", and most third-party API authorization on the web. Understanding it gives you a transferable mental model for nearly every modern auth integration. This learning captures the parts you need to actually build an OAuth 2.1 authorization server, with specific notes for the MCP context.
 
@@ -166,6 +166,78 @@ If your mental model is "OAuth 2.0 minus the bad parts," that's exactly right.
 - **Building a mobile app that calls your own API**: public client, PKCE-based, similar to the MCP setup but you control both sides.
 - **Diagnosing "redirect_uri mismatch"**: the server stored a specific URI at client registration; the OAuth client sent something different. Spec requires exact match.
 - **Debugging "invalid_grant"**: usually one of: code expired, code reused, PKCE verifier mismatch, redirect_uri does not match the auth code, or refresh token already rotated. Server logs should distinguish these.
+
+## Real-world claude.ai connector quirks (from the Tasklog MCP build)
+
+These are NOT in the OAuth 2.1 spec or the MCP authorization spec - they are observed behaviors of the claude.ai web connector that any MCP server author must accommodate. Each one cost real debugging time during P50; they are written down so future builds (or anyone else building against claude.ai) can skip the same pain.
+
+### 1. `/authorize` MUST 302-redirect to the upstream IdP immediately
+
+claude.ai opens `/authorize` in a connector popup and expects an **immediate** `302 Location: <upstream-idp-url>`. If the server instead returns a `200 text/html` page (a branded "Click here to log in" interstitial), the popup never advances to the IdP - the user sees "Authorization with the MCP server failed" with no GitHub screen ever opening.
+
+**Why:** the connector flow is automated; it does not render arbitrary HTML in the popup, it follows redirects.
+
+**Implication:** any branded consent / disclosure you want to show the user must happen either (a) before the connector add (in your docs) or (b) at the upstream IdP (GitHub already has a consent screen). Don't add an interstitial.
+
+### 2. The `resource` parameter has a trailing slash
+
+claude.ai sends `resource=https://your-mcp.example.com/` (with a trailing `/`). Our `MCP_PUBLIC_URL` is canonicalized without the slash. Strict string equality on audience checking (`token.audience !== publicUrl`) rejects every token we just issued.
+
+**Fix:** normalize both sides before comparing - strip the trailing slash on either the stored audience or the configured public URL. RFC 3986 URI equivalence permits this.
+
+### 3. The MCP-Protocol-Version header carries a *future* version
+
+claude.ai sends `mcp-protocol-version: 2025-11-25` on every request after initialize. At the time of this build the latest published MCP spec version was `2025-06-18`. The SDK accepts the newer version internally (via the JSON-RPC initialize negotiation), but if your middleware enumerates "supported versions" against the spec you know about, every post-initialize request 400s.
+
+**Fix:** at the HTTP layer, validate the *format* of the version (regex for `YYYY-MM-DD`), not its membership in a hard-coded set. Let the SDK decide what's actually supported - it negotiates during `initialize`, which is the spec-correct place. (Spec says servers MUST return 400 on unsupported versions, but "unsupported" is defined by what the SDK accepts, not by the human in the loop.)
+
+**Generalization:** for any rapidly-evolving spec consumed via a third-party SDK, prefer format validation over enumeration. The SDK is the source of truth.
+
+### 4. claude.ai does NOT echo `Mcp-Session-Id`
+
+The MCP spec lets the server choose stateful or stateless. If stateful, the server returns `Mcp-Session-Id` on the initialize response; the client MUST echo it on subsequent requests, or the spec says the server SHOULD return 400.
+
+claude.ai's connector treats MCP endpoints as **stateless** - it never carries the session id forward. In stateful mode you get a successful initialize followed by 400 on every tools/list, tools/call. Symptom in the UI: "Couldn't reload tools from the server."
+
+**Fix:** stateless mode. With `@modelcontextprotocol/sdk` (Node), that means **per-request** `McpServer` + transport:
+
+```typescript
+app.post('/mcp', async (c) => {
+  const server = createMcpServerForRequest();  // fresh server, re-registers tools
+  const transport = new WebStandardStreamableHTTPServerTransport({
+    sessionIdGenerator: undefined,  // stateless
+    enableJsonResponse: true,
+  });
+  await server.connect(transport);
+  try {
+    return await transport.handleRequest(c.req.raw);
+  } finally {
+    await transport.close();
+    await server.close();
+  }
+});
+```
+
+Cost: ~16 tool handler bindings per request. In practice negligible (<1ms). Trying to reuse a single stateless transport across requests is what the SDK refuses ("Stateless transport cannot be reused across requests. Create a new transport per request.").
+
+### 5. Always run request + header logging from day one
+
+In each of the four failures above, the root cause was *one specific request header* claude.ai was sending. Without per-request logging of method + path + relevant headers (`accept`, `content-type`, `mcp-protocol-version`, `mcp-session-id`, `origin`, `authorization`), every failure looked the same from outside: "Authorization with the MCP server failed" or "Couldn't reload tools." Half a day of guessing.
+
+**Rule:** the first middleware you mount on an MCP server should log the request line + the diagnostic headers. Keep it in production - the cost is negligible, the time it saves on the next debugging session is huge.
+
+```typescript
+app.use('*', async (c, next) => {
+  const start = Date.now();
+  console.log(`[req] ${c.req.method} ${c.req.path}`);
+  if (c.req.path === '/mcp' && c.req.method === 'POST') {
+    const interesting = ['accept', 'content-type', 'mcp-protocol-version', 'mcp-session-id', 'origin'];
+    console.log(`[req-hdrs] ${interesting.map(h => `${h}=${c.req.header(h) ?? '-'}`).join(' ')}`);
+  }
+  await next();
+  console.log(`[res] ${c.req.method} ${c.req.path} ${c.res.status} ${Date.now() - start}ms`);
+});
+```
 
 ## Configuration in common stacks
 

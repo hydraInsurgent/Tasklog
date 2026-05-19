@@ -9,7 +9,7 @@
 
 ## TLDR
 
-A new Node/TS service (`mcp/`) on the phone exposes the existing Tasklog API as MCP tools. The service includes a built-in OAuth 2.1 authorization server (Dynamic Client Registration, PKCE S256) that authenticates the user via GitHub upstream OAuth. A Cloudflare Tunnel exposes only this service publicly at `mcp.tasklog.manudubey.in`. End goal: text Claude from anywhere to manage Tasklog tasks. No changes to `Tasklog.Api`, frontend, or DB schema.
+A new Node/TS service (`mcp/`) on the phone exposes the existing Tasklog API as MCP tools. The service includes a built-in OAuth 2.1 authorization server (Dynamic Client Registration, PKCE S256) that authenticates the user via GitHub upstream OAuth. A Cloudflare Tunnel exposes only this service publicly at `mcp-tasklog.manudubey.in`. End goal: text Claude from anywhere to manage Tasklog tasks. No changes to `Tasklog.Api`, frontend, or DB schema.
 
 ## Goal State
 
@@ -21,7 +21,7 @@ A new Node/TS service (`mcp/`) on the phone exposes the existing Tasklog API as 
 **Goal State:**
 - Three services on the phone (`tasklog-api`, `tasklog-web`, `tasklog-mcp`) + a fourth process for Cloudflare Tunnel.
 - `tasklog-api` and `tasklog-web` remain LAN-only with no auth (unchanged).
-- `tasklog-mcp` is the only public surface, exposed at `https://mcp.tasklog.manudubey.in/mcp` via Cloudflare Tunnel.
+- `tasklog-mcp` is the only public surface, exposed at `https://mcp-tasklog.manudubey.in/mcp` via Cloudflare Tunnel.
 - OAuth 2.1 with GitHub upstream gates access; only the allow-listed GitHub user can connect.
 - claude.ai web and mobile have Tasklog as a Custom Connector; the user can text Claude to manage tasks.
 - Three new study learnings, one new guide, two doc updates (architecture + product-design).
@@ -98,7 +98,7 @@ No full UI spec needed. The only UI element is a single `/authorize` HTML page w
   - [x] 🟩 0.2 User: verified Cloudflare imported existing DNS records; manually added 3 missing A records (`tasklog`, `tasklog.home`, `tasklog-business`) as DNS only; switched `*` wildcard CNAME from Proxied to DNS only
   - [x] 🟩 0.3 User: logged into Porkbun, replaced 4 Porkbun nameservers with 2 Cloudflare ones (`rudy.ns.cloudflare.com`, `marlowe.ns.cloudflare.com`)
   - [x] 🟩 0.4 Verified NS propagation via DoH lookup; verified all 5 subdomains still resolve and serve content correctly post-migration
-  - [x] 🟩 0.5 User: registered GitHub OAuth App `Tasklog MCP` at github.com/settings/developers with callback URL `https://mcp.tasklog.manudubey.in/auth/github/callback`. Initial attempt mistakenly opened "GitHub Apps" form (different product); aborted and re-did under "OAuth Apps".
+  - [x] 🟩 0.5 User: registered GitHub OAuth App `Tasklog MCP` at github.com/settings/developers with callback URL `https://mcp-tasklog.manudubey.in/auth/github/callback`. Initial attempt mistakenly opened "GitHub Apps" form (different product); aborted and re-did under "OAuth Apps".
   - [x] 🟩 0.6 User: installed KeePassXC, saved Client ID + Client Secret entry titled "Tasklog MCP - GitHub OAuth App"
   - [x] 🟩 0.7 Capture Step 0 learnings and guides (periodic-capture pattern, user-requested rhythm; logged in [docs/workflow-notes.md](../workflow-notes.md))
     - [x] 🟩 0.7.1 Write [docs/learnings/dns-and-nameservers.md](../learnings/dns-and-nameservers.md)
@@ -166,17 +166,17 @@ No full UI spec needed. The only UI element is a single `/authorize` HTML page w
     tunnel: <uuid-from-6.3>
     credentials-file: /data/data/com.termux/files/home/.cloudflared/<uuid>.json
     ingress:
-      - hostname: mcp.tasklog.manudubey.in
+      - hostname: mcp-tasklog.manudubey.in
         service: http://localhost:5180
       - service: http_status:404
     ```
-  - [ ] 🟥 6.5 `cloudflared tunnel route dns tasklog mcp.tasklog.manudubey.in` (creates CNAME record on Cloudflare DNS)
+  - [ ] 🟥 6.5 `cloudflared tunnel route dns tasklog mcp-tasklog.manudubey.in` (creates CNAME record on Cloudflare DNS)
   - [ ] 🟥 6.6 Update the `tasklog-tunnel` runit service from 5.3 if needed (config path correct). `sv restart tasklog-tunnel`
-  - [ ] 🟥 6.7 External verification: from a non-phone network (laptop on cellular hotspot or a remote server), `curl https://mcp.tasklog.manudubey.in/.well-known/oauth-protected-resource` returns 200
+  - [ ] 🟥 6.7 External verification: from a non-phone network (laptop on cellular hotspot or a remote server), `curl https://mcp-tasklog.manudubey.in/.well-known/oauth-protected-resource` returns 200
   - [x] 🟩 6.8 Wrote [docs/learnings/cloudflare-tunnel.md](../learnings/cloudflare-tunnel.md): tunnel pattern as a concept (outbound-only relay), vs port forwarding / VPN / reverse proxy, Cloudflare-specific architecture, trust model considerations, common misconceptions. Cross-linked to research + guides. README index updated.
 
 - [ ] 🟥 **Step 7: claude.ai connector setup and smoke test** `[sequential]` → depends on: Step 6
-  - [ ] 🟥 7.1 In claude.ai web (Pro/Max): Customize > Connectors > Add custom connector. URL: `https://mcp.tasklog.manudubey.in/mcp`. Advanced settings: leave Client ID and Client Secret blank
+  - [ ] 🟥 7.1 In claude.ai web (Pro/Max): Customize > Connectors > Add custom connector. URL: `https://mcp-tasklog.manudubey.in/mcp`. Advanced settings: leave Client ID and Client Secret blank
   - [ ] 🟥 7.2 Tap Connect. Browser opens our `/authorize` page; click Log in with GitHub; complete GitHub OAuth flow; redirected back to claude.ai with a success state
   - [ ] 🟥 7.3 Verify "Connected" status in claude.ai web. Inspect `tools/list` is populated (claude.ai usually shows tool count)
   - [ ] 🟥 7.4 From Claude mobile (iOS or Android): ask "what tasks do I have today?". Verify it calls `list_tasks` and reports the list correctly. If the same connector definition is not auto-shared with mobile, repeat 7.1 on mobile

@@ -1,6 +1,6 @@
 # Learnings
 
-**Last updated:** 2026-05-05
+**Last updated:** 2026-05-19
 
 Timeless concepts picked up while building Tasklog. Things that aren't tied to a single feature or platform but are useful to understand whenever they come up.
 
@@ -39,6 +39,7 @@ Inspired by the split in [album-to-movies](https://github.com/...) which separat
 | [mcp-protocol.md](mcp-protocol.md) | The Model Context Protocol: host/client/server roles, JSON-RPC base, Streamable HTTP transport, tools and how they're invoked | MCP server (2026-05) |
 | [oauth-2-1-for-mcp.md](oauth-2-1-for-mcp.md) | OAuth 2.1: the four roles, PKCE, DCR, the upstream-IdP pattern, audience binding, refresh rotation. What MCP servers must implement. | MCP server (2026-05) |
 | [cloudflare-tunnel.md](cloudflare-tunnel.md) | The tunnel pattern (outbound-only relay) vs port forwarding / VPN / reverse proxy. Cloudflare Tunnel specifics. | MCP server (2026-05) |
+| [cloudflare-universal-ssl.md](cloudflare-universal-ssl.md) | Free Universal SSL covers only one wildcard level; nested subdomains fail TLS handshake. Naming pattern guidance. | MCP server (2026-05) |
 
 <!--
 TODO future learnings, add as encountered:

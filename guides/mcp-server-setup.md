@@ -1,8 +1,17 @@
 # MCP Server Setup (End to End)
 
-**Last updated:** 2026-05-18
+**Last updated:** 2026-05-19
 
 How to take a working `tasklog-api` + `tasklog-web` phone deployment and add the MCP server with a public claude.ai connector. The top-level walkthrough for the feature shipped in [docs/plans/_archive/P50-mcp-server.md](../docs/plans/_archive/P50-mcp-server.md).
+
+## Pick a flat subdomain (Cloudflare Universal SSL constraint)
+
+Before you do anything, choose your public hostname. Cloudflare's free Universal SSL only covers `<apex>` and `*.<apex>` (one level deep). A nested subdomain like `mcp.tasklog.example.com` will fail the TLS handshake at the Cloudflare edge - the cert doesn't cover that depth. Use a **flat one-level subdomain** instead:
+
+- `mcp-tasklog.example.com` (works)
+- `mcp.tasklog.example.com` (fails TLS, free plan)
+
+For multiple future MCP servers, prefix the project: `mcp-tasklog`, `mcp-album`, `mcp-finance`. See [docs/learnings/cloudflare-universal-ssl.md](../docs/learnings/cloudflare-universal-ssl.md) for the full explanation. Paid alternative is ACM (~$10/month per zone) which supports any depth.
 
 ## How this all fits together
 
@@ -81,7 +90,7 @@ Inside proot:
 cat > /root/.tasklog-mcp.env <<'ENV'
 PORT=5180
 TASKLOG_API_URL=http://localhost:5115
-MCP_PUBLIC_URL=https://mcp.tasklog.manudubey.in
+MCP_PUBLIC_URL=https://mcp-tasklog.manudubey.in
 GITHUB_CLIENT_ID=<paste from KeePassXC>
 GITHUB_CLIENT_SECRET=<paste from KeePassXC>
 ALLOWED_GH_USERS=hydraInsurgent
@@ -118,66 +127,52 @@ ssh phone 'curl -s http://localhost:5180/.well-known/oauth-protected-resource'
 # Should print the RFC 9728 metadata JSON.
 ```
 
-### 3. Install cloudflared on the phone
+### 3. Install cloudflared on the phone (inside proot Ubuntu)
 
-Native Termux install (not inside proot - cloudflared is a static Go binary, no glibc needed):
-
-```bash
-ssh phone bash <<'EOF'
-curl -L -o $PREFIX/bin/cloudflared \
-  https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64
-chmod +x $PREFIX/bin/cloudflared
-cloudflared --version
-EOF
-```
-
-If the Termux native install errors out for any architecture reason, fall back to inside-proot install:
+Newer cloudflared binaries (built with recent Go) use the `faccessat2` syscall, which Termux's seccomp filter blocks - the process dies on startup with `SIGSYS: bad system call`. So install cloudflared **inside proot Ubuntu**, where the seccomp restriction does not apply:
 
 ```bash
-ssh phone 'proot-distro login ubuntu -- bash -c "curl -L -o /usr/local/bin/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64 && chmod +x /usr/local/bin/cloudflared"'
+ssh phone 'proot-distro login ubuntu -- bash -c "curl -L -o /usr/local/bin/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64 && chmod +x /usr/local/bin/cloudflared && cloudflared --version"'
 ```
 
-(Then adjust the `tasklog-tunnel` runit service to invoke via proot - left as a TODO if needed.)
+The `tasklog-tunnel` runit service is already configured to invoke cloudflared via proot (see `scripts/deploy-phone.sh`).
 
 ### 4. Authenticate cloudflared with your Cloudflare account
 
 ```bash
-ssh phone 'cloudflared tunnel login'
+ssh phone -t 'proot-distro login ubuntu -- cloudflared tunnel login'
 ```
 
-This prints a URL. Open it on your laptop browser, log in to Cloudflare, select the zone `manudubey.in`, click Authorize. The phone-side cloudflared receives the credentials and writes them to `$HOME/.cloudflared/cert.pem`.
+This prints a URL. Open it on your laptop browser, log in to Cloudflare, select the zone `manudubey.in`, click Authorize. cloudflared (running inside proot) receives the credentials and writes them to `/root/.cloudflared/cert.pem` inside the proot rootfs.
 
 ### 5. Create the tunnel and DNS route
 
 ```bash
-ssh phone bash <<'EOF'
-cloudflared tunnel create tasklog
-# Note the UUID printed. The credentials file is at $HOME/.cloudflared/<UUID>.json
-cat $HOME/.cloudflared/*.json | jq -r .TunnelID  # confirm UUID
-EOF
+ssh phone -t 'proot-distro login ubuntu -- cloudflared tunnel create tasklog'
+# Note the UUID printed. The credentials file is at /root/.cloudflared/<UUID>.json (inside proot)
 ```
 
 Write the config file pointing the hostname at the local MCP service:
 
 ```bash
-ssh phone bash <<'EOF'
-UUID=$(jq -r .TunnelID $HOME/.cloudflared/*.json | head -1)
-cat > $HOME/.cloudflared/config.yml <<CFG
-tunnel: $UUID
-credentials-file: /data/data/com.termux/files/home/.cloudflared/$UUID.json
+ssh phone 'proot-distro login ubuntu -- bash -c "
+UUID=\$(ls /root/.cloudflared/*.json | xargs -I {} basename {} .json | head -1)
+cat > /root/.cloudflared/config.yml <<CFG
+tunnel: \$UUID
+credentials-file: /root/.cloudflared/\$UUID.json
 ingress:
-  - hostname: mcp.tasklog.manudubey.in
+  - hostname: mcp-tasklog.manudubey.in
     service: http://localhost:5180
   - service: http_status:404
 CFG
-cat $HOME/.cloudflared/config.yml
-EOF
+cat /root/.cloudflared/config.yml
+"'
 ```
 
 Create the DNS record (Cloudflare adds a CNAME to `<uuid>.cfargotunnel.com`):
 
 ```bash
-ssh phone 'cloudflared tunnel route dns tasklog mcp.tasklog.manudubey.in'
+ssh phone -t 'proot-distro login ubuntu -- cloudflared tunnel route dns tasklog mcp-tasklog.manudubey.in'
 ```
 
 ### 6. Restart the tunnel service
@@ -193,17 +188,17 @@ ssh phone "SVDIR=\$PREFIX/var/service sv status tasklog-tunnel"
 From your laptop (not on the phone's LAN if possible, e.g. cellular hotspot):
 
 ```bash
-curl -s https://mcp.tasklog.manudubey.in/.well-known/oauth-protected-resource | jq
+curl -s https://mcp-tasklog.manudubey.in/.well-known/oauth-protected-resource | jq
 ```
 
-Should return RFC 9728 metadata pointing at `https://mcp.tasklog.manudubey.in`.
+Should return RFC 9728 metadata pointing at `https://mcp-tasklog.manudubey.in`.
 
 ### 8. Add the connector in claude.ai
 
 In claude.ai web (Pro/Max plan):
 
 1. Customize > Connectors > Add custom connector.
-2. URL: `https://mcp.tasklog.manudubey.in/mcp`.
+2. URL: `https://mcp-tasklog.manudubey.in/mcp`.
 3. Advanced settings: leave Client ID and Client Secret BLANK (we use Dynamic Client Registration).
 4. Click Add.
 
@@ -269,16 +264,22 @@ ssh phone "SVDIR=\$PREFIX/var/service sv restart tasklog-mcp"
 
 **Want to test claude.ai mobile separately:** the connector list syncs across the same Claude account, so adding it on web means it appears on mobile too. If not visible, try logging out + back in on mobile.
 
+**TLS handshake failure / "Bad Gateway" on the public URL:** if you used a nested subdomain like `mcp.tasklog.example.com`, Cloudflare's free Universal SSL doesn't cover it. Rename to a flat one-level subdomain (e.g. `mcp-tasklog.example.com`). See [docs/learnings/cloudflare-universal-ssl.md](../docs/learnings/cloudflare-universal-ssl.md).
+
+**"Couldn't reload tools from the server" in claude.ai (initialize succeeds, tools/list 400s):** stateful MCP server with claude.ai connector. claude.ai doesn't echo `Mcp-Session-Id`. Switch the transport to stateless mode (per-request `McpServer` + transport). See the "claude.ai connector quirks" section in [docs/learnings/oauth-2-1-for-mcp.md](../docs/learnings/oauth-2-1-for-mcp.md).
+
+**400 on every /mcp call after initialize, header shows `mcp-protocol-version` newer than published spec:** middleware enumerates "supported versions" and rejects claude.ai's newer version. Switch to format validation (regex `YYYY-MM-DD`) and let the SDK negotiate during initialize.
+
 ## Adding a second MCP server in the future
 
-If you build a separate MCP server for another project (e.g. `mcp.album-to-movies.manudubey.in`):
+If you build a separate MCP server for another project (e.g. `mcp-album.manudubey.in`):
 
 1. Register a separate GitHub OAuth App for that project.
-2. Create another tunnel hostname: `cloudflared tunnel route dns tasklog mcp.album-to-movies.manudubey.in` (you can reuse one tunnel for many hostnames via `ingress` config).
+2. Create another tunnel hostname: `cloudflared tunnel route dns tasklog mcp-album.manudubey.in` (you can reuse one tunnel for many hostnames via `ingress` config).
 3. Update `cloudflared` config.yml to add an ingress entry for the new hostname pointing at the new service's port.
 4. Add the connector to claude.ai with the new URL.
 
-The Cloudflare DNS + tunnel infrastructure scales to many services.
+Use **flat one-level subdomains** (e.g. `mcp-album` not `mcp.album`) so they're covered by Cloudflare's free Universal SSL. The Cloudflare DNS + tunnel infrastructure scales to many services.
 
 ## See also
 
@@ -286,6 +287,7 @@ The Cloudflare DNS + tunnel infrastructure scales to many services.
 - [docs/learnings/mcp-protocol.md](../docs/learnings/mcp-protocol.md) - what MCP is and how the wire protocol works.
 - [docs/learnings/oauth-2-1-for-mcp.md](../docs/learnings/oauth-2-1-for-mcp.md) - the OAuth flow this server implements.
 - [docs/learnings/cloudflare-tunnel.md](../docs/learnings/cloudflare-tunnel.md) - tunnel concepts.
+- [docs/learnings/cloudflare-universal-ssl.md](../docs/learnings/cloudflare-universal-ssl.md) - why subdomain naming matters for free Universal SSL.
 - [guides/cloudflare-tunnel-dns-setup.md](cloudflare-tunnel-dns-setup.md) - the prerequisite domain migration.
 - [guides/github-oauth-app-setup.md](github-oauth-app-setup.md) - the prerequisite OAuth App registration.
 - [docs/research/mcp-spec-2025-06-18.md](../docs/research/mcp-spec-2025-06-18.md), [docs/research/claude-ai-connector-oauth.md](../docs/research/claude-ai-connector-oauth.md), [docs/research/cloudflare-tunnel.md](../docs/research/cloudflare-tunnel.md) - the verified facts informing this guide.

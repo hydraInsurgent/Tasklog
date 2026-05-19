@@ -11,7 +11,7 @@
 - 16 MCP tools: list/get/create/delete/complete/uncomplete tasks, assign tasks to projects, set task labels, list/create/rename/delete projects, list/create/update/delete labels
 - OAuth 2.1 authorization server with Dynamic Client Registration (RFC 7591), PKCE S256 (RFC 7636), Authorization Server Metadata (RFC 8414), Protected Resource Metadata (RFC 9728), and Resource Indicators (RFC 8707) - the full spec stack claude.ai's connector requires
 - GitHub OAuth upstream for user authentication: log in with GitHub, allow-listed by username (env var `ALLOWED_GH_USERS`), zero passwords managed by the server
-- Cloudflare Tunnel integration so the MCP endpoint is publicly reachable at `https://mcp.tasklog.manudubey.in` without exposing the phone's IP or opening any inbound ports
+- Cloudflare Tunnel integration so the MCP endpoint is publicly reachable at `https://mcp-tasklog.manudubey.in` without exposing the phone's IP or opening any inbound ports
 - `scripts/deploy-phone.sh` extended to build, transfer, and supervise the new `tasklog-mcp` and `tasklog-tunnel` services via runit
 - `guides/mcp-server-setup.md` - top-level end-to-end walkthrough
 - `guides/cloudflare-tunnel-dns-setup.md` - prerequisite: migrating a domain to Cloudflare DNS

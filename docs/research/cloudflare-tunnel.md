@@ -17,7 +17,7 @@ This file is intentionally less spec-dense than the MCP and claude.ai files beca
 A lightweight daemon (`cloudflared`) runs on your origin (the phone) and makes outbound-only connections to Cloudflare's edge network. Cloudflare then accepts public HTTPS traffic at your chosen hostname (e.g. `mcp.example.com`) and proxies it through that outbound connection to the local service. The origin never accepts inbound connections from the public internet, so no port forwarding and no exposed origin IP.
 
 ```
-claude.ai → mcp.tasklog.manudubey.in (public DNS on Cloudflare)
+claude.ai → mcp-tasklog.manudubey.in (public DNS on Cloudflare)
               ↓ (Cloudflare edge terminates TLS)
               ↓ (Cloudflare routes via persistent outbound connection to phone)
         cloudflared (on phone, outbound-only)
@@ -39,7 +39,7 @@ From the dashboard setup page:
 
 A named tunnel that routes a custom hostname requires the parent domain to be on Cloudflare DNS. The fastest way: change the domain's nameservers to Cloudflare's at the registrar level. This is a one-time setup per domain, free, and works on any Cloudflare account.
 
-For Tasklog: we already have `tasklog.manudubey.in` from the GCP guide. Need to verify whether `manudubey.in` is on Cloudflare DNS or another provider. If on Cloudflare already, we can add an `mcp.tasklog.manudubey.in` subdomain. If not, we either migrate the domain or use a different one.
+For Tasklog: we already have `tasklog.manudubey.in` from the GCP guide. Need to verify whether `manudubey.in` is on Cloudflare DNS or another provider. If on Cloudflare already, we can add an `mcp-tasklog.manudubey.in` subdomain. If not, we either migrate the domain or use a different one.
 
 ### cloudflared binary
 
@@ -107,7 +107,7 @@ The CLI flow uses these commands (well-documented in the broader Cloudflare docs
 ```bash
 cloudflared tunnel login           # opens browser, picks Cloudflare zone
 cloudflared tunnel create tasklog  # creates the tunnel, writes credentials file
-cloudflared tunnel route dns tasklog mcp.tasklog.manudubey.in  # creates DNS record
+cloudflared tunnel route dns tasklog mcp-tasklog.manudubey.in  # creates DNS record
 cloudflared tunnel run tasklog     # starts the tunnel
 ```
 
@@ -117,7 +117,7 @@ A `config.yml` file controls hostname-to-service mappings:
 tunnel: <tunnel-uuid>
 credentials-file: /root/.cloudflared/<uuid>.json
 ingress:
-  - hostname: mcp.tasklog.manudubey.in
+  - hostname: mcp-tasklog.manudubey.in
     service: http://localhost:5180
   - service: http_status:404
 ```
@@ -148,14 +148,14 @@ This becomes the fourth service alongside `tasklog-api`, `tasklog-web`, and `tas
 ## Setup checklist (Tasklog-specific)
 
 - [ ] Verify `manudubey.in` is on Cloudflare DNS (or migrate it).
-- [ ] Pick the subdomain (`mcp.tasklog.manudubey.in`).
+- [ ] Pick the subdomain (`mcp-tasklog.manudubey.in`).
 - [ ] Install cloudflared on the phone (Termux-native if possible). Use the official ARM64 binary.
 - [ ] `cloudflared tunnel login` once to authenticate.
 - [ ] `cloudflared tunnel create tasklog` to create the tunnel and credentials file.
-- [ ] Write `config.yml` mapping `mcp.tasklog.manudubey.in` to `http://localhost:5180`.
-- [ ] `cloudflared tunnel route dns tasklog mcp.tasklog.manudubey.in` to create the DNS record.
+- [ ] Write `config.yml` mapping `mcp-tasklog.manudubey.in` to `http://localhost:5180`.
+- [ ] `cloudflared tunnel route dns tasklog mcp-tasklog.manudubey.in` to create the DNS record.
 - [ ] Add a `tasklog-tunnel` runit service so it starts on phone boot.
-- [ ] Verify end-to-end: `curl https://mcp.tasklog.manudubey.in/.well-known/oauth-protected-resource` from a network outside the phone should hit the MCP server.
+- [ ] Verify end-to-end: `curl https://mcp-tasklog.manudubey.in/.well-known/oauth-protected-resource` from a network outside the phone should hit the MCP server.
 
 ---
 
