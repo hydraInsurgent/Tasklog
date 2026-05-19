@@ -15,7 +15,6 @@
  * (docs/plans/P50-mcp-server.md).
  */
 
-import { randomUUID } from 'node:crypto';
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -33,27 +32,38 @@ import {
   bearerAuthMiddleware,
 } from './oauth/middleware.js';
 
-const mcp = new McpServer({
-  name: 'tasklog-mcp',
-  version: '0.1.0',
-});
-
-registerAllTools(mcp);
-
-// Stateful mode: the transport assigns a session id on the initialize
-// response (Mcp-Session-Id header), and the client echoes it back on every
-// subsequent request. The SDK rejects mid-stream calls without a valid
-// session id. The alternative (stateless mode) requires constructing a
-// new transport per request, which the SDK's high-level API does not make
-// ergonomic. Stateful is simpler and matches how claude.ai's client behaves.
-const transport = new WebStandardStreamableHTTPServerTransport({
-  sessionIdGenerator: () => randomUUID(),
-  enableJsonResponse: true,
-});
-
-await mcp.connect(transport);
+// Stateless mode: a fresh McpServer + transport is built per request.
+// claude.ai's connector does not echo Mcp-Session-Id headers, so stateful
+// sessions trip 400 on every call after initialize. Per-request isolation
+// matches the SDK's documented stateless pattern and avoids request-id
+// collisions across concurrent calls. Cost: re-registering tool handlers
+// on every request (~16 cheap function bindings).
+function createMcpServerForRequest(): McpServer {
+  const server = new McpServer({ name: 'tasklog-mcp', version: '0.1.0' });
+  registerAllTools(server);
+  return server;
+}
 
 const app = new Hono();
+
+// Request logger - one line per request, status + duration. Keep here (not
+// behind a flag) so production logs make debugging the OAuth flow possible.
+// For /mcp requests, also log the headers claude.ai actually sends so we can
+// diagnose protocol-version and session-id mismatches.
+app.use('*', async (c, next) => {
+  const start = Date.now();
+  const ua = c.req.header('user-agent') ?? '';
+  console.log(`[req] ${c.req.method} ${c.req.path}${c.req.url.includes('?') ? '?' + c.req.url.split('?')[1] : ''} ua="${ua.slice(0, 60)}"`);
+  if (c.req.path === '/mcp' && c.req.method === 'POST') {
+    const interesting = ['accept', 'content-type', 'mcp-protocol-version', 'mcp-session-id', 'origin'];
+    const headers = interesting
+      .map((h) => `${h}=${c.req.header(h) ?? '-'}`)
+      .join(' ');
+    console.log(`[req-hdrs] ${headers}`);
+  }
+  await next();
+  console.log(`[res] ${c.req.method} ${c.req.path} ${c.res.status} ${Date.now() - start}ms`);
+});
 
 // Service identification at the root for sanity-checking the server is up.
 app.get('/', (c) =>
@@ -84,7 +94,21 @@ app.use('/mcp', bearerAuthMiddleware);
 
 // The MCP endpoint. POST is the JSON-RPC request channel per the spec.
 // The transport handles initialize, tools/list, tools/call, etc.
-app.post('/mcp', (c) => transport.handleRequest(c.req.raw));
+// Stateless: fresh server + transport per request, closed when done.
+app.post('/mcp', async (c) => {
+  const server = createMcpServerForRequest();
+  const transport = new WebStandardStreamableHTTPServerTransport({
+    sessionIdGenerator: undefined, // stateless - no Mcp-Session-Id header
+    enableJsonResponse: true,
+  });
+  await server.connect(transport);
+  try {
+    return await transport.handleRequest(c.req.raw);
+  } finally {
+    await transport.close();
+    await server.close();
+  }
+});
 
 // Spec allows servers to refuse GET if they do not push server-initiated
 // messages. Returning 405 keeps the surface honest. See

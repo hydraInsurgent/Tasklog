@@ -10,12 +10,14 @@
  *   2. Generate a CSRF state for OUR round trip to GitHub.
  *   3. Stash all the OAuth params plus the CSRF state in a short-lived
  *      signed cookie (so when GitHub redirects back, we can recover them).
- *   4. Render an HTML page with a "Log in with GitHub" button that links
- *      to github.com/login/oauth/authorize.
+ *   4. 302-redirect the user agent to github.com/login/oauth/authorize.
  *
- * The user clicks the button. GitHub does its own consent flow. When GitHub
- * redirects to /auth/github/callback, we read the cookie and continue (see
- * github.ts).
+ * GitHub does its own consent flow. When GitHub redirects to
+ * /auth/github/callback, we read the cookie and continue (see github.ts).
+ *
+ * Direct redirect (not an interstitial HTML page) is what claude.ai's
+ * connector flow expects - it opens /authorize in a popup and expects an
+ * immediate redirect to the upstream IdP, not a page requiring a user click.
  */
 
 import type { Hono } from 'hono';
@@ -112,43 +114,6 @@ export function mountAuthorize(app: Hono): void {
     githubAuthUrl.searchParams.set('state', githubState);
     githubAuthUrl.searchParams.set('scope', 'read:user');
 
-    const clientNameSafe = escapeHtml(client.client_name);
-    const githubUrlSafe = escapeHtml(githubAuthUrl.toString());
-
-    return c.html(`<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Tasklog MCP - Sign in</title>
-  <style>
-    :root { color-scheme: light dark; }
-    body { font-family: system-ui, -apple-system, sans-serif; max-width: 480px; margin: 4rem auto; padding: 0 1rem; line-height: 1.5; }
-    main { border: 1px solid #ccc4; border-radius: 8px; padding: 2rem; }
-    h1 { margin: 0 0 0.5rem 0; font-size: 1.5rem; }
-    p { margin: 0.75rem 0; }
-    .btn { display: inline-block; padding: 0.75rem 1.25rem; background: #24292f; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; margin-top: 1rem; }
-    .btn:hover { background: #1f2328; }
-    .small { color: #6b7280; font-size: 0.875rem; }
-  </style>
-</head>
-<body>
-  <main>
-    <h1>Tasklog MCP</h1>
-    <p><strong>${clientNameSafe}</strong> would like to access your Tasklog tasks.</p>
-    <p class="small">Sign in with GitHub to authorize. Only allow-listed GitHub usernames are permitted.</p>
-    <a class="btn" href="${githubUrlSafe}">Log in with GitHub</a>
-  </main>
-</body>
-</html>`);
+    return c.redirect(githubAuthUrl.toString(), 302);
   });
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 }

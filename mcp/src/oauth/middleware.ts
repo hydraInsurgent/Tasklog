@@ -23,7 +23,12 @@ import type { Context, MiddlewareHandler } from 'hono';
 import { config } from '../config.js';
 import { accessTokens } from './store.js';
 
-const SUPPORTED_PROTOCOL_VERSION = '2025-06-18';
+// Sanity-format only: protocol version must look like a date (YYYY-MM-DD).
+// We don't enumerate accepted versions because the MCP SDK does the actual
+// negotiation in the JSON-RPC initialize body, and claude.ai may send an
+// unreleased version (e.g. 2025-11-25) that the SDK still accepts. Rejecting
+// at the HTTP layer would 400 valid clients whose initialize already succeeded.
+const VERSION_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 export const originMiddleware: MiddlewareHandler = async (c, next) => {
   const origin = c.req.header('origin');
@@ -56,9 +61,9 @@ export const protocolVersionMiddleware: MiddlewareHandler = async (c, next) => {
   // Per the spec, the version header is REQUIRED only on requests AFTER
   // the initialize handshake. Missing on the initialize is fine. To be
   // pragmatic: accept missing, reject only when present and wrong.
-  if (version && version !== SUPPORTED_PROTOCOL_VERSION) {
+  if (version && !VERSION_PATTERN.test(version)) {
     return c.text(
-      `Unsupported MCP-Protocol-Version: ${version}. Server supports ${SUPPORTED_PROTOCOL_VERSION}.`,
+      `Malformed MCP-Protocol-Version: ${version}. Expected YYYY-MM-DD.`,
       400,
     );
   }
@@ -83,12 +88,18 @@ export const bearerAuthMiddleware: MiddlewareHandler = async (c, next) => {
     return unauthorized(c, 'token expired');
   }
   // RFC 8707 + MCP spec: token MUST be intended for this resource (us).
-  if (record.audience !== config.publicUrl) {
+  // claude.ai sends resource=<publicUrl>/ (with trailing slash); we treat
+  // that as equivalent to <publicUrl> per RFC 3986 URI normalization.
+  if (stripTrailingSlash(record.audience) !== stripTrailingSlash(config.publicUrl)) {
     return unauthorized(c, `token audience mismatch (token issued for ${record.audience})`);
   }
 
   return next();
 };
+
+function stripTrailingSlash(url: string): string {
+  return url.endsWith('/') ? url.slice(0, -1) : url;
+}
 
 function unauthorized(c: Context, description: string) {
   // RFC 9728 challenge: tell the client where to find our protected resource
