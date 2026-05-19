@@ -101,12 +101,16 @@ app.post('/mcp', async (c) => {
     sessionIdGenerator: undefined, // stateless - no Mcp-Session-Id header
     enableJsonResponse: true,
   });
-  await server.connect(transport);
   try {
+    // connect() can throw on transient SDK / transport errors; keep it inside
+    // the try so the finally block still releases both resources.
+    await server.connect(transport);
     return await transport.handleRequest(c.req.raw);
   } finally {
-    await transport.close();
-    await server.close();
+    // Independent try/catch on each close so a failure of one doesn't shadow
+    // the other or the original handler error.
+    try { await transport.close(); } catch (e) { console.warn('[mcp] transport close failed:', e); }
+    try { await server.close(); } catch (e) { console.warn('[mcp] server close failed:', e); }
   }
 });
 

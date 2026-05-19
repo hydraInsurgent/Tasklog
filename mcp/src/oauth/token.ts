@@ -26,7 +26,7 @@
 
 import type { Context, Hono } from 'hono';
 import { config } from '../config.js';
-import { authCodes, accessTokens, refreshTokens } from './store.js';
+import { authCodes, accessTokens, refreshTokens, inTransaction } from './store.js';
 import { opaqueToken, pkceVerify } from './crypto.js';
 
 const ACCESS_TOKEN_TTL_SECONDS = 60 * 60; // 1 hour
@@ -59,6 +59,21 @@ export function mountToken(app: Hono): void {
   });
 }
 
+// The outcome of an in-transaction grant attempt. Validation failures commit
+// the transaction (consume sticks - OAuth 2.1 one-use); only crashes/throws
+// roll back, in which case the consumed code/refresh token is restored.
+type GrantOutcome =
+  | { kind: 'fail'; error: string; description: string }
+  | { kind: 'success'; payload: TokenResponse };
+
+interface TokenResponse {
+  access_token: string;
+  token_type: 'Bearer';
+  expires_in: number;
+  refresh_token: string;
+  scope: string;
+}
+
 function handleAuthCodeGrant(c: Context, form: Record<string, string>) {
   const missing = ['code', 'code_verifier', 'redirect_uri', 'client_id']
     .filter((k) => !form[k]);
@@ -66,32 +81,42 @@ function handleAuthCodeGrant(c: Context, form: Record<string, string>) {
     return errorResp(c, 'invalid_request', `missing: ${missing.join(', ')}`, 400);
   }
 
-  // Consume = look up + delete in one transaction. Replay attacks fail.
-  const record = authCodes.consume(form.code!);
-  if (!record) {
-    return errorResp(c, 'invalid_grant', 'code not found or already used', 400);
-  }
-
-  const now = Math.floor(Date.now() / 1000);
-  if (record.expires_at < now) {
-    return errorResp(c, 'invalid_grant', 'code expired', 400);
-  }
-  if (record.client_id !== form.client_id) {
-    return errorResp(c, 'invalid_grant', 'client_id does not match the auth code', 400);
-  }
-  if (record.redirect_uri !== form.redirect_uri) {
-    return errorResp(c, 'invalid_grant', 'redirect_uri does not match the auth code', 400);
-  }
-  if (!pkceVerify(form.code_verifier!, record.code_challenge)) {
-    return errorResp(c, 'invalid_grant', 'PKCE verification failed', 400);
-  }
-
-  return issueTokenPair(c, {
-    client_id: record.client_id,
-    audience: record.resource ?? config.publicUrl,
-    github_user: record.github_user,
-    scope: record.scope,
+  // Atomic: consume the auth code AND insert the new tokens together. If the
+  // process crashes between consume and insert, SQLite rolls back and the
+  // code is preserved for retry. See store.ts inTransaction.
+  const outcome: GrantOutcome = inTransaction(() => {
+    const record = authCodes.consume(form.code!);
+    if (!record) {
+      return { kind: 'fail', error: 'invalid_grant', description: 'code not found or already used' };
+    }
+    const now = Math.floor(Date.now() / 1000);
+    if (record.expires_at < now) {
+      return { kind: 'fail', error: 'invalid_grant', description: 'code expired' };
+    }
+    if (record.client_id !== form.client_id) {
+      return { kind: 'fail', error: 'invalid_grant', description: 'client_id does not match the auth code' };
+    }
+    if (record.redirect_uri !== form.redirect_uri) {
+      return { kind: 'fail', error: 'invalid_grant', description: 'redirect_uri does not match the auth code' };
+    }
+    if (!pkceVerify(form.code_verifier!, record.code_challenge)) {
+      return { kind: 'fail', error: 'invalid_grant', description: 'PKCE verification failed' };
+    }
+    return {
+      kind: 'success',
+      payload: issueTokenPair({
+        client_id: record.client_id,
+        audience: record.resource ?? config.publicUrl,
+        github_user: record.github_user,
+        scope: record.scope,
+      }),
+    };
   });
+
+  if (outcome.kind === 'fail') {
+    return errorResp(c, outcome.error, outcome.description, 400);
+  }
+  return c.json(outcome.payload);
 }
 
 function handleRefreshGrant(c: Context, form: Record<string, string>) {
@@ -100,33 +125,46 @@ function handleRefreshGrant(c: Context, form: Record<string, string>) {
     return errorResp(c, 'invalid_request', `missing: ${missing.join(', ')}`, 400);
   }
 
-  // Consume = look up + delete. Rotation: the old refresh token is invalid
-  // after this call regardless of outcome.
-  const record = refreshTokens.consume(form.refresh_token!);
-  if (!record) {
-    return errorResp(c, 'invalid_grant', 'refresh token not found or already used', 400);
-  }
-
-  const now = Math.floor(Date.now() / 1000);
-  if (record.expires_at < now) {
-    return errorResp(c, 'invalid_grant', 'refresh token expired', 400);
-  }
-  if (record.client_id !== form.client_id) {
-    return errorResp(c, 'invalid_grant', 'client_id does not match the refresh token', 400);
-  }
-
-  return issueTokenPair(c, {
-    client_id: record.client_id,
-    audience: record.audience,
-    github_user: record.github_user,
-    scope: record.scope,
+  // Atomic: consume + rotate. A crash between consume and the new inserts
+  // rolls back, leaving the old refresh token intact so the client can retry.
+  const outcome: GrantOutcome = inTransaction(() => {
+    const record = refreshTokens.consume(form.refresh_token!);
+    if (!record) {
+      return { kind: 'fail', error: 'invalid_grant', description: 'refresh token not found or already used' };
+    }
+    const now = Math.floor(Date.now() / 1000);
+    if (record.expires_at < now) {
+      return { kind: 'fail', error: 'invalid_grant', description: 'refresh token expired' };
+    }
+    if (record.client_id !== form.client_id) {
+      return { kind: 'fail', error: 'invalid_grant', description: 'client_id does not match the refresh token' };
+    }
+    return {
+      kind: 'success',
+      payload: issueTokenPair({
+        client_id: record.client_id,
+        audience: record.audience,
+        github_user: record.github_user,
+        scope: record.scope,
+      }),
+    };
   });
+
+  if (outcome.kind === 'fail') {
+    return errorResp(c, outcome.error, outcome.description, 400);
+  }
+  return c.json(outcome.payload);
 }
 
-function issueTokenPair(
-  c: Context,
-  info: { client_id: string; audience: string; github_user: string; scope: string },
-) {
+// Runs inside the transaction; returns the response payload but does NOT
+// touch the Hono context. The caller decides whether to commit the txn (by
+// returning normally) or roll it back (by throwing).
+function issueTokenPair(info: {
+  client_id: string;
+  audience: string;
+  github_user: string;
+  scope: string;
+}): TokenResponse {
   const now = Math.floor(Date.now() / 1000);
   const access = opaqueToken();
   const refresh = opaqueToken();
@@ -149,13 +187,13 @@ function issueTokenPair(
     expires_at: now + REFRESH_TOKEN_TTL_SECONDS,
   });
 
-  return c.json({
+  return {
     access_token: access,
     token_type: 'Bearer',
     expires_in: ACCESS_TOKEN_TTL_SECONDS,
     refresh_token: refresh,
     scope: info.scope,
-  });
+  };
 }
 
 function errorResp(c: Context, error: string, error_description: string, status: number) {

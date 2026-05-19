@@ -212,6 +212,16 @@ export const accessTokens = {
   },
 };
 
+// Atomic wrapper for composing multiple store operations into a single
+// SQLite transaction. Crash mid-flight (or any throw from inside fn) rolls
+// back every write. Used by the token endpoint so auth-code consume +
+// access/refresh token insert all happen together, or not at all.
+// Validation paths that explicitly return an error commit (one-use semantic);
+// only crashes / throws roll back.
+export function inTransaction<T>(fn: () => T): T {
+  return db.transaction(fn)();
+}
+
 export const refreshTokens = {
   insert(t: RefreshTokenRecord): void {
     insertRefreshToken.run(

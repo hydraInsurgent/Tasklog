@@ -52,14 +52,37 @@ export class ApiError extends Error {
   }
 }
 
+// 15s upstream timeout - tasklog-api on the phone is loopback, but proot +
+// SQLite can stall under load. Surface a clean 504 to the LLM so it can
+// retry or tell the user rather than hanging the MCP request indefinitely.
+const REQUEST_TIMEOUT_MS = 15_000;
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers ?? {}),
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      signal: init?.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      headers: {
+        'Content-Type': 'application/json',
+        ...(init?.headers ?? {}),
+      },
+    });
+  } catch (e: unknown) {
+    if (
+      typeof e === 'object' &&
+      e !== null &&
+      ((e as { name?: string }).name === 'AbortError' ||
+        (e as { name?: string }).name === 'TimeoutError')
+    ) {
+      throw new ApiError(
+        504,
+        'Gateway Timeout',
+        `Tasklog API did not respond within ${REQUEST_TIMEOUT_MS / 1000}s`,
+      );
+    }
+    throw e;
+  }
   if (!res.ok) {
     const body = await res.text().catch(() => '');
     throw new ApiError(res.status, res.statusText, body);

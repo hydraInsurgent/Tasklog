@@ -64,19 +64,29 @@ export function mountGithubCallback(app: Hono): void {
     }
 
     // Exchange GitHub code for a GitHub access token. This token is single-
-    // use for us - we read the user's login and discard it.
-    const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify({
-        client_id: config.githubClientId,
-        client_secret: config.githubClientSecret,
-        code,
-      }),
-    });
+    // use for us - we read the user's login and discard it. 10s timeout so a
+    // hung GitHub doesn't pin our request handler indefinitely.
+    let tokenRes: Response;
+    try {
+      tokenRes = await fetch('https://github.com/login/oauth/access_token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          client_id: config.githubClientId,
+          client_secret: config.githubClientSecret,
+          code,
+        }),
+        signal: AbortSignal.timeout(10_000),
+      });
+    } catch (e: unknown) {
+      if (isAbortLikeError(e)) {
+        return c.text('GitHub token exchange timed out after 10s. Please retry.', 504);
+      }
+      throw e;
+    }
 
     if (!tokenRes.ok) {
       return c.text(`GitHub token exchange failed (HTTP ${tokenRes.status})`, 502);
@@ -90,14 +100,23 @@ export function mountGithubCallback(app: Hono): void {
       );
     }
 
-    // Look up the user's GitHub identity
-    const userRes = await fetch('https://api.github.com/user', {
-      headers: {
-        Authorization: `Bearer ${tokenData.access_token}`,
-        Accept: 'application/vnd.github+json',
-        'User-Agent': 'tasklog-mcp',
-      },
-    });
+    // Look up the user's GitHub identity (10s timeout, same reason).
+    let userRes: Response;
+    try {
+      userRes = await fetch('https://api.github.com/user', {
+        headers: {
+          Authorization: `Bearer ${tokenData.access_token}`,
+          Accept: 'application/vnd.github+json',
+          'User-Agent': 'tasklog-mcp',
+        },
+        signal: AbortSignal.timeout(10_000),
+      });
+    } catch (e: unknown) {
+      if (isAbortLikeError(e)) {
+        return c.text('GitHub user lookup timed out after 10s. Please retry.', 504);
+      }
+      throw e;
+    }
 
     if (!userRes.ok) {
       return c.text(`GitHub user lookup failed (HTTP ${userRes.status})`, 502);
@@ -149,6 +168,14 @@ export function mountGithubCallback(app: Hono): void {
 
     return c.redirect(redirect.toString(), 302);
   });
+}
+
+// AbortSignal.timeout fires a DOMException with name 'TimeoutError' on
+// Node 20+; older fetch impls may surface name 'AbortError'. Accept both.
+function isAbortLikeError(e: unknown): boolean {
+  if (typeof e !== 'object' || e === null) return false;
+  const name = (e as { name?: string }).name;
+  return name === 'AbortError' || name === 'TimeoutError';
 }
 
 function escapeHtml(s: string): string {

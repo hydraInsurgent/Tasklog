@@ -20,14 +20,18 @@ import { z } from 'zod';
 import { clients } from './store.js';
 import { opaqueToken } from './crypto.js';
 
+// Field length caps are not in RFC 7591 - they exist here to bound the cost
+// of public, unauthenticated DCR. Sized generously so legitimate clients
+// (claude.ai, Claude Code) fit easily; an attacker can no longer balloon
+// auth.db with megabyte-sized strings or thousand-entry redirect_uris.
 const RegisterRequest = z
   .object({
-    client_name: z.string().optional(),
-    redirect_uris: z.array(z.string().min(1)).min(1),
-    token_endpoint_auth_method: z.string().optional(),
-    grant_types: z.array(z.string()).optional(),
-    response_types: z.array(z.string()).optional(),
-    scope: z.string().optional(),
+    client_name: z.string().max(255).optional(),
+    redirect_uris: z.array(z.string().min(1).max(2048)).min(1).max(10),
+    token_endpoint_auth_method: z.string().max(64).optional(),
+    grant_types: z.array(z.string().max(64)).max(8).optional(),
+    response_types: z.array(z.string().max(64)).max(8).optional(),
+    scope: z.string().max(255).optional(),
   })
   .passthrough();
 
