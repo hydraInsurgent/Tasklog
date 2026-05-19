@@ -125,6 +125,7 @@ npm run build --prefix frontend
 # inside that container produces correct arm64 binaries (sharp, @next/swc, etc.).
 # We mount the standalone bundle directly so node_modules ends up in place.
 # First run downloads node:20-slim (~50 MB). Subsequent runs use the local cache.
+# chown back to host user at end so the next `next build` can unlink old files.
 
 step "Building arm64 node_modules (Docker, QEMU emulation)"
 
@@ -135,18 +136,30 @@ docker run --rm \
     --platform=linux/arm64 \
     -v "${REPO_ROOT}/frontend/.next/standalone:/app" \
     -w /app \
+    -e HOST_UID="$(id -u)" \
+    -e HOST_GID="$(id -g)" \
     node:20-slim \
-    sh -c 'npm install --omit=dev --no-audit --no-fund --no-progress'
+    sh -c 'npm install --omit=dev --no-audit --no-fund --no-progress && chown -R "$HOST_UID:$HOST_GID" node_modules'
 
 # --- Step 2.6: Build MCP TypeScript ---
+# Needs host-arch devDependencies (typescript). The arm64 production install
+# happens separately in Step 2.7. Idempotent: skips if node_modules/.bin/tsc
+# already exists.
 
 step "Building MCP server (TypeScript)"
+
+if [ ! -x "mcp/node_modules/.bin/tsc" ]; then
+    echo "  installing host devDependencies for tsc"
+    npm install --prefix mcp --no-audit --no-fund --no-progress
+fi
 
 npm run build --prefix mcp
 
 # --- Step 2.7: Build arm64 node_modules for MCP ---
 # Same Docker QEMU pattern as the frontend. better-sqlite3 needs native
 # compilation per architecture, so we cannot reuse the laptop's x64 build.
+# Uses full node:20 (not slim) because better-sqlite3 has no arm64 prebuilt
+# and node-gyp needs Python + make + g++ to compile from source.
 
 step "Building arm64 node_modules for MCP (Docker, QEMU emulation)"
 
@@ -156,8 +169,10 @@ docker run --rm \
     --platform=linux/arm64 \
     -v "${REPO_ROOT}/mcp:/app" \
     -w /app \
-    node:20-slim \
-    sh -c 'npm ci --omit=dev --no-audit --no-fund --no-progress'
+    -e HOST_UID="$(id -u)" \
+    -e HOST_GID="$(id -g)" \
+    node:20 \
+    sh -c 'npm ci --omit=dev --no-audit --no-fund --no-progress && chown -R "$HOST_UID:$HOST_GID" node_modules'
 
 # --- Step 3: Ensure target directory layout on phone ---
 
@@ -269,7 +284,7 @@ exec 2>&1
 #   cat > /root/.tasklog-mcp.env <<ENV
 #   PORT=5180
 #   TASKLOG_API_URL=http://localhost:5115
-#   MCP_PUBLIC_URL=https://mcp.tasklog.manudubey.in
+#   MCP_PUBLIC_URL=https://mcp-tasklog.manudubey.in
 #   GITHUB_CLIENT_ID=<from github.com/settings/developers>
 #   GITHUB_CLIENT_SECRET=<from github.com/settings/developers>
 #   ALLOWED_GH_USERS=hydraInsurgent
@@ -288,14 +303,16 @@ exec svlogd -tt /data/data/com.termux/files/home/log/tasklog-mcp
 RUN
 chmod +x \$PREFIX/var/service/tasklog-mcp/log/run
 
-# Service: tasklog-tunnel (cloudflared, runs natively in Termux not proot)
-# Expected to fail on first deploy until cloudflared is installed and a tunnel
-# is created. See guides/mcp-server-setup.md for the one-time setup.
+# Service: tasklog-tunnel (cloudflared, runs inside proot Ubuntu)
+# We host cloudflared inside proot because newer Go binaries use the
+# faccessat2 syscall, which Termux's seccomp filter blocks (SIGSYS).
+# Expected to fail on first deploy until cloudflared is installed in proot
+# and a tunnel is created. See guides/mcp-server-setup.md for the one-time setup.
 mkdir -p \$PREFIX/var/service/tasklog-tunnel/log
 cat > \$PREFIX/var/service/tasklog-tunnel/run <<'RUN'
 #!/data/data/com.termux/files/usr/bin/bash
 exec 2>&1
-exec cloudflared tunnel --config /data/data/com.termux/files/home/.cloudflared/config.yml run tasklog
+exec proot-distro login ubuntu -- bash -c 'exec cloudflared tunnel --config /root/.cloudflared/config.yml run tasklog'
 RUN
 chmod +x \$PREFIX/var/service/tasklog-tunnel/run
 
