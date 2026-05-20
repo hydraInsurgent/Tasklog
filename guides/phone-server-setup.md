@@ -116,6 +116,44 @@ To test without rebooting the phone:
 ssh phone -t 'bash ~/.termux/boot/start-tasklog-server.sh'
 ```
 
+### Wi-Fi keepalive (LAN reachability workaround)
+
+Some Android ROMs (notably Realme / ColorOS) hide the legacy "Keep Wi-Fi on during sleep" toggle. Without it, the phone's Wi-Fi radio enters power save mode after a few minutes of idle, the router's ARP cache for the phone goes stale, and the laptop hits "No route to host" when trying to SSH or curl the phone's LAN IP - even though outbound (cloudflared tunnel, phone-initiated browsing) still works.
+
+The userspace workaround is to keep the LAN warm with a single ICMP packet every 30 seconds. Add a runit service that pings the default gateway:
+
+```bash
+# In Termux on the phone
+mkdir -p $PREFIX/var/service/tasklog-keepalive/log
+
+cat > $PREFIX/var/service/tasklog-keepalive/run <<'RUN'
+#!/data/data/com.termux/files/usr/bin/bash
+exec 2>&1
+while true; do
+  GW=$(ip route | awk '/^default/ {print $3; exit}')
+  if [ -n "$GW" ]; then
+    ping -c 1 -W 2 "$GW" >/dev/null 2>&1 || true
+  fi
+  sleep 30
+done
+RUN
+chmod +x $PREFIX/var/service/tasklog-keepalive/run
+
+cat > $PREFIX/var/service/tasklog-keepalive/log/run <<'RUN'
+#!/data/data/com.termux/files/usr/bin/bash
+mkdir -p $HOME/log/tasklog-keepalive
+exec svlogd -tt $HOME/log/tasklog-keepalive
+RUN
+chmod +x $PREFIX/var/service/tasklog-keepalive/log/run
+
+SVDIR=$PREFIX/var/service sv start tasklog-keepalive
+sv status tasklog-keepalive
+```
+
+Cost: ~2880 single-byte pings per day to your own router. Battery impact negligible (the Wi-Fi radio is already cycling at this rate to maintain the cloudflared tunnel).
+
+This is intentionally NOT part of `scripts/deploy-phone.sh` because it's environment-specific (other phones / ROMs may have the Wi-Fi setting or different power management). The deploy script manages app services; this is phone setup.
+
 ---
 
 ## Part 2: proot Ubuntu side (runtime deps, layout)
