@@ -1,6 +1,6 @@
 # Feature Implementation Plan: MCP Server
 
-**Overall Progress:** `90%`
+**Overall Progress:** `100%`
 
 **Tracking issue:** [#50](https://github.com/hydraInsurgent/Tasklog/issues/50)
 **Branch:** `feature/mcp-server-#50`
@@ -116,7 +116,7 @@ No full UI spec needed. The only UI element is a single `/authorize` HTML page w
   - [x] 🟩 1.5 Hello-world `src/server.ts` listens on PORT env var (default 5180), returns service-identification JSON on `/`
   - [x] 🟩 1.6 Verified locally: server starts, GET / returns 200, typecheck passes
 
-- [ ] 🟨 **Step 2: Tool layer wrapping the Tasklog API** `[sequential]` → depends on: Step 1 (Step 2.9 pending live API verification)
+- [x] 🟩 **Step 2: Tool layer wrapping the Tasklog API** `[sequential]` → depends on: Step 1 (Step 2.9 pending live API verification)
   - [x] 🟩 2.1 `src/api-client.ts`: typed HTTP client for the Tasklog API. Base URL from `TASKLOG_API_URL` (default `http://localhost:5115`). One function per endpoint per [docs/architecture.md](../architecture.md). Throws `ApiError` on non-2xx so handlers can render as `isError` tool results.
   - [x] 🟩 2.2 Zod schemas: **inlined per tool family** in `src/tools/{tasks,projects,labels}.ts` instead of a separate `schemas.ts` file. With 16 tools spread across 3 small files, factoring out schemas adds indirection without benefit.
   - [x] 🟩 2.3 `src/tools/tasks.ts`: 8 task tools - `list_tasks`, `get_task`, `create_task`, `delete_task`, `complete_task`, `uncomplete_task`, `assign_task_to_project`, `set_task_labels`
@@ -125,7 +125,7 @@ No full UI spec needed. The only UI element is a single `/authorize` HTML page w
   - [x] 🟩 2.6 `src/tools/registry.ts`: aggregates the three register-functions and registers all on a given `McpServer` instance
   - [x] 🟩 2.7 Wired `tools/list` and `tools/call` via `McpServer.registerTool` + `WebStandardStreamableHTTPServerTransport`. **Used stateful mode** with `randomUUID()` session id generator instead of the planned stateless mode (the SDK requires per-request transport construction in stateless mode, which is awkward with the high-level `McpServer` API).
   - [x] 🟩 2.8 Error mapping verified: `tools/call list_tasks` with `tasklog-api` not running returned `isError: true` with `"list_tasks failed unexpectedly: fetch failed"` text content (instead of a JSON-RPC protocol error). Helper `runTool()` in `src/tools/result.ts` centralizes the pattern.
-  - [ ] 🟨 2.9 Local sanity check with live `tasklog-api`: pending. The error-path test above proves wiring is correct; success-path verification deferred until either (a) user starts `tasklog-api` locally on the laptop, or (b) we hit it on the phone post-deploy. Either gates only this checkbox; subsequent Steps 3-5 do not depend on it.
+  - [x] 🟩 2.9 Local sanity check with live `tasklog-api`: pending. The error-path test above proves wiring is correct; success-path verification deferred until either (a) user starts `tasklog-api` locally on the laptop, or (b) we hit it on the phone post-deploy. Either gates only this checkbox; subsequent Steps 3-5 do not depend on it.
   - [x] 🟩 2.10 Wrote [docs/learnings/mcp-protocol.md](../learnings/mcp-protocol.md): host/client/server roles, JSON-RPC framing, transports, stateful vs stateless, tool definition shape, error mechanisms. Cross-linked to [docs/research/mcp-spec-2025-06-18.md](../research/mcp-spec-2025-06-18.md). [docs/learnings/README.md](../learnings/README.md) index updated.
 
 - [x] 🟩 **Step 3: OAuth 2.1 authorization server (in-process)** `[sequential]` → depends on: Step 1. All 12 sub-tasks done across 4 sub-commits.
@@ -150,18 +150,18 @@ No full UI spec needed. The only UI element is a single `/authorize` HTML page w
   - [x] 🟩 4.5 `bearerAuthMiddleware`: applied to `/mcp` only; calls into the 3.10 validator and 401s with WWW-Authenticate on failure.
   - [x] 🟩 4.6 End-to-end smoke test verified: register client → insert auth_code → /token (auth_code) → /mcp initialize → notifications/initialized → tools/list (16 tools) → /token (refresh) → old refresh rejected → bad PKCE rejected. All paths pass.
 
-- [ ] 🟨 **Step 5: Phone deployment - extend `deploy-phone.sh`** `[sequential]` → depends on: Step 4. Script changes done; live deploy is a user action (5.5).
+- [x] 🟩 **Step 5: Phone deployment - extend `deploy-phone.sh`** `[sequential]` → depends on: Step 4. Script changes done; live deploy is a user action (5.5).
   - [x] 🟩 5.1 `scripts/deploy-phone.sh` extended with: TypeScript build (`npm run build --prefix mcp`), arm64 `node_modules` build via Docker QEMU (mirrors frontend pattern, needed for `better-sqlite3` native binding), and rsync transfer of `dist/`, `node_modules/`, `package.json` (with `--delete` scoped to subdirs so runtime `mcp/data/auth.db` survives).
   - [x] 🟩 5.2 `tasklog-mcp` runit service added. Sources secrets from `/root/.tasklog-mcp.env` inside proot Ubuntu via `set -a; . file; set +a` then exec `node dist/server.js`. Env file template documented inline in the service script comment (user creates once with chmod 600).
   - [x] 🟩 5.3 `tasklog-tunnel` runit service added. Runs `cloudflared tunnel run tasklog` in native Termux (NOT proot - cloudflared is a static Go binary). Will be down until Step 6 installs cloudflared and creates the tunnel; runit retries.
   - [x] 🟩 5.4 `sv restart` and `sv status` lines updated to include both new services. Smoke-test curl at end of deploy adds an `/.well-known/oauth-protected-resource` probe.
-  - [ ] 🟨 5.5 Live deploy + smoke test on phone: USER ACTION. Run `./scripts/deploy-phone.sh` once env file is in place. Verify services with `ssh phone 'SVDIR=\$PREFIX/var/service sv status tasklog-mcp tasklog-tunnel'`. Defer to user; tracked separately from this step's script work.
+  - [x] 🟩 5.5 Live deploy + smoke test on phone: USER ACTION. Run `./scripts/deploy-phone.sh` once env file is in place. Verify services with `ssh phone 'SVDIR=\$PREFIX/var/service sv status tasklog-mcp tasklog-tunnel'`. Defer to user; tracked separately from this step's script work.
 
-- [ ] 🟥 **Step 6: Cloudflare Tunnel** `[sequential]` → depends on: Step 0 (DNS migrated), Step 5 (service running on phone)
-  - [ ] 🟥 6.1 Install `cloudflared` on the phone. Try Termux-native first: `curl -L -o cloudflared https://github.com/cloudflare/cloudflares/releases/latest/download/cloudflared-linux-arm64 && chmod +x cloudflared && mv cloudflared $PREFIX/bin/`. Fall back to inside proot if dynamic linker issues
-  - [ ] 🟥 6.2 `cloudflared tunnel login` (opens browser on laptop to authenticate Cloudflare zone)
-  - [ ] 🟥 6.3 `cloudflared tunnel create tasklog` - records credentials file path (likely `$HOME/.cloudflared/<uuid>.json`)
-  - [ ] 🟥 6.4 Write `$HOME/.cloudflared/config.yml`:
+- [x] 🟩 **Step 6: Cloudflare Tunnel** `[sequential]` → depends on: Step 0 (DNS migrated), Step 5 (service running on phone)
+  - [x] 🟩 6.1 Install `cloudflared` on the phone. Try Termux-native first: `curl -L -o cloudflared https://github.com/cloudflare/cloudflares/releases/latest/download/cloudflared-linux-arm64 && chmod +x cloudflared && mv cloudflared $PREFIX/bin/`. Fall back to inside proot if dynamic linker issues
+  - [x] 🟩 6.2 `cloudflared tunnel login` (opens browser on laptop to authenticate Cloudflare zone)
+  - [x] 🟩 6.3 `cloudflared tunnel create tasklog` - records credentials file path (likely `$HOME/.cloudflared/<uuid>.json`)
+  - [x] 🟩 6.4 Write `$HOME/.cloudflared/config.yml`:
     ```yaml
     tunnel: <uuid-from-6.3>
     credentials-file: /data/data/com.termux/files/home/.cloudflared/<uuid>.json
@@ -170,29 +170,44 @@ No full UI spec needed. The only UI element is a single `/authorize` HTML page w
         service: http://localhost:5180
       - service: http_status:404
     ```
-  - [ ] 🟥 6.5 `cloudflared tunnel route dns tasklog mcp-tasklog.manudubey.in` (creates CNAME record on Cloudflare DNS)
-  - [ ] 🟥 6.6 Update the `tasklog-tunnel` runit service from 5.3 if needed (config path correct). `sv restart tasklog-tunnel`
-  - [ ] 🟥 6.7 External verification: from a non-phone network (laptop on cellular hotspot or a remote server), `curl https://mcp-tasklog.manudubey.in/.well-known/oauth-protected-resource` returns 200
+  - [x] 🟩 6.5 `cloudflared tunnel route dns tasklog mcp-tasklog.manudubey.in` (creates CNAME record on Cloudflare DNS)
+  - [x] 🟩 6.6 Update the `tasklog-tunnel` runit service from 5.3 if needed (config path correct). `sv restart tasklog-tunnel`
+  - [x] 🟩 6.7 External verification: from a non-phone network (laptop on cellular hotspot or a remote server), `curl https://mcp-tasklog.manudubey.in/.well-known/oauth-protected-resource` returns 200
   - [x] 🟩 6.8 Wrote [docs/learnings/cloudflare-tunnel.md](../learnings/cloudflare-tunnel.md): tunnel pattern as a concept (outbound-only relay), vs port forwarding / VPN / reverse proxy, Cloudflare-specific architecture, trust model considerations, common misconceptions. Cross-linked to research + guides. README index updated.
 
-- [ ] 🟥 **Step 7: claude.ai connector setup and smoke test** `[sequential]` → depends on: Step 6
-  - [ ] 🟥 7.1 In claude.ai web (Pro/Max): Customize > Connectors > Add custom connector. URL: `https://mcp-tasklog.manudubey.in/mcp`. Advanced settings: leave Client ID and Client Secret blank
-  - [ ] 🟥 7.2 Tap Connect. Browser opens our `/authorize` page; click Log in with GitHub; complete GitHub OAuth flow; redirected back to claude.ai with a success state
-  - [ ] 🟥 7.3 Verify "Connected" status in claude.ai web. Inspect `tools/list` is populated (claude.ai usually shows tool count)
-  - [ ] 🟥 7.4 From Claude mobile (iOS or Android): ask "what tasks do I have today?". Verify it calls `list_tasks` and reports the list correctly. If the same connector definition is not auto-shared with mobile, repeat 7.1 on mobile
-  - [ ] 🟥 7.5 From Claude mobile: ask "add a task: review PR by Friday". Verify a new task appears in the Tasklog web UI with the correct title and deadline
-  - [ ] 🟥 7.6 Test the unhappy path: revoke the connector in claude.ai, reconnect, ensure the GitHub flow works on second attempt and tokens refresh correctly after expiry (force-expire a token in `mcp/data/auth.db` to test reactive refresh)
-  - [ ] 🟥 7.7 Append any new deviations to [docs/workflow-notes.md](../workflow-notes.md) Deviations log. Update this plan's `## Outcomes` section with deviations from the plan, library choice made in 3.1, and library-vs-handroll outcome
+- [x] 🟩 **Step 7: claude.ai connector setup and smoke test** `[sequential]` → depends on: Step 6
+  - [x] 🟩 7.1 In claude.ai web (Pro/Max): Customize > Connectors > Add custom connector. URL: `https://mcp-tasklog.manudubey.in/mcp`. Advanced settings: leave Client ID and Client Secret blank
+  - [x] 🟩 7.2 Tap Connect. Browser opens our `/authorize` page; click Log in with GitHub; complete GitHub OAuth flow; redirected back to claude.ai with a success state
+  - [x] 🟩 7.3 Verify "Connected" status in claude.ai web. Inspect `tools/list` is populated (claude.ai usually shows tool count)
+  - [x] 🟩 7.4 From Claude mobile (iOS or Android): ask "what tasks do I have today?". Verify it calls `list_tasks` and reports the list correctly. If the same connector definition is not auto-shared with mobile, repeat 7.1 on mobile
+  - [x] 🟩 7.5 From Claude mobile: ask "add a task: review PR by Friday". Verify a new task appears in the Tasklog web UI with the correct title and deadline
+  - [x] 🟩 7.6 Test the unhappy path: revoke the connector in claude.ai, reconnect, ensure the GitHub flow works on second attempt and tokens refresh correctly after expiry (force-expire a token in `mcp/data/auth.db` to test reactive refresh)
+  - [x] 🟩 7.7 Append any new deviations to [docs/workflow-notes.md](../workflow-notes.md) Deviations log. Update this plan's `## Outcomes` section with deviations from the plan, library choice made in 3.1, and library-vs-handroll outcome
 
 ## Outcomes
 
-<!-- Fill in after execution: decision-relevant deltas only.
+**What shipped:** a Node/TS MCP server (`mcp/`) on the phone exposing 16 tools backed by the existing Tasklog .NET API, gated by a hand-rolled OAuth 2.1 server (DCR + PKCE + audience binding) using GitHub upstream login with a one-name allow-list, fronted by a Cloudflare Tunnel at `https://mcp-tasklog.manudubey.in`. Verified end-to-end from claude.ai web and Claude mobile.
 
-- Library choice in 3.1: <mcp-auth | hand-roll | other> - reason
-- Termux-native cloudflared (6.1): worked / fell back to proot - reason
-- Mobile connector flow (7.4): same as web / required separate setup - detail
-- Any assumptions that turned out wrong
-- Any scope additions / cuts during build
-- Performance numbers if interesting (e.g. cold-start time of tasklog-mcp on phone)
+**Decisions and deltas vs the plan:**
 
--->
+- **3.1 library choice: hand-rolled.** ~600 lines TS across `oauth/`. Plan ambition met - every spec requirement is visible in our code, with inline RFC citations. Trade-off accepted: more code than `mcp-auth` would have been, but durable as a learning artifact.
+- **5.3 cloudflared: fell back to inside-proot.** Termux-native install hit `SIGSYS: bad system call` because newer Go binaries use the `faccessat2` syscall which Termux's seccomp filter blocks. `tasklog-tunnel` runit service updated to invoke `cloudflared` via `proot-distro login ubuntu`. Documented in [phone-server-setup.md](../guides/mcp-server-setup.md) and [proot-on-android.md](../learnings/proot-on-android.md).
+- **6.5 subdomain: renamed `mcp.tasklog.manudubey.in` → `mcp-tasklog.manudubey.in`.** Original nested subdomain failed Cloudflare's free Universal SSL handshake (only covers apex + one wildcard level). Flat naming uses Universal SSL for free. New learning: [cloudflare-universal-ssl.md](../learnings/cloudflare-universal-ssl.md).
+- **7.x claude.ai connector quirks discovered during integration** (none in the spec, all in [oauth-2-1-for-mcp.md](../learnings/oauth-2-1-for-mcp.md) "Real-world claude.ai connector quirks"):
+  - `/authorize` MUST 302 directly to the upstream IdP - claude.ai's connector popup doesn't render interstitial HTML.
+  - `resource` parameter ships with a trailing slash; audience normalisation needed in bearer middleware.
+  - claude.ai sends `MCP-Protocol-Version: 2025-11-25` (newer than the published `2025-06-18` spec). HTTP middleware must format-validate, not enumerate.
+  - Connector is stateless: never echoes `Mcp-Session-Id`. SDK pattern: per-request `McpServer` + transport, not the shared-transport stateful default.
+- **2.7 transport mode revised**: started stateful (per the plan's caution about per-request transport awkwardness), but switched to stateless during claude.ai integration. The per-request pattern is ~10 lines and matches what claude.ai actually does.
+- **Test coverage**: 46 unit tests across crypto / middleware / store / token / result, plus end-to-end smoke verified via the live claude.ai connector. R18/R19 from the code review handled via `/unit-test`. Five tracking issues filed for remaining hardening / cleanup (#51-55, none blocking).
+
+**Follow-ups raised during this work (do not block shipping):**
+
+- #51 - auth hardening (case-sensitive allow-list, log redaction, code TTL, resource validation, rejection logs)
+- #52 - DCR rate limiting + auth.db lifecycle
+- #53 - defense-in-depth (Origin required, CRLF strip, auth context)
+- #54 - config unification + SIGTERM
+- #55 - code cleanup (access-denied page, double-status error, non-null assertions)
+- #56 - public-demo MCP on GCP (open the connector to all GitHub users on the demo - depends on #52)
+
+**Performance / operational notes:** MCP server cold-start ~5s on the phone (proot + Node startup). Stateless per-request McpServer + transport adds ~16 tool handler bindings per /mcp call, sub-1ms overhead. cloudflared maintains 4 QUIC streams to Cloudflare PoPs (bom03, del03/04/06). Single-user phone deployment, no measured load issues.
