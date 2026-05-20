@@ -22,12 +22,14 @@ to reason about completely.
 
 ## The user
 
-Currently: a single user accessing the app from multiple devices on the same
-local network (phone and desktop).
+A single user accessing the app from multiple devices.
 
-This shapes decisions like authentication (not needed yet), data storage (local SQLite),
-and hosting (no cloud requirement). If the user profile changes - e.g. sharing
-with a partner, hosting publicly - these decisions should be revisited.
+Two access paths exist as of v2.10:
+
+- **Direct web UI** on the same local network (phone, desktop): no authentication, browse to `http://<phone-ip>:3000`. Web UI and API stay LAN-bound; if you are not on the home network, you cannot reach them.
+- **claude.ai connector** from anywhere on the internet: gated by OAuth 2.1 with a GitHub upstream allow-list of exactly one username. Authentication is at the MCP server, not the underlying API.
+
+This shapes decisions like data storage (local SQLite on the phone, never replicated to a cloud) and the public surface area (one tightly-scoped MCP endpoint, not the full web UI). If the user profile changes - sharing with a partner, opening the web UI publicly - the allow-list, auth scheme, and CORS policy would all need to be revisited.
 
 ---
 
@@ -58,20 +60,19 @@ Data should not be lost unexpectedly. The app should behave the same way every t
 This is what Tasklog does today. Items listed here are not permanent limits -
 they reflect where the product is right now and what assumptions the code makes.
 
-**Single user** - no accounts, roles, or sharing currently.
-If multi-user or sharing becomes a real need, authentication and data isolation
-would need to be added before anything else.
+**Single user** - no multi-user accounts, roles, or sharing. The allow-list of one GitHub username is enforced at the MCP authorization server.
+If multi-user or sharing becomes a real need, authentication on the web UI (currently absent) and data isolation in the DB would need to be added before anything else.
 
-**Local network only** - no cloud hosting, no public access currently.
-Exposing the app publicly would require authentication and security hardening first.
+**Web UI is local-network only** - no cloud hosting of the UI, no public web access. Exposing the web UI publicly would require adding authentication to the .NET API and re-thinking the CORS policy.
+
+**MCP endpoint is public** (as of v2.10) - `https://mcp-tasklog.manudubey.in` exposes Tasklog as a Model Context Protocol server for the claude.ai custom connector. The MCP endpoint is the ONLY public surface; it gates access via OAuth 2.1 + GitHub upstream + a one-name allow-list. The .NET API remains LAN-only and unauthenticated.
 
 **No notifications** - deadlines are informational. The app shows them; it does not act on them.
 A reminder or alert system would be a meaningful scope addition.
 
 **No calendar integration** - deadlines exist on tasks but do not sync to external calendars.
 
-**Single data file** - all data lives in one SQLite file. The user can back it up by copying it.
-A more complex storage strategy would only make sense if the data model outgrows SQLite.
+**Single data file** - all task data lives in one SQLite file. A second small SQLite file (`mcp/data/auth.db`) holds OAuth state for the MCP server; this is operational state, not user data, and is safe to wipe at any time to force re-consent.
 
 ---
 
@@ -116,3 +117,10 @@ A more complex storage strategy would only make sense if the data model outgrows
 - The app works on phone and desktop through the same codebase.
 - Every action produces visible feedback.
 - Errors are shown clearly rather than silently ignored.
+
+**AI integration (v2.10)**
+- Tasklog is reachable from claude.ai via a Model Context Protocol custom connector.
+- All 15 Tasklog API endpoints are exposed as MCP tools (16 tool definitions; complete/uncomplete are split for cleaner LLM tool selection).
+- The connector works on claude.ai web and mobile (Pro / Max plan).
+- Connecting requires logging in with GitHub once; only the allow-listed username is permitted.
+- All tool calls execute against the same SQLite database the web UI reads from. Tasks created via Claude appear instantly in the web UI on next refresh.

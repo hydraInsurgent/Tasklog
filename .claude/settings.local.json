@@ -26,7 +26,13 @@
       "Bash(gh release list:*)",
       "Bash(gh issue list:*)",
       "Bash(npx jest:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(git checkout *)",
+      "Bash(git stash *)",
+      "WebFetch(domain:support.claude.com)",
+      "WebFetch(domain:developers.cloudflare.com)",
+      "WebFetch(domain:claude.com)",
+      "Bash(node --import tsx --test *)"
     ],
     "additionalDirectories": [
       "/tmp"

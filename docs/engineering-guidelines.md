@@ -122,6 +122,41 @@ is worth considering. Current candidates: `formatDate`, `deadlineColorClass` (is
 
 ---
 
+## MCP server (Node/TypeScript, v2.10+)
+
+The MCP server is the first Node.js service in the repository. Different patterns
+from the .NET backend and Next.js frontend; documented here so the precedent is explicit.
+
+### Current patterns
+
+- **Hono with `@hono/node-server`** as the HTTP framework. Chosen over Express for modern TypeScript-native types, smaller dep tree, equivalent capability for this scope.
+- **TypeScript strict mode + NodeNext module resolution.** All imports use explicit `.js` extensions (NodeNext requires this, even when importing from TypeScript source).
+- **Hand-rolled OAuth 2.1** rather than a library. Visibility into every spec requirement was prioritized over ergonomics, given this was the project's first OAuth implementation.
+- **Opaque tokens (not JWT).** Random 32-byte hex strings stored in SQLite with metadata. Simpler than JWT (no key management) and trivially revocable.
+- **Zod schemas inlined** per tool file (not centralized in a `schemas.ts`). With 16 small tools across 3 files, the indirection of a separate schemas file would not pay back.
+- **`node:test` for unit tests** (not Jest or Vitest). Built into Node 20+, no extra dependency. Test files are `*.test.ts` next to the code they test; excluded from production build via tsconfig.
+- **`better-sqlite3` for the auth DB.** Synchronous API matches the rest of the request-handler shape; performance is microsecond-scale for the kinds of lookups we do (single token, single client).
+
+### Patterns not yet in use - and when to consider them
+
+**Refactor `store.ts` to accept an injected DB path / in-memory mode** - currently it opens the configured file at module load. Worth doing if we ever want to add DB-backed unit tests (currently we rely on end-to-end smoke testing for rotation, audience, expiry).
+
+**ESLint / Prettier** - skipped in the initial scaffold. TypeScript strict mode catches most issues; editor-side formatting handles consistency. Worth adding if collaborators join, or if drift becomes a problem.
+
+**A library-based OAuth server** (e.g. `mcp-auth`) - hand-rolled was correct for learning, but if requirements grow (refresh token chains, multiple upstream IdPs, scoped consent), a library may be worth migrating to.
+
+### Response codes (MCP server specific)
+
+| Situation | Code |
+|-----------|------|
+| Missing or bad Bearer token on `/mcp` | 401 + RFC 9728 `WWW-Authenticate` |
+| Wrong Origin on `/mcp` | 403 |
+| Unsupported MCP-Protocol-Version | 400 |
+| Bad OAuth request (missing params, bad PKCE, etc.) | 400 with RFC 6749 error code in JSON body |
+| `GET /mcp` (no server-initiated push) | 405 with `Allow: POST` |
+
+---
+
 ## Known deviations from these patterns
 
 These are open issues - areas where the current code does not yet match the patterns above.

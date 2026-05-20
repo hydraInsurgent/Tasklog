@@ -7,11 +7,11 @@ It is the primary reference for any AI assistant or contributor working in this 
 
 ## System Overview
 
-Tasklog is a two-process application. The backend and frontend run as separate servers
-and communicate over HTTP. They share no code.
+Tasklog is a three-process application as of v2.10. The backend, frontend, and MCP server
+run as separate processes. They share no code; communication is HTTP.
 
 ```
-Browser
+Browser (LAN-only)
   │
   ├── GET http://localhost:3000        Next.js frontend (React, Tailwind)
   │     │
@@ -21,7 +21,25 @@ Browser
   │                                               (TasklogDatabase.db)
   └── GET http://localhost:3000/tasks/[id]
         └── Server Component fetches from API on the server, returns rendered HTML
+
+claude.ai (public, web + mobile)
+  │
+  └── HTTPS https://mcp-tasklog.manudubey.in/mcp
+        │
+        └── Cloudflare Tunnel  →  cloudflared (Termux)
+                                       │
+                                       └── localhost:5180  →  tasklog-mcp (Node, proot)
+                                                                  │
+                                                                  ├── OAuth 2.1 endpoints
+                                                                  │   (/authorize, /token,
+                                                                  │    /register, /.well-known/*)
+                                                                  │   backed by mcp/data/auth.db
+                                                                  │
+                                                                  └── GET localhost:5115/api/...
+                                                                      (Tasklog API, LAN-only)
 ```
+
+The MCP server is the only public surface. The `/api` and frontend remain LAN-only.
 
 ---
 
@@ -39,6 +57,32 @@ Tasklog/
 │       ├── Program.cs             App startup and service registration
 │       ├── appsettings.json       Config (connection string, logging)
 │       └── TasklogDatabase.db     SQLite data file
+│
+├── mcp/                           Node/TypeScript MCP server (v2.10+)
+│   ├── package.json               Dependencies, build/test scripts
+│   ├── tsconfig.json              strict, NodeNext, target ES2022
+│   ├── src/
+│   │   ├── server.ts              Hono HTTP entry, middleware wiring
+│   │   ├── config.ts              Env var loading + production validation
+│   │   ├── api-client.ts          Typed client for the Tasklog .NET API
+│   │   ├── tools/                 16 MCP tools wrapping every API endpoint
+│   │   │   ├── tasks.ts           8 task tools (list/get/create/delete/complete/
+│   │   │   │                      uncomplete/assign-project/set-labels)
+│   │   │   ├── projects.ts        4 project tools
+│   │   │   ├── labels.ts          4 label tools
+│   │   │   ├── registry.ts        Aggregates and registers all tools
+│   │   │   └── result.ts          runTool() helper for error mapping
+│   │   └── oauth/                 OAuth 2.1 authorization server
+│   │       ├── store.ts           SQLite-backed: clients/codes/access/refresh
+│   │       ├── crypto.ts          opaqueToken(), pkceVerify()
+│   │       ├── crypto.test.ts     node:test unit tests for crypto layer
+│   │       ├── well-known.ts      RFC 9728 + RFC 8414 discovery endpoints
+│   │       ├── register.ts        RFC 7591 Dynamic Client Registration
+│   │       ├── authorize.ts       /authorize HTML page + signed flow cookie
+│   │       ├── github.ts          GitHub OAuth upstream callback
+│   │       ├── token.ts           /token (auth_code + refresh_token grants)
+│   │       └── middleware.ts      Origin / Protocol-Version / Bearer auth
+│   └── data/                      Runtime state (auth.db); gitignored
 │
 ├── frontend/
 │   └── src/
@@ -286,6 +330,114 @@ NEXT_PUBLIC_API_URL     Base URL for API calls. Defined in frontend/.env.local.
 
 ---
 
+## MCP server (Node/TypeScript)
+
+**Runtime:** Node.js 20+ via `tsx` in dev, compiled JS via `tsc` in production
+**HTTP framework:** Hono with `@hono/node-server`
+**MCP SDK:** `@modelcontextprotocol/sdk` (Streamable HTTP transport, stateful mode)
+**OAuth:** hand-rolled, conforming to OAuth 2.1 + RFC 7591/7636/8414/8707/9728
+**Default port:** `5180`
+**Public URL (production):** `https://mcp-tasklog.manudubey.in` via Cloudflare Tunnel
+
+### Endpoint surface
+
+```
+GET  /                                          health/identity JSON
+POST /mcp                                       JSON-RPC (initialize, tools/*, etc.)
+GET  /mcp                                       405 Method Not Allowed (we do not push)
+GET  /.well-known/oauth-protected-resource      RFC 9728 metadata
+GET  /.well-known/oauth-authorization-server    RFC 8414 metadata
+POST /register                                  RFC 7591 Dynamic Client Registration
+GET  /authorize                                 OAuth user-consent page (renders HTML)
+GET  /auth/github/callback                      GitHub OAuth upstream callback
+POST /token                                     auth_code and refresh_token grants
+```
+
+### Middleware on /mcp (applied in order)
+
+| Middleware | Purpose | Failure response |
+|---|---|---|
+| `originMiddleware` | Origin header allow-list (claude.ai, localhost in dev) | 403 |
+| `protocolVersionMiddleware` | `MCP-Protocol-Version: 2025-06-18` if present | 400 |
+| `bearerAuthMiddleware` | Validate access token, check audience claim | 401 + RFC 9728 `WWW-Authenticate` |
+
+### Tool layer
+
+16 MCP tools across three families (tasks: 8, projects: 4, labels: 4). Each tool is a thin wrapper around the corresponding Tasklog `/api` endpoint via `api-client.ts`. Input schemas use Zod and are inlined per tool. The `runTool()` helper in `result.ts` converts thrown `ApiError`s into MCP `isError: true` tool results (not JSON-RPC protocol errors), so the LLM can see and react to failures.
+
+### OAuth data model
+
+Separate SQLite file at `mcp/data/auth.db` (not the Tasklog DB). Four tables:
+
+```
+clients
+  client_id      TEXT  primary key (opaque, generated by /register)
+  client_name    TEXT
+  redirect_uris  TEXT  JSON-encoded array
+  created_at     INTEGER  unix epoch seconds
+
+auth_codes
+  code                  TEXT  primary key (one-use, consumed by /token)
+  client_id             TEXT
+  redirect_uri          TEXT
+  code_challenge        TEXT  S256 base64url
+  code_challenge_method TEXT
+  scope                 TEXT
+  resource              TEXT  RFC 8707 resource indicator
+  github_user           TEXT  verified GitHub login
+  expires_at            INTEGER
+
+access_tokens
+  token        TEXT  primary key (opaque, 32-byte hex)
+  client_id    TEXT
+  audience     TEXT  must match MCP_PUBLIC_URL on validation
+  github_user  TEXT
+  scope        TEXT
+  expires_at   INTEGER  TTL 1h
+
+refresh_tokens
+  same shape as access_tokens, TTL 30d, rotated on every /token use
+```
+
+`consume()` queries on `auth_codes` and `refresh_tokens` are transactional read+delete so replay attacks fail.
+
+### Authorization flow
+
+```
+claude.ai opens /authorize in browser
+  -> we validate params, set signed flow cookie, render "Log in with GitHub"
+  -> user clicks, goes to GitHub
+  -> GitHub redirects to /auth/github/callback
+  -> we exchange code with GitHub, fetch user identity
+  -> we check login against ALLOWED_GH_USERS env var
+  -> we mint our auth code, 302 to claude.ai's callback
+claude.ai POSTs /token with code + PKCE verifier
+  -> we verify PKCE, issue access + refresh tokens
+claude.ai POSTs /mcp with Authorization: Bearer <access_token>
+  -> middleware validates token + audience
+  -> MCP transport handles tools/list, tools/call
+```
+
+See [docs/learnings/oauth-2-1-for-mcp.md](learnings/oauth-2-1-for-mcp.md) for the full mechanics, [docs/learnings/mcp-protocol.md](learnings/mcp-protocol.md) for what MCP itself is, and [guides/mcp-server-setup.md](../guides/mcp-server-setup.md) for the end-to-end setup walkthrough.
+
+### Environment variables (read by config.ts)
+
+| Var | Purpose | Required in prod |
+|---|---|---|
+| `PORT` | HTTP listen port (default 5180) | no |
+| `TASKLOG_API_URL` | Where to reach the Tasklog API | no (default localhost:5115) |
+| `MCP_PUBLIC_URL` | Canonical public URL; used as token audience | yes |
+| `GITHUB_CLIENT_ID` | Upstream GitHub OAuth App | yes |
+| `GITHUB_CLIENT_SECRET` | Same; secret | yes |
+| `ALLOWED_GH_USERS` | Comma-separated GitHub login allow-list | yes |
+| `SESSION_SECRET` | HMAC key for signed flow cookies | yes |
+| `NODE_ENV` | `production` enables strict env validation | implicit |
+| `AUTH_DB_PATH` | SQLite path (default data/auth.db) | no |
+
+In production, `config.ts` throws on startup if any required var is missing or still at its dev default. Secrets live in `/root/.tasklog-mcp.env` (chmod 600) inside proot, sourced by the runit service script.
+
+---
+
 ## How a request flows end to end
 
 **Opening the home page:**
@@ -318,6 +470,20 @@ NEXT_PUBLIC_API_URL     Base URL for API calls. Defined in frontend/.env.local.
 4. .NET returns task JSON
 5. Server renders HTML with task data
 6. Browser receives complete HTML - no client-side fetch needed
+```
+
+**Asking Claude to create a task (post v2.10):**
+```
+1. User types in claude.ai mobile: "add task: review PR by Friday"
+2. claude.ai sends prompt to its LLM, which decides to invoke our connector
+3. claude.ai opens TLS connection to https://mcp-tasklog.manudubey.in/mcp
+4. Cloudflare edge terminates TLS, forwards over the tunnel to phone:5180
+5. tasklog-mcp middleware: Origin OK (claude.ai), Bearer token validated, audience matches
+6. McpServer routes tools/call -> create_task handler
+7. Handler POSTs http://localhost:5115/api/tasks (LAN-only call inside the phone)
+8. Tasklog .NET API inserts row in SQLite, returns new task JSON
+9. Handler wraps the result in a CallToolResult content block
+10. Response flows back: phone -> tunnel -> Cloudflare edge -> claude.ai -> LLM -> user
 ```
 
 ---

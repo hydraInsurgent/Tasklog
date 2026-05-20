@@ -58,6 +58,14 @@ I wanted a task system I understood completely - one where the data, the workflo
 - All data stored locally - no cloud, no account, no sync service required
 - Cross-platform and runs on Windows, macOS, and Linux - your laptop or a home server, whatever fits your setup
 
+**Talk to your tasks via Claude (v2.10)**
+- Tasklog can be plugged into claude.ai as a custom connector (Model Context Protocol server)
+- Text Claude on web or mobile to add, complete, list, organize tasks - no app switch
+- Tasks created via Claude appear instantly in your Tasklog UI
+- OAuth 2.1 with GitHub upstream gates access; only your username is allowed
+- The Tasklog API itself stays LAN-only; only one tightly-scoped MCP endpoint is exposed
+- See [guides/mcp-server-setup.md](guides/mcp-server-setup.md) for the end-to-end setup
+
 ---
 
 ## Screenshots

@@ -1,0 +1,18 @@
+# Build output
+dist/
+
+# Dependencies (large and machine-specific; rebuilt per environment)
+node_modules/
+
+# Runtime state - OAuth client registrations, tokens, codes
+# Lives at mcp/data/auth.db on the phone; never commit live tokens
+data/
+
+# Local environment / secrets
+.env
+.env.local
+.env.production
+
+# Editor / OS noise
+*.swp
+.DS_Store

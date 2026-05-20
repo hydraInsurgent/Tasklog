@@ -22,6 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
+| [P50-mcp-server.md](plans/P50-mcp-server.md) | #50 | feature/mcp-server-#50 | In Progress |
 
 ---
 
@@ -43,6 +44,7 @@ Future features - not yet started. Add GitHub issue number when created.
 | #47 | README overhaul and MIT license file | medium | rewrite as project landing page, add LICENSE |
 | - | ARM64 Linux support: pre-built release + Termux hosting | medium | enable self-hosting on Android/ARM64 devices; add arm64 target to CI release pipeline |
 | #49 | CD pipeline - auto-deploy to GCP via GitHub Actions | medium | complete the CI/CD loop; trigger on release tag |
+| #56 | Public-demo MCP on GCP | medium | extend v2.10 MCP to the demo; depends on #52 rate limits |
 
 ---
 
