@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| [P50-mcp-server.md](plans/P50-mcp-server.md) | #50 | feature/mcp-server-#50 | In Progress |
+| - | - | - | (none) |
 
 ---
 
@@ -75,6 +75,7 @@ Recently completed work (keep last 10):
 
 | # | Title | Type | Closed |
 |---|-------|------|--------|
+| #50 | MCP server for claude.ai custom connector | feature | 2026-05-20 |
 | #48 | Deploy Tasklog to GCP | feature | 2026-04-18 |
 | #47 | README overhaul and MIT license file | feature | 2026-04-04 |
 | #46 | Labels column missing from desktop task table | bug | 2026-04-03 |
