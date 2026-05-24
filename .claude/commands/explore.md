@@ -69,7 +69,17 @@ Flag anything relevant before proceeding:
 - **Pattern flag:** If the feature requires a pattern not yet in the codebase (e.g. a service layer, a new state management approach), note it. The plan will need to account for introducing it.
 - **Deviation flag:** If any open deviation in `engineering-guidelines.md` (the known issues table) is directly relevant to this feature, flag it. It may need to be resolved as part of this work.
 
-### 2b. Analyze the codebase
+### 2b. Research external dependencies first (if applicable)
+
+If the feature involves an external protocol, API, or vendor-specific spec (e.g. MCP, OAuth, a third-party SDK, a public webhook contract), populate `docs/research/` BEFORE codebase analysis. Each research file: dated, sourced (link to canonical doc), quotes the critical bits verbatim, and notes the version/date at top.
+
+Examples: `docs/research/mcp-spec-2025-06-18.md`, `docs/research/claude-ai-connector-oauth.md`, `docs/research/cloudflare-tunnel.md`.
+
+Reason: training data has a cutoff. Specs evolve. Vendor docs change behaviour. Operating from memory on rapidly-evolving systems leads to assumptions that fail at integration time. WebFetch the canonical source, paste the relevant excerpts into a research file, and cite the file path from the plan rather than restating facts from memory.
+
+Skip this step for self-contained refactors, bug fixes, and features that don't touch external systems.
+
+### 2c. Analyze the codebase
 
 With the docs in mind, analyze the code:
 

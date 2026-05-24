@@ -65,10 +65,22 @@ If you hit a critical blocker - a wrong assumption in the plan, a fundamental in
 
 This only applies to critical failures, not every small hiccup.
 
+## When to Capture (learnings + guides during execute, not after)
+
+The default is to write `/learnings` and `/guides` at the end of the feature. That's late: by then the context that made the concept fresh has been swapped out, and the writeup is reconstructed instead of recorded.
+
+Capture alongside the work when:
+
+- A logical chunk of user-facing setup completes (e.g. domain configured, third-party OAuth app registered, deployment target provisioned). Suggest `/guides <name>` while the steps you just walked are still in working memory.
+- A non-obvious concept comes up that took explaining (CORS, OAuth, a transport quirk, a syscall restriction). Suggest `/learnings <concept>` while the explanation you just gave is still fresh.
+
+Just prompt - don't auto-run. Example: "Step 0 completed setting up the OAuth app + DNS migration. Worth capturing as a guide and two learnings now? Otherwise context will be stale by Step 5."
+
 ## Status Updates
 
 After completing each step, update the plan file:
 - Change 🟥 to 🟨 when starting a task
 - Change 🟨 to 🟩 when completing a task
 - Update the overall progress percentage at the top
-- After all steps are complete, fill in the plan's `## Outcomes` section with what changed, deviations, and key decisions made during execution
+- **Tick user-action items the same session they're confirmed done.** If a step depends on the user (deploy, click through a UI, verify externally), do not leave the checkbox 🟥 once they report "done" - update the plan immediately. Plans that drift from reality become a `/ship` blocker.
+- After all steps are complete, fill in the plan's `## Outcomes` section with what changed, deviations, and key decisions made during execution. Don't defer this to `/ship` time - write it as the work concludes.

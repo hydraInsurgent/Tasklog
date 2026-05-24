@@ -60,9 +60,18 @@ Short summary of what we're building and why.
 **Goal State:** Where we want to end up.
 
 ## Critical Decisions
-Key architectural/implementation choices made during exploration:
+Key architectural/implementation choices made during exploration.
+
+For low-stakes choices, one line is fine:
 - Decision 1: [choice] - [brief rationale]
-- Decision 2: [choice] - [brief rationale]
+
+For high-stakes architectural decisions (technology choice, framework, public-API contract, security model, hosting shape), use the expanded format so the rationale is recoverable months later:
+
+- **Decision N: [choice]**
+  - **Options considered:** [list, with one-line summary of each]
+  - **Chosen:** [option] - [why this one beats the others]
+  - **Trade-offs accepted:** [what we give up by choosing this]
+  - **Research citation:** [path to docs/research/ file(s) that informed the decision, if applicable]
 
 <!-- GUIDELINES CHECK: If this plan introduces a pattern not yet in engineering-guidelines.md
      (e.g. first use of a service layer, new state management, new library), add it here as

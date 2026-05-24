@@ -76,12 +76,9 @@ Format:
 
 Candidates we want to evaluate codifying into `.claude/commands/` or `.claude/rules/toolkit.md` once this feature ships. Format: short name, target file, why we are considering it.
 
-| Candidate | Target file | Why consider |
+| Candidate | Target file | Status |
 |---|---|---|
-| `/explore` Phase 2a: add one sentence requiring `docs/research/` to be populated when work involves an external protocol, API, or public spec | `.claude/commands/explore.md` | `docs/research/` is documented in the toolkit's documentation map but has never been used. This build is the test of whether mandating it produces better outcomes. |
-| Plan template: extend `## Critical Decisions` template to encourage "options considered + rationale + research citation" format for non-trivial decisions | `.claude/commands/create-plan.md` | Current one-line template (`Decision 1: [choice] - [brief rationale]`) is too terse for high-stakes architectural decisions where the rationale matters as future reference. |
-| Living `workflow-notes.md` doc as a tracked artifact in the documentation map | `.claude/rules/toolkit.md` (documentation map table) | If this file proves useful across more than one feature, formalize it. |
-| Periodic learning/guide capture during `/execute` (or a new `/checkpoint` skill) | `.claude/commands/execute.md` | User explicitly asked for this pattern. Captured 2 learnings + 2 guides after Step 0 of MCP plan rather than waiting for end-of-feature. Validates the "alongside the work" principle at a finer granularity. |
+| Living `workflow-notes.md` doc as a tracked artifact in the documentation map | `.claude/rules/toolkit.md` (documentation map table) | **Deferred** (one feature of data isn't enough; re-evaluate after the next 1-2 features). |
 
 ---
 
@@ -100,10 +97,20 @@ The doc itself is never deleted. It is an append-only log of how the workflow ev
 
 ## Codified
 
-(none yet)
+### 2026-05-24 - post-ship review of P50 (MCP server) candidates
+
+1. **Research-first `/explore` for external specs** → `.claude/commands/explore.md` got a new Phase 2b "Research external dependencies first (if applicable)". Codifies the practice that saved hours during the MCP build (verified excerpts from MCP spec, claude.ai connector docs, Cloudflare Tunnel docs cited from the plan vs. relying on training data). Skip-if-not-applicable clause covers refactors / bug fixes / self-contained features so the step doesn't bloat every exploration.
+
+2. **Extended Critical Decisions template** → `.claude/commands/create-plan.md` template now has two formats: one-line for low-stakes choices, expanded format (options considered / chosen / trade-offs / research citation) for high-stakes architectural decisions. Triggered by the P50 plan's decision block being noticeably more useful than older plans' one-liners.
+
+3. **Periodic learning/guide capture during `/execute`** → `.claude/commands/execute.md` got a new "When to Capture" section. Codifies the practice (user-requested during P50) of prompting for `/learnings` and `/guides` after logical chunks complete, rather than deferring to end-of-feature where context is stale. Prompt-only, no auto-run.
+
+4. **Plan checkbox + Outcomes discipline** → also added to `.claude/commands/execute.md` Status Updates section. Not a P50 candidate per se, but P50's `/ship` hit a blocker (90% progress, many 🟥/🟨) because user-action checkboxes were never updated and Outcomes was deferred to ship time. Toolkit now explicitly requires both to be kept current during execute.
 
 ---
 
 ## Rejected
 
-(none yet)
+### 2026-05-24 - stash workaround for `/start-feature` clean-tree check
+
+**Rejected because:** the situation only arose because `workflow-notes.md` was being created at the same moment the feature it tracked was starting. Future workflow-notes edits are modifications, not creates, and won't trip the clean-tree check. One-time edge case, not worth permanent toolkit complexity.
