@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| - | - | - | (none) |
+| [P57-mcp-search-and-tool-improvements.md](plans/P57-mcp-search-and-tool-improvements.md) | #57 | feature/mcp-search-and-tool-improvements-#57 | In Progress |
 
 ---
 
