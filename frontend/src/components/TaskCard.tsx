@@ -20,6 +20,11 @@ interface Props {
   onEdit: (task: Task) => void;
   // Quick deadline change from the deadline-pill popover. null clears it.
   onDeadlineChange: (id: number, deadline: string | null) => void;
+  // Multi-select support (all optional - off by default). When selectionMode is
+  // on, a selection checkbox is shown and tapping it toggles selection.
+  selectionMode?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (id: number) => void;
   // Which task ID has a delete in flight (disables that card's delete action).
   deletingId: number | null;
   // Which task ID has a completion toggle in flight (disables that card's checkbox).
@@ -36,6 +41,9 @@ export default function TaskCard({
   onDelete,
   onEdit,
   onDeadlineChange,
+  selectionMode = false,
+  selected = false,
+  onToggleSelect,
   deletingId,
   completingId,
   isHiding,
@@ -74,6 +82,20 @@ export default function TaskCard({
         isHiding ? " transition-all duration-300 opacity-0 translate-y-1" : " transition-colors duration-150"
       }${isCompletedAndVisible ? " opacity-50" : ""}`}
     >
+      {/* Selection checkbox - only shown in multi-select mode. Square, distinct
+          from the round completion toggle, so the two actions aren't confused. */}
+      {selectionMode && (
+        <label className="flex items-center justify-center min-w-[44px] min-h-[44px] shrink-0 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={() => onToggleSelect?.(task.id)}
+            aria-label={`Select "${task.title}"`}
+            className="w-4 h-4 rounded border-zinc-300 text-blue-600 focus:ring-2 focus:ring-blue-600 cursor-pointer"
+          />
+        </label>
+      )}
+
       {/* Circle checkbox - label provides the 44px tap target around a 20px visual circle.
           appearance-none removes native styling; checked:bg-zinc-900 fills it on completion. */}
       <label className="flex items-center justify-center min-w-[44px] min-h-[44px] shrink-0 cursor-pointer">

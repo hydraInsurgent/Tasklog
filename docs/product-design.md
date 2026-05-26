@@ -88,6 +88,7 @@ A reminder or alert system would be a meaningful scope addition.
 - Deadlines are visible to the user but the app does not enforce or act on them.
 - Every task carries a server-computed \`dueStatus\` (overdue / today / this_week / later / none), derived from the deadline relative to today (v2.10.3). It centralizes the due-bucket logic so Claude and any future client get a consistent answer without recomputing it.
 - A task can belong to a project (optional). Tasks with no project are in Inbox.
+- Bulk actions (v2.10.4): a "Select" mode on the task list lets you pick several tasks and, from a bulk-actions bar, complete/reopen them, move them to a project (or Inbox), or set/clear their deadline in one step. The same three operations are available to Claude via bulk MCP tools. There is no bulk delete - deletion stays one task at a time.
 
 **Projects**
 - Projects let the user categorize tasks.

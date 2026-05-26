@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| _none_ | | | |
+| [P63-bulk-operations.md](plans/P63-bulk-operations.md) | #63 | feature/bulk-operations-#63 | In Progress |
 
 ---
 

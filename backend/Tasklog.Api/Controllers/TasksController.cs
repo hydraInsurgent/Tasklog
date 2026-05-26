@@ -282,6 +282,78 @@ namespace Tasklog.Api.Controllers
 
             return Ok(task);
         }
+
+        // POST /api/tasks/bulk
+        // Applies one operation to a set of tasks in a single transaction. Supported
+        // operations: "complete" (data.isCompleted), "assignProject" (data.projectId,
+        // null = Inbox), "setDeadline" (data.deadline, null = clear, ISO string = set).
+        // No bulk delete - deletion stays single-task. Non-existent ids are skipped;
+        // returns the affected tasks (with labels). 400 on bad input.
+        [HttpPost("bulk")]
+        public async Task<IActionResult> Bulk([FromBody] BulkTaskRequest request)
+        {
+            if (request.TaskIds is null || request.TaskIds.Count == 0)
+                return BadRequest(new { message = "taskIds must be a non-empty array." });
+
+            // Cap the batch size server-side rather than trusting the client (the MCP
+            // layer caps at 100, but a direct HTTP caller could send an unbounded list).
+            const int maxBulk = 500;
+            if (request.TaskIds.Count > maxBulk)
+                return BadRequest(new { message = $"taskIds is limited to {maxBulk} per request." });
+
+            // Load only the tasks that exist (unknown ids are silently skipped) with
+            // their labels so the response is fully populated.
+            var tasks = await _context.Tasks
+                .Include(t => t.Labels)
+                .Where(t => request.TaskIds.Contains(t.Id))
+                .ToListAsync();
+
+            var data = request.Data;
+
+            switch (request.Operation)
+            {
+                case "complete":
+                    if (data?.IsCompleted is not bool isCompleted)
+                        return BadRequest(new { message = "data.isCompleted is required for the complete operation." });
+                    foreach (var task in tasks)
+                    {
+                        task.IsCompleted = isCompleted;
+                        // Match the single-task Complete action: stamp/clear CompletedAt.
+                        task.CompletedAt = isCompleted ? DateTime.Now : null;
+                    }
+                    break;
+
+                case "assignProject":
+                    var projectId = data?.ProjectId;
+                    // Validate the destination project exists (null = Inbox is always valid).
+                    // Stricter than the single-task endpoint on purpose; bulk is higher-stakes.
+                    if (projectId is int pid && !await _context.Projects.AnyAsync(p => p.Id == pid))
+                        return BadRequest(new { message = $"Project {pid} not found." });
+                    foreach (var task in tasks)
+                        task.ProjectId = projectId;
+                    break;
+
+                case "setDeadline":
+                    DateTime? deadline = null;
+                    // null/absent clears the deadline; a string must be a valid ISO date.
+                    if (data?.Deadline is string raw)
+                    {
+                        if (!DateTime.TryParse(raw, out var parsed))
+                            return BadRequest(new { message = "data.deadline must be an ISO 8601 date string or null." });
+                        deadline = parsed;
+                    }
+                    foreach (var task in tasks)
+                        task.Deadline = deadline;
+                    break;
+
+                default:
+                    return BadRequest(new { message = $"Unknown operation '{request.Operation}'. Expected: complete, assignProject, setDeadline." });
+            }
+
+            await _context.SaveChangesAsync();
+
+            return Ok(tasks);
+        }
     }
 
     // Request body shape for task creation.
@@ -295,6 +367,13 @@ namespace Tasklog.Api.Controllers
 
     // Request body shape for replacing a task's full label set.
     public record SetTaskLabelsRequest(int[] LabelIds);
+
+    // Request body shape for bulk operations. Operation is one of
+    // "complete" / "assignProject" / "setDeadline". Data carries the per-operation
+    // payload; Deadline is a string so it can be parsed and validated explicitly
+    // (null = clear), mirroring the single-task PATCH.
+    public record BulkTaskRequest(string Operation, List<int> TaskIds, BulkTaskData? Data);
+    public record BulkTaskData(bool? IsCompleted, int? ProjectId, string? Deadline);
 
     // Query-string shape for filtering the task list. All fields optional.
     // [FromQuery] binds:

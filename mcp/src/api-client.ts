@@ -181,6 +181,19 @@ export const setTaskLabels = (id: number, labelIds: number[]): Promise<Task> =>
     body: JSON.stringify({ labelIds }),
   });
 
+// Bulk operations: one transactional POST applies one operation to many tasks.
+// data carries the per-operation payload (isCompleted / projectId / deadline).
+// Returns the affected tasks.
+export const bulkTasks = (
+  operation: 'complete' | 'assignProject' | 'setDeadline',
+  taskIds: number[],
+  data?: { isCompleted?: boolean; projectId?: number | null; deadline?: string | null },
+): Promise<Task[]> =>
+  request('/api/tasks/bulk', {
+    method: 'POST',
+    body: JSON.stringify({ operation, taskIds, data }),
+  });
+
 // --- Projects ---
 
 export const listProjects = (): Promise<Project[]> => request('/api/projects');

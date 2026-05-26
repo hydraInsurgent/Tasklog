@@ -56,6 +56,36 @@ describe('update_task PATCH body contract (JSON.stringify keep/clear/set)', () =
   });
 });
 
+// The bulk endpoint takes { operation, taskIds, data }. The body must carry the
+// operation discriminator and the right data shape; deadline null must survive
+// (clear) while a value is sent (set), same JSON.stringify contract as above.
+describe('bulk POST body contract', () => {
+  test('complete carries operation + taskIds + isCompleted', () => {
+    assert.equal(
+      JSON.stringify({ operation: 'complete', taskIds: [1, 2], data: { isCompleted: true } }),
+      '{"operation":"complete","taskIds":[1,2],"data":{"isCompleted":true}}',
+    );
+  });
+  test('assignProject null moves to Inbox (null survives)', () => {
+    assert.equal(
+      JSON.stringify({ operation: 'assignProject', taskIds: [3], data: { projectId: null } }),
+      '{"operation":"assignProject","taskIds":[3],"data":{"projectId":null}}',
+    );
+  });
+  test('setDeadline value sets', () => {
+    assert.equal(
+      JSON.stringify({ operation: 'setDeadline', taskIds: [4], data: { deadline: '2026-12-31' } }),
+      '{"operation":"setDeadline","taskIds":[4],"data":{"deadline":"2026-12-31"}}',
+    );
+  });
+  test('setDeadline null clears', () => {
+    assert.equal(
+      JSON.stringify({ operation: 'setDeadline', taskIds: [4], data: { deadline: null } }),
+      '{"operation":"setDeadline","taskIds":[4],"data":{"deadline":null}}',
+    );
+  });
+});
+
 describe('buildTaskQuery', () => {
   test('returns empty string when filter is undefined (no query)', () => {
     assert.equal(buildTaskQuery(undefined), '');

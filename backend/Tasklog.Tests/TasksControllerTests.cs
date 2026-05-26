@@ -655,4 +655,183 @@ public class TasksControllerTests
 
         result.Should().BeOfType<NotFoundObjectResult>();
     }
+
+    // --- Bulk (POST /api/tasks/bulk) ---
+
+    // Seeds three tasks and returns their ids alongside the controller + context.
+    private static async Task<(TasksController controller, TasklogDbContext context, List<int> ids)> SeedThreeTasks()
+    {
+        var context = CreateContext();
+        var tasks = new[]
+        {
+            new TaskModel { Title = "A", CreatedAt = DateTime.Now },
+            new TaskModel { Title = "B", CreatedAt = DateTime.Now },
+            new TaskModel { Title = "C", CreatedAt = DateTime.Now },
+        };
+        context.Tasks.AddRange(tasks);
+        await context.SaveChangesAsync();
+        return (new TasksController(context), context, tasks.Select(t => t.Id).ToList());
+    }
+
+    [Fact]
+    public async Task Bulk_Complete_SetsIsCompletedAndCompletedAt_OnAll()
+    {
+        var (controller, context, ids) = await SeedThreeTasks();
+        using var _ = context;
+
+        var result = await controller.Bulk(new BulkTaskRequest("complete", ids, new BulkTaskData(true, null, null)));
+
+        var tasks = result.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeAssignableTo<List<TaskModel>>().Subject;
+        tasks.Should().HaveCount(3);
+        tasks.Should().OnlyContain(t => t.IsCompleted && t.CompletedAt != null);
+    }
+
+    [Fact]
+    public async Task Bulk_Complete_False_ClearsCompletedAt_OnAll()
+    {
+        var (controller, context, ids) = await SeedThreeTasks();
+        using var _ = context;
+        // Pre-complete them so the false path has something to clear.
+        await controller.Bulk(new BulkTaskRequest("complete", ids, new BulkTaskData(true, null, null)));
+
+        var result = await controller.Bulk(new BulkTaskRequest("complete", ids, new BulkTaskData(false, null, null)));
+
+        var tasks = result.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeAssignableTo<List<TaskModel>>().Subject;
+        tasks.Should().OnlyContain(t => !t.IsCompleted && t.CompletedAt == null);
+    }
+
+    [Fact]
+    public async Task Bulk_Complete_MissingIsCompleted_Returns400()
+    {
+        var (controller, context, ids) = await SeedThreeTasks();
+        using var _ = context;
+
+        var result = await controller.Bulk(new BulkTaskRequest("complete", ids, new BulkTaskData(null, null, null)));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task Bulk_AssignProject_MovesAll()
+    {
+        var (controller, context, ids) = await SeedThreeTasks();
+        using var _ = context;
+        var project = new Project { Name = "Work", CreatedAt = DateTime.UtcNow };
+        context.Projects.Add(project);
+        await context.SaveChangesAsync();
+
+        var result = await controller.Bulk(new BulkTaskRequest("assignProject", ids, new BulkTaskData(null, project.Id, null)));
+
+        var tasks = result.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeAssignableTo<List<TaskModel>>().Subject;
+        tasks.Should().OnlyContain(t => t.ProjectId == project.Id);
+    }
+
+    [Fact]
+    public async Task Bulk_AssignProject_NullMovesAllToInbox()
+    {
+        var (controller, context, ids) = await SeedThreeTasks();
+        using var _ = context;
+
+        var result = await controller.Bulk(new BulkTaskRequest("assignProject", ids, new BulkTaskData(null, null, null)));
+
+        var tasks = result.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeAssignableTo<List<TaskModel>>().Subject;
+        tasks.Should().OnlyContain(t => t.ProjectId == null);
+    }
+
+    [Fact]
+    public async Task Bulk_AssignProject_MissingProject_Returns400()
+    {
+        var (controller, context, ids) = await SeedThreeTasks();
+        using var _ = context;
+
+        var result = await controller.Bulk(new BulkTaskRequest("assignProject", ids, new BulkTaskData(null, 999, null)));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task Bulk_SetDeadline_SetsOnAll()
+    {
+        var (controller, context, ids) = await SeedThreeTasks();
+        using var _ = context;
+
+        var result = await controller.Bulk(new BulkTaskRequest("setDeadline", ids, new BulkTaskData(null, null, "2026-12-31")));
+
+        var tasks = result.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeAssignableTo<List<TaskModel>>().Subject;
+        tasks.Should().OnlyContain(t => t.Deadline == new DateTime(2026, 12, 31));
+    }
+
+    [Fact]
+    public async Task Bulk_SetDeadline_NullClearsOnAll()
+    {
+        var (controller, context, ids) = await SeedThreeTasks();
+        using var _ = context;
+        await controller.Bulk(new BulkTaskRequest("setDeadline", ids, new BulkTaskData(null, null, "2026-12-31")));
+
+        var result = await controller.Bulk(new BulkTaskRequest("setDeadline", ids, new BulkTaskData(null, null, null)));
+
+        var tasks = result.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeAssignableTo<List<TaskModel>>().Subject;
+        tasks.Should().OnlyContain(t => t.Deadline == null);
+    }
+
+    [Fact]
+    public async Task Bulk_SetDeadline_BadDate_Returns400()
+    {
+        var (controller, context, ids) = await SeedThreeTasks();
+        using var _ = context;
+
+        var result = await controller.Bulk(new BulkTaskRequest("setDeadline", ids, new BulkTaskData(null, null, "not-a-date")));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task Bulk_EmptyTaskIds_Returns400()
+    {
+        using var context = CreateContext();
+        var controller = new TasksController(context);
+
+        var result = await controller.Bulk(new BulkTaskRequest("complete", new List<int>(), new BulkTaskData(true, null, null)));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task Bulk_TooManyTaskIds_Returns400()
+    {
+        using var context = CreateContext();
+        var controller = new TasksController(context);
+        // 501 ids exceeds the server-side cap of 500.
+        var tooMany = Enumerable.Range(1, 501).ToList();
+
+        var result = await controller.Bulk(new BulkTaskRequest("complete", tooMany, new BulkTaskData(true, null, null)));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task Bulk_UnknownOperation_Returns400()
+    {
+        var (controller, context, ids) = await SeedThreeTasks();
+        using var _ = context;
+
+        var result = await controller.Bulk(new BulkTaskRequest("explode", ids, null));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task Bulk_UnknownIds_AreSkipped_ReturnsOnlyExisting()
+    {
+        var (controller, context, ids) = await SeedThreeTasks();
+        using var _ = context;
+        // Two real ids + one that does not exist.
+        var mixed = new List<int> { ids[0], ids[1], 999999 };
+
+        var result = await controller.Bulk(new BulkTaskRequest("complete", mixed, new BulkTaskData(true, null, null)));
+
+        var tasks = result.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeAssignableTo<List<TaskModel>>().Subject;
+        tasks.Should().HaveCount(2);
+        tasks.Select(t => t.Id).Should().BeEquivalentTo(new[] { ids[0], ids[1] });
+    }
 }

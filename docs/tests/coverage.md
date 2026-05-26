@@ -1,6 +1,6 @@
 # Test Coverage
 
-**Last updated:** 2026-05-27 (#61 - computed dueStatus field + MCP tool-description shape hints)
+**Last updated:** 2026-05-27 (#63 - bulk task operations: endpoint + 3 MCP tools + multi-select UI)
 
 ---
 
@@ -15,7 +15,8 @@
 | Class | Lines | Branches | Notes |
 |---|---|---|---|
 | TasksController | 100% | 100% | All methods and branches covered. +9 tests for Update/PATCH partial-update (#59) |
-| TaskModel.ComputeDueStatus | 100% | 100% | +11 tests for the dueStatus bucket logic (#61) - 74 backend tests total |
+| TaskModel.ComputeDueStatus | 100% | 100% | +11 tests for the dueStatus bucket logic (#61) |
+| TasksController.Bulk | 100% | 100% | +13 tests for POST /api/tasks/bulk (#63, incl. the 500-id cap) - 87 backend tests total |
 | ProjectsController | 100% | 100% | All methods and branches covered |
 | TasklogDbContext | 100% | 100% | |
 | Program.cs | 0% | - | Framework wiring - not a test target |
@@ -38,7 +39,7 @@
 | oauth/well-known.ts | - | - | - | Returns fixed JSON metadata |
 | server.ts | - | - | - | Hono mount order + request logger; covered by middleware tests + end-to-end smoke |
 
-**66 tests, 0 failures** (was 65; +1 in api-client.test.ts for the `Task.dueStatus` shape contract, #61). Run with: `npm test --prefix mcp` (auto-rebuilds better-sqlite3 for host arch via pretest hook if needed). Note: a fresh `npm install` on the host installs better-sqlite3 without the native binary - run `npm rebuild better-sqlite3` once after install if the OAuth store/token tests fail with `ERR_DLOPEN_FAILED`.
+**70 tests, 0 failures** (was 66; +4 in api-client.test.ts for the bulk POST body contract, #63). Run with: `npm test --prefix mcp` (auto-rebuilds better-sqlite3 for host arch via pretest hook if needed). Note: a fresh `npm install` on the host installs better-sqlite3 without the native binary - run `npm rebuild better-sqlite3` once after install if the OAuth store/token tests fail with `ERR_DLOPEN_FAILED`.
 
 ### Next.js Frontend - last run 2026-05-26
 
@@ -48,7 +49,8 @@
 | CompleteTaskButton.tsx | 100% | 100% | 100% | - |
 | DeleteTaskButton.tsx | 100% | 100% | 100% | - |
 | deadlinePresets.ts | 95.23% | 87.5% | 100% | L41 (one unreachable preset branch); pure resolver, 10 tests (#59) |
-| TaskCard.tsx | 77.14% | 88.46% | 78.12% | L58, 111-133, 168-169 (deadline popover open + edit wiring - exercised via TasksClient, not unit-tested directly) |
+| TaskCard.tsx | ~80% | ~88% | ~80% | deadline popover open + edit wiring exercised via TasksClient; +3 tests for selection-mode checkbox (#63) |
+| BulkActionsBar.tsx | 0% | 0% | 0% | New (#63). Integration candidate; the bar is presentational (buttons + a reused DeadlinePopover) and is exercised via the live smoke + manual UI |
 | format.ts | 85% | 83.33% | 85.71% | 20-21 |
 | AddTaskForm.tsx | 45.09% | 40.74% | 49.45% | Project dropdown + label autocomplete render paths (grew since v2.4; not a regression) |
 | DeadlinePopover.tsx | 10.52% | 0% | 11.76% | Behavior covered indirectly: `resolvePreset` is unit-tested; the popover is a thin button list. Direct render test is an integration candidate |
@@ -101,6 +103,21 @@
 - [x] 🟩 on Saturday: Sunday -> this_week; Monday -> later
 - [x] 🟩 compares date-only, ignoring time of day -> today
 - [x] 🟩 DueStatus property wires ComputeDueStatus to DateTime.Today
+
+### TasksController.Bulk (POST /api/tasks/bulk)
+- [x] 🟩 complete true - sets IsCompleted + CompletedAt on all
+- [x] 🟩 complete false - clears IsCompleted + CompletedAt on all
+- [x] 🟩 complete - missing isCompleted -> 400
+- [x] 🟩 assignProject - moves all to the target project
+- [x] 🟩 assignProject - null moves all to Inbox
+- [x] 🟩 assignProject - non-existent project -> 400
+- [x] 🟩 setDeadline - sets the deadline on all
+- [x] 🟩 setDeadline - null clears the deadline on all
+- [x] 🟩 setDeadline - unparseable date -> 400
+- [x] 🟩 empty taskIds -> 400
+- [x] 🟩 more than 500 taskIds -> 400 (server-side cap, review R1)
+- [x] 🟩 unknown operation -> 400
+- [x] 🟩 unknown ids are skipped, returns only existing tasks
 
 ### ProjectsController
 - [x] 🟩 GetAll - returns projects ordered alphabetically
@@ -163,6 +180,9 @@
 - [x] 🟩 shows project name when activeView is "all"
 - [x] 🟩 hides project name when activeView is "inbox"
 - [x] 🟩 applies line-through to title when task is completed and not hiding
+- [x] 🟩 no selection checkbox when not in selection mode (#63)
+- [x] 🟩 selection checkbox appears + calls onToggleSelect in select mode (#63)
+- [x] 🟩 selection checkbox reflects the selected prop (#63)
 
 ### deadlinePresets (resolvePreset, injected `now`)
 - [x] 🟩 today - returns today's local date
@@ -246,6 +266,9 @@ its own subprocess, so in-memory DBs are isolated across files.
 - [x] 🟩 update_task - PATCH body with title only
 - [x] 🟩 update_task - PATCH body with both title and deadline
 - [x] 🟩 Task.dueStatus - type carries dueStatus as one of the five buckets (#61, pass-through contract)
+- [x] 🟩 bulk - complete body carries operation + taskIds + isCompleted (#63)
+- [x] 🟩 bulk - assignProject null survives serialization (Inbox) (#63)
+- [x] 🟩 bulk - setDeadline value sets / null clears (#63)
 
 ### Not covered (and why)
 - `tools/tasks.ts`, `tools/projects.ts`, `tools/labels.ts` - thin api-client wrappers; behavior is exercised through `runTool` tests + the end-to-end smoke run with claude.ai.
