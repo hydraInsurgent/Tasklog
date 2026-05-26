@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| [P59-update-task-and-edit-modal.md](plans/P59-update-task-and-edit-modal.md) | #59 | feature/update-task-and-edit-modal-#59 | In Progress |
+| _none_ | | | |
 
 ---
 
@@ -75,6 +75,7 @@ Recently completed work (keep last 10):
 
 | # | Title | Type | Closed |
 |---|-------|------|--------|
+| #59 | Update task (title/deadline) + edit modal + quick deadline (v2.10.2) | feature | 2026-05-27 |
 | #57 | MCP task filtering + tool consolidation (v2.10.1) | feature | 2026-05-26 |
 | #50 | MCP server for claude.ai custom connector | feature | 2026-05-20 |
 | #48 | Deploy Tasklog to GCP | feature | 2026-04-18 |
@@ -84,10 +85,6 @@ Recently completed work (keep last 10):
 | #44 | CI and Cross-Platform Distribution | feature | 2026-03-31 |
 | #42 | Feature: Background Auto-Refresh | feature | 2026-03-25 |
 | #37 | Feature: Downloadable Package | feature | 2026-03-20 |
-| #30 | Feature: Labels and Filtering | feature | 2026-03-20 |
-| #31-#36 | Review fixes for #30 | fix | 2026-03-20 |
-| #22 | Feature: Mobile Task Cards | feature | 2026-03-14 |
-| #12 | Feature: Projects and Inbox | feature | 2026-03-13 |
 
 ---
 
@@ -100,10 +97,8 @@ Untracked ideas - not estimated, not prioritized, not committed to. Just things 
 - Relative time display for completed date - show "just now", "2 hours ago", "3 days ago" instead of a formatted date. CompletedAt timestamp is already stored so this would be a UI-only change.
 - Cross-device sync / live updates - changes on one device reflect on another without a manual reload.
 - Project color codes - each project could have an assigned color shown as a swatch in the sidebar and next to tasks. The Edit Project dialog is already planned as a modal, making this a natural future addition (add a color picker field).
-- Task edit modal - inline modal popup for editing a task's title, deadline, and project without leaving the main view. Currently clicking a task navigates to /tasks/[id]. A modal would keep the user in context.
 - Rich task detail - for long-running tasks with multiple milestones, add: (1) an optional description field, (2) subtasks (checklist items under a parent task), and (3) comments/progress notes to track how the work evolved. Each piece can be built incrementally. Description is the smallest change (migration + text field on detail page). Subtasks require a self-referencing or child-task model. Comments require a TaskComment table with timestamps. Would make the task detail page the natural home for complex work.
 - README as GitHub artifact - rewrite README.md as a proper project introduction: project vision, what problem it solves, tech stack, quick-start instructions, and a roadmap section. Should feel like a polished open-source project landing page.
 - Task priority - a priority field (P1/P2/P3 or High/Medium/Low) on each task. Adds a priority filter to the filter panel alongside labels/project/date.
-- Editable deadline / postpone - deadlines are currently set only at task creation. Add a small popup with a calendar to change the deadline from the task list. Include a quick "postpone to weekend" action alongside the full calendar picker for choosing a specific date.
 - Theme selection - allow the user to switch between light, dark, and high-contrast color themes. Theme changes affect overall background, header/navbar, and general UI chrome. Project colors, label colors, and other user-assigned colors remain unchanged.
 - README overhaul - rewrite README.md as a proper GitHub project introduction: project vision, why it exists (the Todoist frustration origin), a feature showcase with screenshots, quick-start instructions, and a roadmap section showing where the project is heading. Goal is for someone landing on the repo to immediately understand what Tasklog is, why it matters, and how to run it.
