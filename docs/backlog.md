@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| [P63-bulk-operations.md](plans/P63-bulk-operations.md) | #63 | feature/bulk-operations-#63 | In Progress |
+| _none_ | | | |
 
 ---
 
@@ -77,6 +77,7 @@ Recently completed work (keep last 10):
 
 | # | Title | Type | Closed |
 |---|-------|------|--------|
+| #63 | Bulk task operations (complete, move-to-project, set-deadline) (v2.10.4) | feature | 2026-05-27 |
 | #61 | Computed dueStatus field + MCP tool-description shape hints (v2.10.3) | feature | 2026-05-27 |
 | #59 | Update task (title/deadline) + edit modal + quick deadline (v2.10.2) | feature | 2026-05-27 |
 | #57 | MCP task filtering + tool consolidation (v2.10.1) | feature | 2026-05-26 |
@@ -86,7 +87,6 @@ Recently completed work (keep last 10):
 | #46 | Labels column missing from desktop task table | bug | 2026-04-03 |
 | #45 | Frontend .next dir missing from distributable | bug | 2026-04-03 |
 | #44 | CI and Cross-Platform Distribution | feature | 2026-03-31 |
-| #42 | Feature: Background Auto-Refresh | feature | 2026-03-25 |
 
 ---
 
