@@ -65,9 +65,10 @@ Tasklog/
 │   │   ├── server.ts              Hono HTTP entry, middleware wiring
 │   │   ├── config.ts              Env var loading + production validation
 │   │   ├── api-client.ts          Typed client for the Tasklog .NET API
-│   │   ├── tools/                 16 MCP tools wrapping every API endpoint
-│   │   │   ├── tasks.ts           8 task tools (list[+filters]/get/create/update/
-│   │   │   │                      delete/set-completion/assign-project/set-labels)
+│   │   ├── tools/                 19 MCP tools wrapping every API endpoint
+│   │   │   ├── tasks.ts           11 task tools (list[+filters]/get/create/update/
+│   │   │   │                      delete/set-completion/assign-project/set-labels +
+│   │   │   │                      bulk-set-completion/bulk-assign-to-project/bulk-set-deadline)
 │   │   │   ├── projects.ts        4 project tools
 │   │   │   ├── labels.ts          4 label tools
 │   │   │   ├── registry.ts        Aggregates and registers all tools
@@ -101,7 +102,8 @@ Tasklog/
 │       │   ├── DeleteTaskButton.tsx  Delete action on detail page (Client Component)
 │       │   ├── CompleteTaskButton.tsx  Complete/incomplete toggle on detail page (Client Component)
 │       │   ├── EditTaskModal.tsx   Full task edit (title/deadline/project/labels), diff-and-fan-out save (Client Component, v2.10.2)
-│       │   └── DeadlinePopover.tsx Quick deadline preset picker on the deadline pill (Client Component, v2.10.2)
+│       │   ├── DeadlinePopover.tsx Quick deadline preset picker on the deadline pill (Client Component, v2.10.2)
+│       │   └── BulkActionsBar.tsx  Sticky bulk-actions bar for multi-select mode (Client Component, v2.10.4)
 │       │   (list is representative - other components: TaskCard, FilterPanel, LabelsClient, etc.)
 │       └── lib/
 │           ├── api.ts             Typed API call functions (used by both server and client)
@@ -184,6 +186,7 @@ LabelTaskModel  (join table - implicit many-to-many)
 | DELETE | `/api/tasks/{id}` | Delete task. 204 on success, 404 if not found |
 | PATCH | `/api/tasks/{id}/complete` | Mark task complete or incomplete. Body: `{ isCompleted: bool }`. Returns updated task |
 | PATCH | `/api/tasks/{id}/project` | Reassign task to a project or Inbox. Body: `{ projectId: int? }` |
+| POST | `/api/tasks/bulk` | Apply one operation to many tasks in one transaction. Body: `{ operation: "complete" \| "assignProject" \| "setDeadline", taskIds: int[], data?: { isCompleted?, projectId?, deadline? } }`. No bulk delete. Unknown ids skipped; returns the affected tasks. 400 on empty ids / unknown op / invalid data (incl. assignProject to a missing project) |
 | GET | `/api/projects` | All projects, ordered by name |
 | POST | `/api/projects` | Create project. Body: `{ name: string }`. Returns created project |
 | PATCH | `/api/projects/{id}` | Rename project. Body: `{ name: string }`. Returns updated project |
@@ -372,7 +375,7 @@ POST /token                                     auth_code and refresh_token gran
 
 ### Tool layer
 
-16 MCP tools across three families (tasks: 8, projects: 4, labels: 4). Each tool is a thin wrapper around the corresponding Tasklog `/api` endpoint via `api-client.ts`. Input schemas use Zod and are inlined per tool. The `runTool()` helper in `result.ts` converts thrown `ApiError`s into MCP `isError: true` tool results (not JSON-RPC protocol errors), so the LLM can see and react to failures.
+19 MCP tools across three families (tasks: 11, projects: 4, labels: 4). The task family includes three bulk tools (`bulk_set_completion`, `bulk_assign_to_project`, `bulk_set_deadline`) backed by the single `POST /api/tasks/bulk` endpoint. Each tool is a thin wrapper around the corresponding Tasklog `/api` endpoint via `api-client.ts`. Input schemas use Zod and are inlined per tool. The `runTool()` helper in `result.ts` converts thrown `ApiError`s into MCP `isError: true` tool results (not JSON-RPC protocol errors), so the LLM can see and react to failures.
 
 The `list_tasks` tool accepts an optional filter object (project, inbox, labels, deadline range, completion, title substring) that `api-client.ts` serializes into a query string on `GET /api/tasks`. Completion is a single `set_task_completion(id, isCompleted)` tool - the earlier `complete_task` / `uncomplete_task` split was consolidated in v2.10.1.
 

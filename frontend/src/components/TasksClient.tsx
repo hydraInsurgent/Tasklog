@@ -3,13 +3,14 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { usePolling } from "@/hooks/usePolling";
 import Link from "next/link";
-import { Trash2, CheckCircle, XCircle, Loader2, MoreHorizontal, Plus, Pencil } from "lucide-react";
-import { getTasks, createTask, deleteTask, completeTask, getLabels, setTaskLabels, updateTask, getTask, Task, Project, Label } from "@/lib/api";
+import { Trash2, CheckCircle, XCircle, Loader2, MoreHorizontal, Plus, Pencil, ListChecks } from "lucide-react";
+import { getTasks, createTask, deleteTask, completeTask, getLabels, setTaskLabels, updateTask, bulkTasks, BulkOperation, Task, Project, Label } from "@/lib/api";
 import { formatDate, deadlineColorClass, projectName, labelColor } from "@/lib/format";
 import AddTaskForm from "./AddTaskForm";
 import TaskCard from "./TaskCard";
 import EditTaskModal from "./EditTaskModal";
 import DeadlinePopover from "./DeadlinePopover";
+import BulkActionsBar from "./BulkActionsBar";
 import FilterPanel, { FilterState, EMPTY_FILTER, hasActiveFilters, activeFilterCount } from "./FilterPanel";
 
 // Feedback shown briefly after an action (replaces TempData flash messages from v1).
@@ -51,6 +52,11 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
   // Which task's deadline quick-popover is open in the DESKTOP table (mobile
   // cards manage their own popover state internally).
   const [deadlinePopoverId, setDeadlinePopoverId] = useState<number | null>(null);
+  // Multi-select state. selectionMode toggles the selection checkboxes + bulk bar.
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  // True while a bulk request is in flight (disables the bulk bar actions).
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   // Fetch all tasks and labels in parallel. Called on mount.
   const loadTasks = useCallback(async () => {
@@ -76,7 +82,7 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
   // overwriting optimistic state.
   const pollEnabled =
     deletingId === null && completingId === null && hidingIds.size === 0 &&
-    editingTask === null && deadlinePopoverId === null;
+    editingTask === null && deadlinePopoverId === null && !selectionMode;
 
   usePolling(
     useCallback(async () => {
@@ -100,6 +106,60 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
   function showFeedback(type: "success" | "error", message: string) {
     setFeedback({ type, message });
     setTimeout(() => setFeedback(null), 4000);
+  }
+
+  // --- Multi-select ---
+
+  // Leave select mode and drop the selection. Called on Cancel, after a bulk
+  // action, and whenever the view/filter changes (so we never act on tasks the
+  // user can no longer see).
+  const exitSelectMode = useCallback(() => {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  }, []);
+
+  // Changing the sidebar view or filters clears any in-progress selection.
+  useEffect(() => {
+    exitSelectMode();
+  }, [activeView, filterState, exitSelectMode]);
+
+  function toggleSelect(id: number) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  // Apply a bulk operation to the current selection, then merge the returned
+  // tasks back into local state and exit select mode.
+  async function handleBulk(
+    operation: BulkOperation,
+    data?: { isCompleted?: boolean; projectId?: number | null; deadline?: string | null },
+  ) {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    setBulkBusy(true);
+    try {
+      const updated = await bulkTasks(operation, ids, data);
+      const byId = new Map(updated.map((t) => [t.id, t]));
+      setTasks((prev) => prev.map((t) => byId.get(t.id) ?? t));
+      const verb =
+        operation === "complete"
+          ? data?.isCompleted
+            ? "completed"
+            : "reopened"
+          : operation === "assignProject"
+          ? "moved"
+          : "updated";
+      showFeedback("success", `${updated.length} task${updated.length === 1 ? "" : "s"} ${verb}.`);
+      exitSelectMode();
+    } catch {
+      showFeedback("error", "Bulk action failed. Please try again.");
+    } finally {
+      setBulkBusy(false);
+    }
   }
 
   // Called by AddTaskForm on submit. Updates local state so no full reload is needed.
@@ -330,6 +390,21 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
               </button>
             )}
 
+            {/* Select toggle - enters/leaves multi-select mode. Shown only when
+                there are tasks to select. */}
+            {!loading && filteredTasks.length > 0 && (
+              <button
+                onClick={() => (selectionMode ? exitSelectMode() : setSelectionMode(true))}
+                aria-pressed={selectionMode}
+                className={`flex items-center gap-1.5 text-sm focus:outline-none focus:underline transition-colors duration-150 cursor-pointer ${
+                  selectionMode ? "text-blue-600 font-medium" : "text-zinc-500 hover:text-zinc-900"
+                }`}
+              >
+                <ListChecks size={16} aria-hidden="true" />
+                {selectionMode ? "Done" : "Select"}
+              </button>
+            )}
+
             {/* Filter button - three-dot menu opens the filter panel. */}
             <div ref={filterButtonRef} className="relative">
               <button
@@ -381,7 +456,23 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-zinc-100 text-left">
-                  <th className="pl-6 pr-2 py-3 w-8">
+                  {/* Select-all checkbox - only in select mode. */}
+                  {selectionMode && (
+                    <th className="pl-6 pr-2 py-3 w-8">
+                      <input
+                        type="checkbox"
+                        checked={visibleTasks.length > 0 && visibleTasks.every((t) => selectedIds.has(t.id))}
+                        onChange={(e) =>
+                          setSelectedIds(
+                            e.target.checked ? new Set(visibleTasks.map((t) => t.id)) : new Set(),
+                          )
+                        }
+                        aria-label="Select all tasks"
+                        className="w-4 h-4 rounded border-zinc-300 text-blue-600 focus:ring-2 focus:ring-blue-600 cursor-pointer"
+                      />
+                    </th>
+                  )}
+                  <th className={`${selectionMode ? "pl-2" : "pl-6"} pr-2 py-3 w-8`}>
                     <span className="sr-only">Complete</span>
                   </th>
                   <th className="px-6 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">
@@ -421,8 +512,21 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
                         isHiding ? " transition-all duration-300 opacity-0 translate-y-1" : ""
                       }${isCompletedAndVisible ? " opacity-50" : ""}`}
                     >
+                      {/* Selection checkbox - only in select mode. */}
+                      {selectionMode && (
+                        <td className="pl-6 pr-2 py-4">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(task.id)}
+                            onChange={() => toggleSelect(task.id)}
+                            aria-label={`Select ${task.title}`}
+                            className="w-4 h-4 rounded border-zinc-300 text-blue-600 focus:ring-2 focus:ring-blue-600 cursor-pointer"
+                          />
+                        </td>
+                      )}
+
                       {/* Completion checkbox */}
-                      <td className="pl-6 pr-2 py-4">
+                      <td className={`${selectionMode ? "pl-2" : "pl-6"} pr-2 py-4`}>
                         <input
                           type="checkbox"
                           checked={task.isCompleted}
@@ -554,6 +658,9 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
                 onDelete={handleDelete}
                 onEdit={setEditingTask}
                 onDeadlineChange={handleDeadlineQuickSet}
+                selectionMode={selectionMode}
+                selected={selectedIds.has(task.id)}
+                onToggleSelect={toggleSelect}
                 deletingId={deletingId}
                 completingId={completingId}
                 isHiding={hidingIds.has(task.id)}
@@ -580,6 +687,20 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
           allLabels={allLabels}
           onSaved={handleSaved}
           onClose={() => setEditingTask(null)}
+        />
+      )}
+
+      {/* Bulk-actions bar - shown while tasks are selected in select mode. */}
+      {selectionMode && selectedIds.size > 0 && (
+        <BulkActionsBar
+          count={selectedIds.size}
+          projects={projects}
+          busy={bulkBusy}
+          onComplete={() => handleBulk("complete", { isCompleted: true })}
+          onUncomplete={() => handleBulk("complete", { isCompleted: false })}
+          onMoveToProject={(projectId) => handleBulk("assignProject", { projectId })}
+          onSetDeadline={(deadline) => handleBulk("setDeadline", { deadline })}
+          onCancel={exitSelectMode}
         />
       )}
     </div>

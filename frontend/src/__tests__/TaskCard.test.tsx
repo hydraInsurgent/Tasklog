@@ -104,4 +104,22 @@ describe('TaskCard', () => {
     render(<TaskCard {...makeProps({ task: { ...baseTask, isCompleted: true }, isHiding: false })} />)
     expect(screen.getByRole('link', { name: /buy groceries/i })).toHaveClass('line-through')
   })
+
+  it('does not render a selection checkbox when not in selection mode', () => {
+    render(<TaskCard {...makeProps()} />)
+    expect(screen.queryByRole('checkbox', { name: /select "buy groceries"/i })).not.toBeInTheDocument()
+  })
+
+  it('renders a selection checkbox in selection mode and calls onToggleSelect when clicked', async () => {
+    const onToggleSelect = jest.fn()
+    render(<TaskCard {...makeProps({ selectionMode: true, onToggleSelect })} />)
+    const checkbox = screen.getByRole('checkbox', { name: /select "buy groceries"/i })
+    await userEvent.click(checkbox)
+    expect(onToggleSelect).toHaveBeenCalledWith(1)
+  })
+
+  it('shows the selection checkbox as checked when selected', () => {
+    render(<TaskCard {...makeProps({ selectionMode: true, selected: true })} />)
+    expect(screen.getByRole('checkbox', { name: /select "buy groceries"/i })).toBeChecked()
+  })
 })

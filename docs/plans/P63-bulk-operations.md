@@ -1,6 +1,6 @@
 # Feature Implementation Plan: Bulk task operations
 
-**Overall Progress:** `0%`
+**Overall Progress:** `80%`
 
 **Tracking issue:** [#63](https://github.com/hydraInsurgent/Tasklog/issues/63)
 **Branch:** `feature/bulk-operations-#63`
@@ -51,27 +51,27 @@ MCP tools:
 
 ## Tasks
 
-- [ ] 🟥 **Step 1: Backend - `POST /api/tasks/bulk`** `[sequential]` → depends on: nothing
-  - [ ] 🟥 1.1 Add `BulkTaskRequest(string Operation, List<int> TaskIds, BulkTaskData? Data)` + `BulkTaskData(bool? IsCompleted, int? ProjectId, string? Deadline)` records. Note: deadline as string so it can be parsed/validated explicitly (like the single PATCH).
-  - [ ] 🟥 1.2 `Bulk([FromBody] BulkTaskRequest req)` action: validate non-empty taskIds + known operation; load matching tasks with `.Include(t => t.Labels)`; switch on operation applying the change to each; one `SaveChangesAsync`; return `Ok(tasks)`. Per-op validation per the contract.
-  - [ ] 🟥 1.3 Unit tests: complete true/false sets+clears CompletedAt on all; assignProject moves all (and null = Inbox); assignProject to missing project -> 400; setDeadline sets + null clears on all; bad deadline -> 400; empty taskIds -> 400; unknown operation -> 400; unknown ids skipped (returns only existing); complete without isCompleted -> 400.
+- [x] 🟩 **Step 1: Backend - `POST /api/tasks/bulk`** `[sequential]` → depends on: nothing
+  - [x] 🟩 1.1 Added `BulkTaskRequest` + `BulkTaskData` records (deadline as string for explicit parse/validate).
+  - [x] 🟩 1.2 `Bulk([FromBody] BulkTaskRequest)` action: validates non-empty ids + known op, loads matching tasks with labels, switch applies per-op, one SaveChanges, returns the affected tasks. assignProject validates target project exists.
+  - [x] 🟩 1.3 12 tests (complete set/clear, missing isCompleted 400, assignProject move/inbox/missing-400, setDeadline set/clear/bad-date-400, empty-ids 400, unknown-op 400, unknown-ids skipped). 86 backend tests pass.
 
-- [ ] 🟥 **Step 2: MCP - three bulk tools** `[sequential]` → depends on: Step 1
-  - [ ] 🟥 2.1 `api.bulkTasks(operation, taskIds, data)` (or three thin wrappers) in `mcp/src/api-client.ts` POSTing to `/api/tasks/bulk`.
-  - [ ] 🟥 2.2 Register `bulk_set_completion`, `bulk_assign_to_project`, `bulk_set_deadline` in `mcp/src/tools/tasks.ts` with Zod schemas (taskIds: non-empty int array, max ~100) + "Returns:" hints. Update the header comment (8 -> 11 task tools). Tool count 16 -> 19.
-  - [ ] 🟥 2.3 Tests: api-client POST body contract for each op (operation + taskIds + data shape; deadline null vs value).
+- [x] 🟩 **Step 2: MCP - three bulk tools** `[sequential]` → depends on: Step 1
+  - [x] 🟩 2.1 `api.bulkTasks(operation, taskIds, data)` added to `mcp/src/api-client.ts` (POST /api/tasks/bulk, returns Task[]).
+  - [x] 🟩 2.2 Registered `bulk_set_completion`, `bulk_assign_to_project`, `bulk_set_deadline` with shared taskIds schema (min 1, max 100) + "Returns:" hints. Header comment updated (11 task tools). Tool count 16 -> 19.
+  - [x] 🟩 2.3 4 api-client body-contract tests (complete/assignProject-null/setDeadline set+clear). Typecheck clean; 70 MCP tests pass.
 
-- [ ] 🟥 **Step 3: Web UI - select mode + bulk-actions bar** `[sequential]` → depends on: Step 1 `[UI]`
-  - [ ] 🟥 3.1 `api.bulkTasks(...)` in `frontend/src/lib/api.ts`.
-  - [ ] 🟥 3.2 TasksClient: `selectionMode` boolean + `selectedIds: Set<number>` state; a "Select" toggle in the list header; pause polling while in select mode. Clear selection on exit and on view/filter change.
-  - [ ] 🟥 3.3 Desktop table: leading selection-checkbox column (square, distinct from the round completion toggle) + a select-all in the header. Mobile `TaskCard`: a selection checkbox shown only in select mode (new optional props, default off so existing tests pass).
-  - [ ] 🟥 3.4 `BulkActionsBar` component (sticky bottom): "N selected", Complete, Mark incomplete, Move to project (dropdown reusing the project list), Set deadline (reuses `DeadlinePopover`), and Done. Calls `bulkTasks`, then updates local state with the returned tasks (or removes completed ones from the default view consistent with single-complete behavior). Error + loading states.
-  - [ ] 🟥 3.5 Fixtures/tests: extend TaskCard props with the optional selection props (default off); add a focused test for the selection toggle + bar enable/disable if practical. Keep existing tests green.
+- [x] 🟩 **Step 3: Web UI - select mode + bulk-actions bar** `[sequential]` → depends on: Step 1 `[UI]`
+  - [x] 🟩 3.1 `bulkTasks(operation, taskIds, data)` + `BulkOperation` type in `frontend/src/lib/api.ts`.
+  - [x] 🟩 3.2 TasksClient: `selectionMode` + `selectedIds: Set<number>` + `bulkBusy` state; "Select"/"Done" header toggle; polling pauses in select mode; selection clears on exit and on activeView/filter change (useEffect).
+  - [x] 🟩 3.3 Desktop: leading selection column + select-all header (only in select mode), with the completion column padding shifted. Mobile `TaskCard`: optional `selectionMode`/`selected`/`onToggleSelect` props (default off) render a square selection checkbox.
+  - [x] 🟩 3.4 `BulkActionsBar` (sticky bottom): N selected, Complete, Reopen, Move to project (dropdown of Inbox + projects), Set deadline (reuses `DeadlinePopover`), Cancel. Calls `handleBulk` -> `bulkTasks`, merges returned tasks into state, exits select mode. Busy + error states.
+  - [x] 🟩 3.5 +3 TaskCard tests (no checkbox by default; appears + toggles in select mode; reflects selected). 50 frontend tests pass; clean `next build`. Existing tests untouched (props optional).
 
-- [ ] 🟥 **Step 4: Docs + CHANGELOG** `[sequential]` → depends on: Steps 1-3
-  - [ ] 🟥 4.1 architecture.md: add `POST /api/tasks/bulk` to the endpoints table; bump MCP tool count 16 -> 19; note `BulkActionsBar`.
-  - [ ] 🟥 4.2 product-design.md: note bulk actions on the task list + via Claude.
-  - [ ] 🟥 4.3 CHANGELOG.md: v2.10.4 section. coverage.md: new counts + checklists.
+- [x] 🟩 **Step 4: Docs + CHANGELOG** `[sequential]` → depends on: Steps 1-3
+  - [x] 🟩 4.1 architecture.md: added `POST /api/tasks/bulk` to the endpoints table; tool count 16 -> 19 (prose + tree, 11 task tools); noted `BulkActionsBar`.
+  - [x] 🟩 4.2 product-design.md: noted bulk actions (UI select mode + Claude), no bulk delete.
+  - [x] 🟩 4.3 CHANGELOG.md: v2.10.4 section. coverage.md: counts (86/70/50) + Bulk + selection + bulk-body checklists.
 
 - [ ] 🟥 **Step 5: Deploy + smoke test** `[sequential]` → depends on: Step 4
   - [ ] 🟥 5.1 `./scripts/deploy-phone.sh`.

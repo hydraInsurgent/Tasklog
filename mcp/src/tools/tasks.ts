@@ -1,11 +1,13 @@
 /**
  * MCP tools for task operations.
  *
- * Eight tools wrap the task-related Tasklog API endpoints. The
- * completion toggle is a single tool (set_task_completion) that takes a
- * boolean - earlier versions split it into separate complete_task and
- * uncomplete_task tools, but the LLM picks the right value from natural
- * language reliably and one tool reduces the surface area.
+ * Eleven tools wrap the task-related Tasklog API endpoints: eight single-task
+ * tools plus three bulk tools (bulk_set_completion, bulk_assign_to_project,
+ * bulk_set_deadline) that apply one operation to many tasks in a single
+ * transactional call. The completion toggle is a single tool
+ * (set_task_completion) that takes a boolean - earlier versions split it into
+ * separate complete_task and uncomplete_task tools, but the LLM picks the right
+ * value from natural language reliably and one tool reduces the surface area.
  *
  * list_tasks accepts an optional filter object that the backend translates
  * into a query string on GET /api/tasks. Filters AND across dimensions and
@@ -285,5 +287,87 @@ export function registerTaskTools(server: McpServer): void {
     },
     async ({ taskId, labelIds }) =>
       runTool('set_task_labels', () => api.setTaskLabels(taskId, labelIds)),
+  );
+
+  // --- Bulk tools (act on many tasks in one transactional call) ---
+
+  // A reusable schema for the task-id list shared by the bulk tools.
+  const taskIds = z
+    .array(z.number().int().positive())
+    .min(1)
+    .max(100)
+    .describe('The task ids to act on. Non-empty; up to 100 per call.');
+
+  server.registerTool(
+    'bulk_set_completion',
+    {
+      title: 'Bulk Set Completion',
+      description:
+        'Mark many tasks complete or incomplete at once. Use when the user says ' +
+        '"mark these done", "complete all of these", "reopen these". One call ' +
+        'instead of one per task. Returns: array of the updated tasks (same shape ' +
+        'as list_tasks items, including dueStatus).',
+      inputSchema: {
+        taskIds,
+        isCompleted: z
+          .boolean()
+          .describe('true to mark all complete, false to reopen all.'),
+      },
+    },
+    async ({ taskIds, isCompleted }) =>
+      runTool('bulk_set_completion', () =>
+        api.bulkTasks('complete', taskIds, { isCompleted }),
+      ),
+  );
+
+  server.registerTool(
+    'bulk_assign_to_project',
+    {
+      title: 'Bulk Assign to Project',
+      description:
+        'Move many tasks to one project (or to Inbox) at once. Use when the user ' +
+        'says "move these to Work", "put all of these in project X", "send these ' +
+        'to Inbox". Returns: array of the updated tasks (same shape as list_tasks ' +
+        'items, including dueStatus).',
+      inputSchema: {
+        taskIds,
+        projectId: z
+          .number()
+          .int()
+          .positive()
+          .nullable()
+          .describe('Destination project id, or null to move all to Inbox.'),
+      },
+    },
+    async ({ taskIds, projectId }) =>
+      runTool('bulk_assign_to_project', () =>
+        api.bulkTasks('assignProject', taskIds, { projectId }),
+      ),
+  );
+
+  server.registerTool(
+    'bulk_set_deadline',
+    {
+      title: 'Bulk Set Deadline',
+      description:
+        'Set or clear the deadline on many tasks at once. Use when the user says ' +
+        '"push all of these to Friday", "clear the deadlines on these". Pass ' +
+        'deadline as null to clear. Returns: array of the updated tasks (same ' +
+        'shape as list_tasks items, including dueStatus).',
+      inputSchema: {
+        taskIds,
+        deadline: z
+          .string()
+          .nullable()
+          .describe(
+            'New deadline as an ISO 8601 date string (e.g. "2026-12-31") for all ' +
+              'selected tasks, or null to clear them.',
+          ),
+      },
+    },
+    async ({ taskIds, deadline }) =>
+      runTool('bulk_set_deadline', () =>
+        api.bulkTasks('setDeadline', taskIds, { deadline }),
+      ),
   );
 }

@@ -2,6 +2,17 @@
 
 ---
 
+## v2.10.4 - Bulk task operations
+*May 2026*
+
+### Added
+
+- `POST /api/tasks/bulk` - apply one operation to many tasks in a single transaction: `complete` (complete/reopen), `assignProject` (move to a project or Inbox), or `setDeadline` (set or clear). Returns the affected tasks; unknown ids are skipped. There is intentionally no bulk delete (#63)
+- Three MCP tools - `bulk_set_completion`, `bulk_assign_to_project`, `bulk_set_deadline` - so Claude can reorganize many tasks in one call (e.g. "move these 5 to Work", "push all of these to Friday") instead of one call per task. MCP tool count: 16 → 19
+- Web UI multi-select: a "Select" toggle on the task list reveals selection checkboxes (desktop column with select-all, mobile card checkboxes) and a sticky bulk-actions bar with Complete, Reopen, Move to project, and Set deadline
+
+---
+
 ## v2.10.3 - Computed dueStatus field + MCP tool-description shape hints
 *May 2026*
 
