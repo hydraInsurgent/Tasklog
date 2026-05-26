@@ -83,6 +83,9 @@ export default function EditTaskModal({ task, projects, allLabels, onSaved, onCl
     const titleChanged = trimmed !== task.title;
     // Compare on the date-string form so "no deadline" vs a date is detected.
     const newDeadline = deadline || null; // "" -> null (cleared)
+    // Normalise null -> "" on both sides so the comparison is string-vs-string.
+    // Without the `?? ""`, "still no deadline" (null vs "") would read as a change
+    // and fire a pointless clear PATCH; with it, only a real add/change/clear counts.
     const deadlineChanged = (newDeadline ?? "") !== toDateInput(task.deadline);
     const projectChanged = projectId !== origProjectId;
     const labelsChanged =
@@ -113,7 +116,11 @@ export default function EditTaskModal({ task, projects, allLabels, onSaved, onCl
       const updated = await getTask(task.id);
       onSaved(updated);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save changes.");
+      // Saves fan out across up to three endpoints in sequence, so an early one
+      // can succeed while a later one fails. Be honest that some changes may have
+      // landed and tell the user to refresh rather than blindly redo everything.
+      const reason = err instanceof Error ? err.message : "Failed to save changes.";
+      setError(`${reason} Some changes may have been saved - refresh to check.`);
       setSaving(false);
     }
   }
@@ -123,6 +130,9 @@ export default function EditTaskModal({ task, projects, allLabels, onSaved, onCl
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
       onMouseDown={(e) => {
+        // Don't let an outside click dismiss the modal mid-save - the user would
+        // never see the success or error result of the in-flight request.
+        if (saving) return;
         if (dialogRef.current && !dialogRef.current.contains(e.target as Node)) onClose();
       }}
     >
@@ -262,7 +272,7 @@ export default function EditTaskModal({ task, projects, allLabels, onSaved, onCl
               type="button"
               onClick={onClose}
               disabled={saving}
-              className="px-4 py-2 min-h-[40px] text-sm text-zinc-600 hover:text-zinc-900 focus:outline-none focus:underline disabled:opacity-50 cursor-pointer transition-colors duration-150"
+              className="px-4 py-2 min-h-[40px] text-sm text-zinc-600 hover:text-zinc-900 focus:outline-none focus:underline disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors duration-150"
             >
               Cancel
             </button>
