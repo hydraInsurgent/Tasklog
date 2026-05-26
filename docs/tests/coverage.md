@@ -16,7 +16,7 @@
 |---|---|---|---|
 | TasksController | 100% | 100% | All methods and branches covered. +9 tests for Update/PATCH partial-update (#59) |
 | TaskModel.ComputeDueStatus | 100% | 100% | +11 tests for the dueStatus bucket logic (#61) |
-| TasksController.Bulk | 100% | 100% | +12 tests for POST /api/tasks/bulk (#63) - 86 backend tests total |
+| TasksController.Bulk | 100% | 100% | +13 tests for POST /api/tasks/bulk (#63, incl. the 500-id cap) - 87 backend tests total |
 | ProjectsController | 100% | 100% | All methods and branches covered |
 | TasklogDbContext | 100% | 100% | |
 | Program.cs | 0% | - | Framework wiring - not a test target |
@@ -115,6 +115,7 @@
 - [x] 🟩 setDeadline - null clears the deadline on all
 - [x] 🟩 setDeadline - unparseable date -> 400
 - [x] 🟩 empty taskIds -> 400
+- [x] 🟩 more than 500 taskIds -> 400 (server-side cap, review R1)
 - [x] 🟩 unknown operation -> 400
 - [x] 🟩 unknown ids are skipped, returns only existing tasks
 

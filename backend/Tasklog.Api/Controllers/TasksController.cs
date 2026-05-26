@@ -295,6 +295,12 @@ namespace Tasklog.Api.Controllers
             if (request.TaskIds is null || request.TaskIds.Count == 0)
                 return BadRequest(new { message = "taskIds must be a non-empty array." });
 
+            // Cap the batch size server-side rather than trusting the client (the MCP
+            // layer caps at 100, but a direct HTTP caller could send an unbounded list).
+            const int maxBulk = 500;
+            if (request.TaskIds.Count > maxBulk)
+                return BadRequest(new { message = $"taskIds is limited to {maxBulk} per request." });
+
             // Load only the tasks that exist (unknown ids are silently skipped) with
             // their labels so the response is fully populated.
             var tasks = await _context.Tasks

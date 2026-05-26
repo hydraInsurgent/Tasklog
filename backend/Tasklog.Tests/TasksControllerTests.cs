@@ -797,6 +797,19 @@ public class TasksControllerTests
     }
 
     [Fact]
+    public async Task Bulk_TooManyTaskIds_Returns400()
+    {
+        using var context = CreateContext();
+        var controller = new TasksController(context);
+        // 501 ids exceeds the server-side cap of 500.
+        var tooMany = Enumerable.Range(1, 501).ToList();
+
+        var result = await controller.Bulk(new BulkTaskRequest("complete", tooMany, new BulkTaskData(true, null, null)));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
     public async Task Bulk_UnknownOperation_Returns400()
     {
         var (controller, context, ids) = await SeedThreeTasks();

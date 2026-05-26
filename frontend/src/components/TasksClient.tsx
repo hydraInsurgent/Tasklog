@@ -110,9 +110,10 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
 
   // --- Multi-select ---
 
-  // Leave select mode and drop the selection. Called on Cancel, after a bulk
-  // action, and whenever the view/filter changes (so we never act on tasks the
-  // user can no longer see).
+  // Leave select mode and drop the selection. Clears BOTH the mode flag and the
+  // selection set - the latter is what lets the bulk bar's `size > 0` render
+  // guard hide the bar. Called on Cancel/Done, after a bulk action, and whenever
+  // the view/filter changes (so we never act on tasks the user can no longer see).
   const exitSelectMode = useCallback(() => {
     setSelectionMode(false);
     setSelectedIds(new Set());
@@ -155,8 +156,10 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
           : "updated";
       showFeedback("success", `${updated.length} task${updated.length === 1 ? "" : "s"} ${verb}.`);
       exitSelectMode();
-    } catch {
-      showFeedback("error", "Bulk action failed. Please try again.");
+    } catch (err) {
+      // Surface the backend's specific reason (bulkTasks extracts it) so a bad
+      // selection reads differently from a server error.
+      showFeedback("error", err instanceof Error ? err.message : "Bulk action failed. Please try again.");
     } finally {
       setBulkBusy(false);
     }
