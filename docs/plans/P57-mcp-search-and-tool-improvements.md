@@ -1,6 +1,6 @@
 # Feature Implementation Plan: MCP search/filter + tool surface improvements
 
-**Overall Progress:** `98%`
+**Overall Progress:** `100%`
 
 **Tracking issue:** [#57](https://github.com/hydraInsurgent/Tasklog/issues/57)
 **Branch:** `feature/mcp-search-and-tool-improvements-#57`
@@ -142,4 +142,8 @@ set_task_completion (MCP tool) - new, replaces complete_task + uncomplete_task:
 - Captured as [docs/learnings/proot-signal-propagation.md](../learnings/proot-signal-propagation.md), cross-linked from proot-on-android.md.
 - **Validated on a second deploy** (didn't wait for Phase 2). Turned out to be a two-parter: (a) `sv restart` doesn't reach the proot guest - fixed by killing inner processes; (b) the web kill pattern `node server.js` matched nothing because Next.js renames its process to `next-server (vX.Y.Z)` - fixed to `next-server`. After both fixes, all four services restart cleanly (fresh pids, behavioral 400 check passes inside the deploy). Lesson added to the learning: match the *running* process name, not the launch command.
 
-**Remaining:** user reconnects the claude.ai connector to refetch tool defs and smoke-test the new MCP surface from the phone, then /review → /document → /ship as v2.10.1.
+**Second real bug, caught by real-data testing (not unit tests):** `list_tasks` with `projectIds=[3,5]` returned 0 instead of 9. `buildTaskQuery` emitted `?projectIds=3,5` (comma), but ASP.NET Core binds `int[]` only from *repeated keys* (`?projectIds=3&projectIds=5`); it parses "3,5" as one int, fails, and the filter silently matches nothing. Single-element arrays worked by luck. Same unit-test blind spot as the inbox-400 case - the tests pass arrays straight to `GetAll()` and never exercise HTTP query binding. Fix: `buildTaskQuery` now uses `params.append()` per element. Backend needed no change (already binds repeated keys - verified live: `=3&=5` → 9). Redeployed MCP. **Lesson: query-string binding needs an integration-level check; pure controller unit tests can't see it.** This is the second binding-layer bug the real-data battery caught that the (passing) unit suite missed.
+
+**Connector verified end-to-end** from Claude mobile: a "what's due this week" query correctly issued `list_tasks({dueBefore, completed:false})` and the empty result was correct (the only pre-June dated task is completed). The new tool schema (incl. the R5/R6 `maxLength`/`maxItems` caps) confirmed live on the connector.
+
+**Remaining:** /ship as v2.10.1 (the array fix is the last code change; connector + backend both verified).
