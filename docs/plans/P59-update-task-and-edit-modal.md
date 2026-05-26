@@ -1,6 +1,6 @@
 # Feature Implementation Plan: Update task (title/deadline) + edit modal + quick deadline
 
-**Overall Progress:** `85%`
+**Overall Progress:** `95%`
 
 **Tracking issue:** [#59](https://github.com/hydraInsurgent/Tasklog/issues/59)
 **Branch:** `feature/update-task-and-edit-modal-#59`
@@ -79,11 +79,18 @@ update_task (MCP tool):
   - [x] 🟩 5.3 CHANGELOG.md: v2.10.2 section added (PATCH endpoint, update_task tool, EditTaskModal, DeadlinePopover).
   - [x] 🟩 5.4 coverage.md: updated counts (63 backend / 65 MCP / 47 frontend) + per-test checklists for Update, update_task contract, and resolvePreset; refreshed frontend coverage table with real numbers.
 
-- [ ] 🟥 **Step 6: Deploy + smoke test** `[sequential]` → depends on: Step 5
-  - [ ] 🟥 6.1 `./scripts/deploy-phone.sh` (now with the fixed restart logic from #57).
-  - [ ] 🟥 6.2 Live curl: PATCH a title, clear a deadline (null), set a deadline, confirm empty-title 400. Verify on the phone backend.
+- [x] 🟩 **Step 6: Deploy + smoke test** `[sequential]` → depends on: Step 5
+  - [x] 🟩 6.1 `./scripts/deploy-phone.sh` ran clean (exit 0). All four services restarted with fresh code (216s uptime); built-in smoke passed (api 200, filter-400 check 400, frontend 200, mcp well-known 200).
+  - [x] 🟩 6.2 Live curl against the phone backend (192.168.1.51:5115) on a throwaway task, then deleted it: title-only PATCH (deadline kept), set deadline (title kept), `deadline:null` clear, whitespace-title 400, malformed-deadline 400, unknown-id 404, delete 204. Present-key semantics confirmed at the real HTTP-binding layer.
   - [ ] 🟥 6.3 USER ACTION: from Claude, "rename task N to X" and "change task N deadline to Friday" / "clear task N's deadline" → `update_task`. From the web UI: open a task's edit modal, change fields, save; click a deadline pill, pick a preset.
 
 ## Outcomes
 
-<!-- Fill in after execution: decision-relevant deltas only. What changed vs. planned? Key decisions made? Assumptions invalidated? -->
+Built as planned; no design assumptions invalidated.
+
+- **All five decisions held.** True partial PATCH via `JsonElement` present-key detection, full-edit modal reusing the existing project/labels sub-resource PATCHes, clearable deadline, the four preset semantics, and both popover + modal. The live curl battery confirmed omit=keep / null=clear / value=set end to end against the deployed backend.
+- **Deviation (Step 3.2): modal labels are toggle-chips, not autocomplete-with-create.** The `AddTaskForm` label control creates labels inline; for "adjust which labels apply to an existing task" the `FilterPanel` toggle-chip pattern is cleaner. Creating brand-new labels mid-edit stays on the add form / labels page. Recorded in the plan step.
+- **EditTaskModal save = diff-and-fan-out, then `getTask` for the canonical result.** Only changed fields fire (title/deadline → `updateTask`, project → `assignTaskProject`, labels → `setTaskLabels`); a final `getTask` avoids the `assign-project` response's missing-labels quirk and gives the parent one authoritative object to swap into state.
+- **First use of the `JsonElement` partial-PATCH pattern in the backend.** Recorded in `engineering-guidelines.md` (additions from v2.10.2). Unlike the query-string array binding that hid bugs in #57, present-key logic is directly unit-testable (build a `JsonElement` from a JSON string), so it carries no HTTP-binding blind spot - but it was still smoke-tested live to be sure.
+- **Tests:** +9 backend (Update), +5 MCP (update_task PATCH body contract), +10 frontend (resolvePreset). Totals: 63 backend / 65 MCP / 47 frontend, all green.
+- **Pending:** only the hands-on connector + web UI checks (Step 6.3), then commit Step 6, `/review`, `/document`, `/ship` as v2.10.2.
