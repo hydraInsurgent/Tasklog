@@ -2,9 +2,10 @@
 
 import { useRef, useEffect, useState } from "react";
 import Link from "next/link";
-import { MoreVertical, Trash2, Loader2 } from "lucide-react";
+import { MoreVertical, Trash2, Loader2, Pencil } from "lucide-react";
 import { Task, Project } from "@/lib/api";
 import { formatDate, deadlineColorClass, projectName, labelColor } from "@/lib/format";
+import DeadlinePopover from "./DeadlinePopover";
 
 interface Props {
   task: Task;
@@ -15,6 +16,10 @@ interface Props {
   activeView: "all" | "inbox" | number;
   onComplete: (id: number, isCompleted: boolean) => void;
   onDelete: (id: number) => void;
+  // Open the edit modal for this task (handled by the parent).
+  onEdit: (task: Task) => void;
+  // Quick deadline change from the deadline-pill popover. null clears it.
+  onDeadlineChange: (id: number, deadline: string | null) => void;
   // Which task ID has a delete in flight (disables that card's delete action).
   deletingId: number | null;
   // Which task ID has a completion toggle in flight (disables that card's checkbox).
@@ -29,11 +34,14 @@ export default function TaskCard({
   activeView,
   onComplete,
   onDelete,
+  onEdit,
+  onDeadlineChange,
   deletingId,
   completingId,
   isHiding,
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [deadlineOpen, setDeadlineOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const isDeleting = deletingId === task.id;
@@ -97,13 +105,24 @@ export default function TaskCard({
             {showProject && (
               <span className="text-zinc-500">{projectName(task.projectId, projects)}</span>
             )}
-            {task.deadline ? (
-              <span className={deadlineColorClass(task.deadline)}>
-                {formatDate(task.deadline)}
-              </span>
-            ) : (
-              <span className="text-zinc-300">No deadline</span>
-            )}
+            <span className="relative inline-block">
+              <button
+                type="button"
+                onClick={() => setDeadlineOpen((p) => !p)}
+                aria-label={`Change deadline for "${task.title}"`}
+                className={`rounded px-1 -mx-1 hover:bg-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer transition-colors duration-150 ${
+                  task.deadline ? deadlineColorClass(task.deadline) : "text-zinc-300"
+                }`}
+              >
+                {task.deadline ? formatDate(task.deadline) : "No deadline"}
+              </button>
+              {deadlineOpen && (
+                <DeadlinePopover
+                  onPick={(d) => onDeadlineChange(task.id, d)}
+                  onClose={() => setDeadlineOpen(false)}
+                />
+              )}
+            </span>
           </div>
 
           {/* Right side: label names shown as #labelname in the label's color.
@@ -143,6 +162,18 @@ export default function TaskCard({
             role="menu"
             className="absolute right-0 top-full mt-1 w-32 bg-white border border-zinc-200 rounded-md shadow-md z-10"
           >
+            <button
+              role="menuitem"
+              onClick={() => {
+                setMenuOpen(false);
+                onEdit(task);
+              }}
+              aria-label={`Edit task: ${task.title}`}
+              className="flex items-center gap-2 w-full px-3 py-2.5 text-sm text-zinc-700 hover:bg-zinc-50 focus:outline-none focus:bg-zinc-50 cursor-pointer transition-colors duration-150 rounded-md"
+            >
+              <Pencil size={14} aria-hidden="true" />
+              Edit
+            </button>
             <button
               role="menuitem"
               onClick={() => {

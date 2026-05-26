@@ -34,6 +34,10 @@ When in doubt, prefer the simpler approach and evolve later.
 - **EF Core eager loading with `.Include()`** - used in `TasksController` to load `Labels` alongside tasks. All task queries use `.Include(t => t.Labels)` so callers always receive a populated `labels` array. Use the same pattern for any future navigation property that is always needed with the parent entity.
 - **Many-to-many via implicit join table** - `TaskModel` and `Label` use EF Core's `HasMany/WithMany` to configure a join table (`LabelTaskModel`) without an explicit join entity. Cascade deletes on the join table are handled automatically by the database.
 
+### Current patterns - additions from v2.10.2
+
+- **`JsonElement` partial PATCH (present-key detection)** - `TasksController.Update` (`PATCH /api/tasks/{id}`) binds the body to `[FromBody] JsonElement` and inspects each field with `TryGetProperty`, rather than binding to a typed record. This is the only way to distinguish "field omitted" (keep the current value) from "field set to `null`" (clear it). A typed record with nullable properties collapses both cases to `null`, so it cannot express a clear-vs-keep difference. Reach for this whenever a PATCH needs nullable-clear semantics. Unlike query-string array binding, the present-key logic is directly unit-testable: build a `JsonElement` from a JSON string with `JsonDocument.Parse(json).RootElement.Clone()` and pass it to the action, which exercises the same branching the HTTP body would.
+
 ### Patterns not yet in use - and when to consider them
 
 **Repository pattern** - not used currently. DbContext is injected directly into controllers.

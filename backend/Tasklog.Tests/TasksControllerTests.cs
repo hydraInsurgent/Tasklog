@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -382,6 +383,152 @@ public class TasksControllerTests
         var created = result.Should().BeOfType<CreatedAtActionResult>().Subject;
         var task = created.Value.Should().BeOfType<TaskModel>().Subject;
         task.ProjectId.Should().Be(project.Id);
+    }
+
+    // --- Update (partial PATCH via JsonElement) ---
+
+    // Build a JsonElement from a JSON string. Clone() so it survives the
+    // backing JsonDocument being disposed (RootElement alone would dangle).
+    private static JsonElement Json(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        return doc.RootElement.Clone();
+    }
+
+    [Fact]
+    public async Task Update_TitleOnly_ChangesTitleLeavesDeadline()
+    {
+        using var context = CreateContext();
+        var deadline = new DateTime(2026, 8, 1);
+        var task = new TaskModel { Title = "Old", CreatedAt = DateTime.Now, Deadline = deadline };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.Update(task.Id, Json("{\"title\":\"New title\"}"));
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        var updated = ok.Value.Should().BeOfType<TaskModel>().Subject;
+        updated.Title.Should().Be("New title");
+        updated.Deadline.Should().Be(deadline); // unchanged - key was absent
+    }
+
+    [Fact]
+    public async Task Update_TrimsTitle()
+    {
+        using var context = CreateContext();
+        var task = new TaskModel { Title = "Old", CreatedAt = DateTime.Now };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        await controller.Update(task.Id, Json("{\"title\":\"  Trimmed  \"}"));
+
+        context.Tasks.Find(task.Id)!.Title.Should().Be("Trimmed");
+    }
+
+    [Fact]
+    public async Task Update_DeadlineNull_ClearsDeadline()
+    {
+        using var context = CreateContext();
+        var task = new TaskModel { Title = "T", CreatedAt = DateTime.Now, Deadline = new DateTime(2026, 8, 1) };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.Update(task.Id, Json("{\"deadline\":null}"));
+
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        var updated = ok.Value.Should().BeOfType<TaskModel>().Subject;
+        updated.Deadline.Should().BeNull();
+        updated.Title.Should().Be("T"); // unchanged - key absent
+    }
+
+    [Fact]
+    public async Task Update_DeadlineValue_SetsDeadline()
+    {
+        using var context = CreateContext();
+        var task = new TaskModel { Title = "T", CreatedAt = DateTime.Now, Deadline = null };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        await controller.Update(task.Id, Json("{\"deadline\":\"2026-12-31\"}"));
+
+        context.Tasks.Find(task.Id)!.Deadline.Should().Be(new DateTime(2026, 12, 31));
+    }
+
+    [Fact]
+    public async Task Update_BothFields_UpdatesBoth()
+    {
+        using var context = CreateContext();
+        var task = new TaskModel { Title = "Old", CreatedAt = DateTime.Now, Deadline = null };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        await controller.Update(task.Id, Json("{\"title\":\"New\",\"deadline\":\"2026-06-15\"}"));
+
+        var saved = context.Tasks.Find(task.Id)!;
+        saved.Title.Should().Be("New");
+        saved.Deadline.Should().Be(new DateTime(2026, 6, 15));
+    }
+
+    [Fact]
+    public async Task Update_EmptyBody_ChangesNothing()
+    {
+        using var context = CreateContext();
+        var deadline = new DateTime(2026, 8, 1);
+        var task = new TaskModel { Title = "Keep", CreatedAt = DateTime.Now, Deadline = deadline };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.Update(task.Id, Json("{}"));
+
+        result.Should().BeOfType<OkObjectResult>();
+        var saved = context.Tasks.Find(task.Id)!;
+        saved.Title.Should().Be("Keep");
+        saved.Deadline.Should().Be(deadline);
+    }
+
+    [Fact]
+    public async Task Update_EmptyTitle_Returns400()
+    {
+        using var context = CreateContext();
+        var task = new TaskModel { Title = "T", CreatedAt = DateTime.Now };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.Update(task.Id, Json("{\"title\":\"   \"}"));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task Update_MalformedDeadline_Returns400()
+    {
+        using var context = CreateContext();
+        var task = new TaskModel { Title = "T", CreatedAt = DateTime.Now };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.Update(task.Id, Json("{\"deadline\":\"not-a-date\"}"));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task Update_UnknownId_Returns404()
+    {
+        using var context = CreateContext();
+        var controller = new TasksController(context);
+
+        var result = await controller.Update(999, Json("{\"title\":\"x\"}"));
+
+        result.Should().BeOfType<NotFoundObjectResult>();
     }
 
     // --- Delete ---

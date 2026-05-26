@@ -86,6 +86,23 @@ export async function deleteTask(id: number): Promise<void> {
   if (!res.ok) throw new Error(`Failed to delete task ${id}.`);
 }
 
+// PATCH /api/tasks/:id - partial update of title and/or deadline.
+// Only the keys present in `fields` are sent; the backend leaves omitted
+// fields unchanged. deadline: null clears the deadline, a string sets it.
+// Returns the updated task.
+export async function updateTask(
+  id: number,
+  fields: { title?: string; deadline?: string | null },
+): Promise<Task> {
+  const res = await fetch(`${getApiUrl()}/api/tasks/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(fields),
+  });
+  if (!res.ok) throw new Error(`Failed to update task ${id}.`);
+  return res.json();
+}
+
 // PATCH /api/tasks/:id/complete - mark a task complete or incomplete.
 // Returns the updated task.
 export async function completeTask(id: number, isCompleted: boolean): Promise<Task> {

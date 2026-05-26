@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Tasklog.Api.Data;
@@ -136,6 +137,59 @@ namespace Tasklog.Api.Controllers
             await _context.SaveChangesAsync();
 
             return CreatedAtAction(nameof(GetById), new { id = task.Id }, task);
+        }
+
+        // PATCH /api/tasks/{id}
+        // Partial update of a task's core editable fields (title, deadline).
+        // Present-key detection: a field absent from the body is left unchanged;
+        // a field present with null clears it (deadline only); a present value sets it.
+        //
+        // We read the body as JsonElement rather than binding to a typed record
+        // because a record collapses "field omitted" and "field set to null" into
+        // the same null - and we need to tell them apart (omit = keep, null = clear).
+        // This is the first use of JsonElement partial-PATCH in the codebase.
+        [HttpPatch("{id:int}")]
+        public async Task<IActionResult> Update(int id, [FromBody] JsonElement body)
+        {
+            var task = await _context.Tasks
+                .Include(t => t.Labels)
+                .FirstOrDefaultAsync(t => t.Id == id);
+
+            if (task is null)
+                return NotFound(new { message = $"Task {id} not found." });
+
+            if (body.ValueKind != JsonValueKind.Object)
+                return BadRequest(new { message = "Request body must be a JSON object." });
+
+            // title: present must be a non-empty string; absent leaves it unchanged.
+            if (body.TryGetProperty("title", out var titleEl))
+            {
+                if (titleEl.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(titleEl.GetString()))
+                    return BadRequest(new { message = "Title must be a non-empty string." });
+                task.Title = titleEl.GetString()!.Trim();
+            }
+
+            // deadline: present + null clears it; present + ISO date string sets it;
+            // anything else is a bad request. Absent leaves it unchanged.
+            if (body.TryGetProperty("deadline", out var deadlineEl))
+            {
+                if (deadlineEl.ValueKind == JsonValueKind.Null)
+                {
+                    task.Deadline = null;
+                }
+                else if (deadlineEl.ValueKind == JsonValueKind.String && deadlineEl.TryGetDateTime(out var dl))
+                {
+                    task.Deadline = dl;
+                }
+                else
+                {
+                    return BadRequest(new { message = "Deadline must be an ISO 8601 date string or null." });
+                }
+            }
+
+            await _context.SaveChangesAsync();
+
+            return Ok(task);
         }
 
         // DELETE /api/tasks/{id}

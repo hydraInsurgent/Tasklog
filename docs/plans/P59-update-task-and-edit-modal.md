@@ -1,6 +1,6 @@
 # Feature Implementation Plan: Update task (title/deadline) + edit modal + quick deadline
 
-**Overall Progress:** `0%`
+**Overall Progress:** `85%`
 
 **Tracking issue:** [#59](https://github.com/hydraInsurgent/Tasklog/issues/59)
 **Branch:** `feature/update-task-and-edit-modal-#59`
@@ -51,33 +51,33 @@ update_task (MCP tool):
 
 ## Tasks
 
-- [ ] 🟥 **Step 1: Backend - `PATCH /api/tasks/{id}` partial update** `[sequential]` → depends on: nothing
-  - [ ] 🟥 1.1 Add `Update(int id, [FromBody] JsonElement body)` action to `TasksController`. Present-key detection: `title` (non-empty, trim, else 400), `deadline` (null = clear, value = parse via `TryGetDateTime` else 400). Load task with `.Include(Labels)`, 404 if missing, save, return updated task.
-  - [ ] 🟥 1.2 Tests in `TasksControllerTests.cs`: title-only update, deadline-only update, clear deadline (null), set deadline, both fields, empty-title 400, malformed-date 400, unknown-id 404, omitted-fields-keep (construct `JsonElement` from JSON strings so the present-key logic is actually exercised).
-  - [ ] 🟥 1.3 Smoke check via curl after deploy (Step 6) - clear a deadline, change a title, confirm 400s.
+- [x] 🟩 **Step 1: Backend - `PATCH /api/tasks/{id}` partial update** `[sequential]` → depends on: nothing
+  - [x] 🟩 1.1 `Update(int id, [FromBody] JsonElement body)` added. Present-key detection for title (non-empty, trimmed, else 400) and deadline (null=clear, ISO string via TryGetDateTime=set, else 400). 404 if missing; returns updated task with labels.
+  - [x] 🟩 1.2 9 tests covering title-only, deadline set/clear, both, empty body (no-op), empty-title 400, malformed-date 400, unknown-id 404, trim. JsonElement built from JSON strings (Clone()) so present-key logic is exercised. 63 backend tests pass.
+  - [ ] 🟥 1.3 Live curl smoke after deploy (Step 6).
 
-- [ ] 🟥 **Step 2: MCP - `update_task` tool** `[sequential]` → depends on: Step 1
-  - [ ] 🟥 2.1 `api.updateTask(id, { title?, deadline? })` in `mcp/src/api-client.ts` - PATCH with `JSON.stringify(body)` (omits undefined, keeps null).
-  - [ ] 🟥 2.2 `update_task` tool in `mcp/src/tools/tasks.ts`: Zod `id` (required), `title` (optional, min 1), `deadline` (optional, nullable - string or null). Description explains omit=keep / null=clear, with a "Returns:" hint.
-  - [ ] 🟥 2.3 Tests in `mcp/src/api-client.test.ts` (or a focused helper): body serialization - title-only omits deadline, `deadline:null` survives, value sets, all-undefined → empty body.
-  - [ ] 🟥 2.4 Update `tools/tasks.ts` header comment (7 → 8 tools).
+- [x] 🟩 **Step 2: MCP - `update_task` tool** `[sequential]` → depends on: Step 1
+  - [x] 🟩 2.1 `api.updateTask(id, { title?, deadline? })` added.
+  - [x] 🟩 2.2 `update_task` tool added (id required; title optional min-1; deadline optional nullable). Description covers omit=keep / null=clear + Returns hint.
+  - [x] 🟩 2.3 5 contract tests in api-client.test.ts (JSON.stringify keep/clear/set). 65 MCP tests pass.
+  - [x] 🟩 2.4 Header comment updated (8 tools).
 
-- [ ] 🟥 **Step 3: Web UI - `EditTaskModal` (full edit)** `[sequential]` → depends on: Step 1 `[UI]`
-  - [ ] 🟥 3.1 `api.updateTask(id, { title?, deadline? })` in `frontend/src/lib/api.ts`.
-  - [ ] 🟥 3.2 `EditTaskModal.tsx` - controlled inputs for title, deadline (date input with clear), project dropdown, label multiselect. Reuse the dropdown/multiselect patterns from `AddTaskForm`. Pre-populate from the task. On Save, diff against original and fire only changed: title/deadline → `updateTask`, project → `assignTaskProject`, labels → `setTaskLabels`.
-  - [ ] 🟥 3.3 Wire an "Edit" entry into the task three-dot menu in `TaskCard.tsx` (mobile) and the equivalent action in the desktop table (`TasksClient.tsx`). Opening sets the modal's task; Save closes + refreshes the list.
-  - [ ] 🟥 3.4 Error + loading states; validation (empty title blocked client-side). Modal closes on Escape / backdrop click (match `FilterPanel`/`ColorPicker` patterns).
+- [x] 🟩 **Step 3: Web UI - `EditTaskModal` (full edit)** `[sequential]` → depends on: Step 1 `[UI]`
+  - [x] 🟩 3.1 `api.updateTask` added to frontend api.ts.
+  - [x] 🟩 3.2 `EditTaskModal.tsx` - title, deadline (clearable), project select, label toggle-chips. Diff-and-fire-changed on save (title/deadline → updateTask, project → assignTaskProject, labels → setTaskLabels), then getTask for the canonical result. **Deviation:** labels are toggle-chips (FilterPanel pattern) not AddTaskForm's autocomplete-with-create - cleaner for "adjust which labels apply"; creating new labels mid-edit stays on the add form / labels page.
+  - [x] 🟩 3.3 Edit wired into TaskCard three-dot menu (mobile) + a Pencil action in the desktop table actions cell.
+  - [x] 🟩 3.4 Error + loading states, empty-title blocked, Escape + backdrop close. Polling pauses while the modal is open.
 
-- [ ] 🟥 **Step 4: Web UI - `DeadlinePopover` (quick presets)** `[sequential]` → depends on: Steps 1, 3 (shares `api.updateTask`) `[UI]`
-  - [ ] 🟥 4.1 `DeadlinePopover.tsx` - preset buttons: Today, Tomorrow, This weekend (upcoming Sat), Next week (upcoming Mon), None. Date math in a small pure helper (testable).
-  - [ ] 🟥 4.2 Make the deadline pill on the task card clickable to open the popover; on select, `updateTask(id, { deadline })` (null for None), close, refresh.
-  - [ ] 🟥 4.3 Unit-test the preset date helper (deterministic with an injected "now").
+- [x] 🟩 **Step 4: Web UI - `DeadlinePopover` (quick presets)** `[sequential]` → depends on: Steps 1, 3 `[UI]`
+  - [x] 🟩 4.1 `DeadlinePopover.tsx` + `lib/deadlinePresets.ts` (pure `resolvePreset`). Presets: Today, Tomorrow, This weekend (upcoming Sat), Next week (upcoming Mon), None.
+  - [x] 🟩 4.2 Deadline pill clickable in both the desktop table and the mobile card → popover → `handleDeadlineQuickSet` → `updateTask({deadline})` + local state update.
+  - [x] 🟩 4.3 10 tests for `resolvePreset` (injected `now`, weekday/Sat/Sun/Mon, month rollover). 47 frontend tests pass. Production `next build` clean.
 
-- [ ] 🟥 **Step 5: Docs + CHANGELOG** `[sequential]` → depends on: Steps 1-4
-  - [ ] 🟥 5.1 architecture.md: add `PATCH /api/tasks/{id}` to the endpoints table; bump MCP tool count 15 → 16; note `EditTaskModal` + `DeadlinePopover` components.
-  - [ ] 🟥 5.2 engineering-guidelines.md: record the `JsonElement` partial-PATCH pattern (first use).
-  - [ ] 🟥 5.3 CHANGELOG.md: v2.10.2 section.
-  - [ ] 🟥 5.4 coverage.md: new backend + MCP + frontend test counts.
+- [x] 🟩 **Step 5: Docs + CHANGELOG** `[sequential]` → depends on: Steps 1-4
+  - [x] 🟩 5.1 architecture.md: added `PATCH /api/tasks/{id}` to the endpoints table; bumped MCP tool count 15 → 16 (prose + repo-tree comment, tasks: 7 → 8).
+  - [x] 🟩 5.2 engineering-guidelines.md: recorded the `JsonElement` partial-PATCH pattern under "additions from v2.10.2".
+  - [x] 🟩 5.3 CHANGELOG.md: v2.10.2 section added (PATCH endpoint, update_task tool, EditTaskModal, DeadlinePopover).
+  - [x] 🟩 5.4 coverage.md: updated counts (63 backend / 65 MCP / 47 frontend) + per-test checklists for Update, update_task contract, and resolvePreset; refreshed frontend coverage table with real numbers.
 
 - [ ] 🟥 **Step 6: Deploy + smoke test** `[sequential]` → depends on: Step 5
   - [ ] 🟥 6.1 `./scripts/deploy-phone.sh` (now with the fixed restart logic from #57).

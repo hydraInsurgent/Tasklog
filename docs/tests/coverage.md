@@ -1,6 +1,6 @@
 # Test Coverage
 
-**Last updated:** 2026-05-24 (#57 - task filter on GetAll + api-client query serialization)
+**Last updated:** 2026-05-26 (#59 - PATCH /api/tasks/{id} + update_task tool + deadline presets)
 
 ---
 
@@ -14,7 +14,7 @@
 
 | Class | Lines | Branches | Notes |
 |---|---|---|---|
-| TasksController | 100% | 100% | All methods and branches covered. +13 tests for GetAll filters (#57, incl. text-trim) - 54 backend tests total |
+| TasksController | 100% | 100% | All methods and branches covered. +9 tests for Update/PATCH partial-update (#59) - 63 backend tests total |
 | ProjectsController | 100% | 100% | All methods and branches covered |
 | TasklogDbContext | 100% | 100% | |
 | Program.cs | 0% | - | Framework wiring - not a test target |
@@ -29,7 +29,7 @@
 | oauth/store.ts | 92.28% | 100% | 83.33% | Uncovered lines are TS interface declarations (no runtime code) |
 | oauth/token.ts | 99% | 87.18% | 100% | L22 + L65 (defensive content-type / grant_type checks not exercised) |
 | tools/result.ts | 100% | 100% | 100% | |
-| api-client.ts | ~80% | ~85% | 30% | `buildTaskQuery` now directly covered by 13 tests in api-client.test.ts (#57). HTTP/timeout paths still integration territory |
+| api-client.ts | ~80% | ~85% | 30% | `buildTaskQuery` covered by 13 tests; `update_task` PATCH body contract (keep/clear/set) covered by 5 tests (#59), both in api-client.test.ts. HTTP/timeout paths still integration territory |
 | config.ts | 89.83% | 40% | 100% | Production-only validation branches not fired in tests |
 | oauth/authorize.ts | - | - | - | Not unit-tested; end-to-end smoke-tested via claude.ai connector |
 | oauth/github.ts | - | - | - | Same - integration territory (GitHub fetch + signed cookie + redirect chain) |
@@ -37,18 +37,21 @@
 | oauth/well-known.ts | - | - | - | Returns fixed JSON metadata |
 | server.ts | - | - | - | Hono mount order + request logger; covered by middleware tests + end-to-end smoke |
 
-**60 tests, 0 failures** (was 46; +14 in api-client.test.ts for #57, incl. text-trim). Run with: `npm test --prefix mcp` (auto-rebuilds better-sqlite3 for host arch via pretest hook if needed).
+**65 tests, 0 failures** (was 60; +5 in api-client.test.ts for the `update_task` PATCH body contract, #59). Run with: `npm test --prefix mcp` (auto-rebuilds better-sqlite3 for host arch via pretest hook if needed).
 
-### Next.js Frontend - last run 2026-03-14
+### Next.js Frontend - last run 2026-05-26
 
 | Component | Statements | Branches | Lines | Uncovered |
 |---|---|---|---|---|
-| AddTaskForm.tsx | 92.59% | 94.11% | 92.59% | 108-126 (project dropdown render - untested, not a gap) |
 | AssignProjectButton.tsx | 100% | 100% | 100% | - |
 | CompleteTaskButton.tsx | 100% | 100% | 100% | - |
 | DeleteTaskButton.tsx | 100% | 100% | 100% | - |
-| TaskCard.tsx | 96.42% | 83.33% | 95.65% | L50 (useEffect cleanup - runs on unmount, not exercised in unit tests) |
-| format.ts | 100% | 100% | 100% | - |
+| deadlinePresets.ts | 95.23% | 87.5% | 100% | L41 (one unreachable preset branch); pure resolver, 10 tests (#59) |
+| TaskCard.tsx | 77.14% | 88.46% | 78.12% | L58, 111-133, 168-169 (deadline popover open + edit wiring - exercised via TasksClient, not unit-tested directly) |
+| format.ts | 85% | 83.33% | 85.71% | 20-21 |
+| AddTaskForm.tsx | 45.09% | 40.74% | 49.45% | Project dropdown + label autocomplete render paths (grew since v2.4; not a regression) |
+| DeadlinePopover.tsx | 10.52% | 0% | 11.76% | Behavior covered indirectly: `resolvePreset` is unit-tested; the popover is a thin button list. Direct render test is an integration candidate |
+| EditTaskModal.tsx | 0% | 0% | 0% | Integration test candidate (fan-out PATCH + getTask flow); the diffing logic is the thing worth covering if it grows |
 | ProjectLayout.tsx | 0% | 0% | 0% | Integration test candidate |
 | ProjectSidebar.tsx | 0% | 0% | 0% | Integration test candidate |
 | TasksClient.tsx | 0% | 0% | 0% | Integration test candidate |
@@ -75,6 +78,15 @@
 - [x] 🟩 AssignProject - assigns project to task
 - [x] 🟩 AssignProject - accepts null ProjectId to move task back to Inbox
 - [x] 🟩 AssignProject - returns 404 when not found
+- [x] 🟩 Update - sets title only (deadline untouched)
+- [x] 🟩 Update - trims whitespace from title
+- [x] 🟩 Update - deadline null clears the deadline
+- [x] 🟩 Update - deadline value sets the deadline
+- [x] 🟩 Update - both title and deadline in one call
+- [x] 🟩 Update - empty body is a no-op (returns the unchanged task)
+- [x] 🟩 Update - returns 400 on empty/whitespace title
+- [x] 🟩 Update - returns 400 on a malformed deadline string
+- [x] 🟩 Update - returns 404 when not found
 
 ### ProjectsController
 - [x] 🟩 GetAll - returns projects ordered alphabetically
@@ -138,6 +150,18 @@
 - [x] 🟩 hides project name when activeView is "inbox"
 - [x] 🟩 applies line-through to title when task is completed and not hiding
 
+### deadlinePresets (resolvePreset, injected `now`)
+- [x] 🟩 today - returns today's local date
+- [x] 🟩 tomorrow - returns now + 1 day
+- [x] 🟩 weekend - returns the upcoming Saturday (from a weekday)
+- [x] 🟩 weekend - returns same day when now is Saturday
+- [x] 🟩 weekend - returns next day when now is Friday
+- [x] 🟩 next-week - returns the upcoming Monday (from a weekday)
+- [x] 🟩 next-week - returns next Monday (7 days out) when now is Monday
+- [x] 🟩 none - returns null (clears the deadline)
+- [x] 🟩 uses local date parts, not UTC (no off-by-one across timezones)
+- [x] 🟩 handles month rollover (e.g. tomorrow from the last day of a month)
+
 ## MCP Server (Node + TypeScript, node:test)
 
 Layer added in #50 (v2.10). Tests use an in-memory SQLite DB
@@ -199,6 +223,14 @@ its own subprocess, so in-memory DBs are isolated across files.
 - [x] 🟩 runTool - ApiError becomes structured tool error with status
 - [x] 🟩 runTool - generic Error becomes structured tool error
 - [x] 🟩 runTool - non-Error throws coerced to string
+
+### api-client.ts (api-client.test.ts)
+- [x] 🟩 buildTaskQuery - serialization of all task filter params (13 tests, #57, incl. repeated-key array binding + text-trim)
+- [x] 🟩 update_task - PATCH body omits an undefined field (keep)
+- [x] 🟩 update_task - PATCH body includes `deadline: null` (clear)
+- [x] 🟩 update_task - PATCH body includes a deadline value (set)
+- [x] 🟩 update_task - PATCH body with title only
+- [x] 🟩 update_task - PATCH body with both title and deadline
 
 ### Not covered (and why)
 - `tools/tasks.ts`, `tools/projects.ts`, `tools/labels.ts` - thin api-client wrappers; behavior is exercised through `runTool` tests + the end-to-end smoke run with claude.ai.

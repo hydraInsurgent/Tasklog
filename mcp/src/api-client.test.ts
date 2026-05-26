@@ -12,6 +12,28 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildTaskQuery } from './api-client.js';
 
+// The update_task PATCH body relies on JSON.stringify's keep/clear/set
+// behaviour: undefined keys are omitted (backend leaves the field unchanged),
+// null is kept (backend clears the field), a value is sent (backend sets it).
+// This contract is what makes the partial PATCH work without read-modify-write.
+describe('update_task PATCH body contract (JSON.stringify keep/clear/set)', () => {
+  test('title only - deadline omitted (keep)', () => {
+    assert.equal(JSON.stringify({ title: 'New' }), '{"title":"New"}');
+  });
+  test('deadline null - clear survives serialization', () => {
+    assert.equal(JSON.stringify({ deadline: null }), '{"deadline":null}');
+  });
+  test('deadline value - set', () => {
+    assert.equal(JSON.stringify({ deadline: '2026-12-31' }), '{"deadline":"2026-12-31"}');
+  });
+  test('undefined field is dropped entirely (keep)', () => {
+    assert.equal(JSON.stringify({ title: 'x', deadline: undefined }), '{"title":"x"}');
+  });
+  test('empty body = no-op update', () => {
+    assert.equal(JSON.stringify({}), '{}');
+  });
+});
+
 describe('buildTaskQuery', () => {
   test('returns empty string when filter is undefined (no query)', () => {
     assert.equal(buildTaskQuery(undefined), '');
