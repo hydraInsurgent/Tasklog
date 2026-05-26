@@ -49,6 +49,7 @@ I wanted a task system I understood completely - one where the data, the workflo
 **Track and complete**
 - Deadline color coding - red when overdue, yellow when due within 3 days
 - Edit a task's title, deadline, project, and labels from the list; quick-set deadlines (Today, Tomorrow, This weekend, Next week) or clear them with one tap
+- Multi-select to act on many tasks at once - complete, move to a project, or set a deadline in one step
 - Checkbox completion with a clean animation - done tasks step aside, not deleted
 - Show/hide completed tasks and undo completion at any time
 - Task detail page with full status and completion history
@@ -121,7 +122,7 @@ That's it. The app opens in your browser.
 
 - Dark mode and custom themes
 - Dedicated device setup guide (Raspberry Pi, Term home server)
-- Task priority levels and bulk actions
+- Task priority levels
 
 ### v3.0 - AI and integrations
 
