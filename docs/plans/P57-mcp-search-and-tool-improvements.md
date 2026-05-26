@@ -1,6 +1,6 @@
 # Feature Implementation Plan: MCP search/filter + tool surface improvements
 
-**Overall Progress:** `95%`
+**Overall Progress:** `98%`
 
 **Tracking issue:** [#57](https://github.com/hydraInsurgent/Tasklog/issues/57)
 **Branch:** `feature/mcp-search-and-tool-improvements-#57`
@@ -140,6 +140,6 @@ set_task_completion (MCP tool) - new, replaces complete_task + uncomplete_task:
 - Symptom: `sv status` shows `got TERM` with multi-hour uptime; the port answers but with old code.
 - Fix: `deploy-phone.sh` Step 7 now kills inner guest processes by distinctive command-line pattern. `proot-distro login --kill-on-exit` (the default) makes proot exit when the guest dies, and runit auto-restarts the service with fresh code. Proven live (api pid 8088 → 13920 on a bare inner-kill, no `sv` command).
 - Captured as [docs/learnings/proot-signal-propagation.md](../learnings/proot-signal-propagation.md), cross-linked from proot-on-android.md.
-- Validation deferred to the Phase 2 deploy (first deploy to exercise the new restart logic end to end).
+- **Validated on a second deploy** (didn't wait for Phase 2). Turned out to be a two-parter: (a) `sv restart` doesn't reach the proot guest - fixed by killing inner processes; (b) the web kill pattern `node server.js` matched nothing because Next.js renames its process to `next-server (vX.Y.Z)` - fixed to `next-server`. After both fixes, all four services restart cleanly (fresh pids, behavioral 400 check passes inside the deploy). Lesson added to the learning: match the *running* process name, not the launch command.
 
 **Remaining:** user reconnects the claude.ai connector to refetch tool defs and smoke-test the new MCP surface from the phone, then /review → /document → /ship as v2.10.1.
