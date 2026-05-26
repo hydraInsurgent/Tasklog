@@ -42,6 +42,7 @@ Inspired by the split in [album-to-movies](https://github.com/...) which separat
 | [cloudflare-universal-ssl.md](cloudflare-universal-ssl.md) | Free Universal SSL covers only one wildcard level; nested subdomains fail TLS handshake. Naming pattern guidance. | MCP server (2026-05) |
 | [proot-signal-propagation.md](proot-signal-propagation.md) | Signals don't cross the proot boundary; `sv restart` ships stale code. Restart by killing the inner guest. | MCP filter feature #57 (2026-05) |
 | [server-local-time-vs-utc.md](server-local-time-vs-utc.md) | Server "today" depends on the process timezone (usually UTC on headless hosts); store instants in UTC but compute calendar-day logic in a known local zone. | dueStatus field #61 (2026-05) |
+| [orm-migration-default-values.md](orm-migration-default-values.md) | A migration's column default comes from the type zero-value, not your model initializer; existing rows backfill with 0/""/false unless you set the DB default explicitly. | Task priority #64 (2026-05) |
 
 <!--
 TODO future learnings, add as encountered:
