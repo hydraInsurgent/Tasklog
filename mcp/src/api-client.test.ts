@@ -66,6 +66,12 @@ describe('buildTaskQuery', () => {
     assert.equal(buildTaskQuery({ text: '   ' }), '');
   });
 
+  test('trims surrounding whitespace from text before sending', () => {
+    // Backend and frontend both trim before matching; the wire value must too,
+    // or "  review  " would match the literal padded substring and find nothing.
+    assert.equal(buildTaskQuery({ text: '  review  ' }), '?text=review');
+  });
+
   test('combines multiple fields with all expected query keys', () => {
     const qs = buildTaskQuery({
       projectIds: [3, 5],

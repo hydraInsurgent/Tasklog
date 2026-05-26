@@ -14,7 +14,7 @@
 
 | Class | Lines | Branches | Notes |
 |---|---|---|---|
-| TasksController | 100% | 100% | All methods and branches covered. +12 tests for GetAll filters (#57) - 53 backend tests total |
+| TasksController | 100% | 100% | All methods and branches covered. +13 tests for GetAll filters (#57, incl. text-trim) - 54 backend tests total |
 | ProjectsController | 100% | 100% | All methods and branches covered |
 | TasklogDbContext | 100% | 100% | |
 | Program.cs | 0% | - | Framework wiring - not a test target |
@@ -37,7 +37,7 @@
 | oauth/well-known.ts | - | - | - | Returns fixed JSON metadata |
 | server.ts | - | - | - | Hono mount order + request logger; covered by middleware tests + end-to-end smoke |
 
-**59 tests, 0 failures** (was 46; +13 in api-client.test.ts for #57). Run with: `npm test --prefix mcp` (auto-rebuilds better-sqlite3 for host arch via pretest hook if needed).
+**60 tests, 0 failures** (was 46; +14 in api-client.test.ts for #57, incl. text-trim). Run with: `npm test --prefix mcp` (auto-rebuilds better-sqlite3 for host arch via pretest hook if needed).
 
 ### Next.js Frontend - last run 2026-03-14
 

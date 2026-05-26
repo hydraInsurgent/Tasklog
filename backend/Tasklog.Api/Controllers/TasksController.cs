@@ -85,7 +85,9 @@ namespace Tasklog.Api.Controllers
                 // InMemory uses C# string.Contains which is case-sensitive; lowering
                 // both sides sidesteps that without losing the SQLite optimisation
                 // (EF Core translates ToLower() to SQL LOWER()).
-                var lowered = filter.Text.ToLower();
+                // Trim before matching so surrounding whitespace doesn't change
+                // the result. The frontend trims too; keeping all layers aligned.
+                var lowered = filter.Text.Trim().ToLower();
                 query = query.Where(t => t.Title.ToLower().Contains(lowered));
             }
 

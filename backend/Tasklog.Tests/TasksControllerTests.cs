@@ -229,6 +229,25 @@ public class TasksControllerTests
     }
 
     [Fact]
+    public async Task GetAll_FilterByText_TrimsSurroundingWhitespace()
+    {
+        using var context = CreateContext();
+        context.Tasks.AddRange(
+            new TaskModel { Title = "Review PR by Friday", CreatedAt = DateTime.Now },
+            new TaskModel { Title = "Buy groceries", CreatedAt = DateTime.Now }
+        );
+        await context.SaveChangesAsync();
+
+        var controller = new TasksController(context);
+
+        // Surrounding whitespace must not change the match (consistent with the
+        // frontend and MCP layers, which also trim).
+        var result = await controller.GetAll(EmptyFilter() with { Text = "  review  " });
+        var tasks = ExtractTasks(result);
+        tasks.Select(t => t.Title).Should().BeEquivalentTo(new[] { "Review PR by Friday" });
+    }
+
+    [Fact]
     public async Task GetAll_MultipleFilters_AndAcrossDimensions()
     {
         using var context = CreateContext();

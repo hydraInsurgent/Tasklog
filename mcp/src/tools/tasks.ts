@@ -37,6 +37,7 @@ export function registerTaskTools(server: McpServer): void {
       inputSchema: {
         projectIds: z
           .array(z.number().int().positive())
+          .max(50)
           .optional()
           .describe(
             'Filter by project ids. Tasks in ANY of the listed projects ' +
@@ -51,6 +52,7 @@ export function registerTaskTools(server: McpServer): void {
           ),
         labelIds: z
           .array(z.number().int().positive())
+          .max(50)
           .optional()
           .describe(
             'Filter by label ids. Tasks tagged with ANY of the listed ' +
@@ -79,6 +81,7 @@ export function registerTaskTools(server: McpServer): void {
           ),
         text: z
           .string()
+          .max(200)
           .optional()
           .describe(
             'Case-insensitive substring match on task title. Useful for ' +
@@ -148,7 +151,8 @@ export function registerTaskTools(server: McpServer): void {
       title: 'Delete Task',
       description:
         'Permanently delete a task. Use when the user explicitly says ' +
-        '"delete" or "remove" - not for completing tasks (use complete_task).',
+        '"delete" or "remove" - not for completing tasks (use ' +
+        'set_task_completion).',
       inputSchema: {
         id: z.number().int().positive().describe('The task id to delete.'),
       },

@@ -127,7 +127,9 @@ export function buildTaskQuery(filter?: TaskFilter): string {
   if (filter.dueBefore) params.set('dueBefore', filter.dueBefore);
   if (filter.dueAfter) params.set('dueAfter', filter.dueAfter);
   if (filter.completed !== undefined) params.set('completed', String(filter.completed));
-  if (filter.text && filter.text.trim() !== '') params.set('text', filter.text);
+  // Send the trimmed value so the wire query matches what the backend and the
+  // frontend match on (all three trim before comparing).
+  if (filter.text && filter.text.trim() !== '') params.set('text', filter.text.trim());
   const qs = params.toString();
   return qs ? `?${qs}` : '';
 }
