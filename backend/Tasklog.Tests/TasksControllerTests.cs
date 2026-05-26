@@ -728,6 +728,8 @@ public class TasksControllerTests
     [Theory]
     [InlineData("{\"priority\": 0}")]
     [InlineData("{\"priority\": 9}")]
+    [InlineData("{\"priority\": -1}")]   // negative is below the P1-P4 range
+    [InlineData("{\"priority\": 2.5}")]  // a float is not a valid priority (TryGetInt32 fails)
     [InlineData("{\"priority\": \"high\"}")]
     public async Task Update_BadPriority_Returns400(string json)
     {
