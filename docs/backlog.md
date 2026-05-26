@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| [P61-due-status-and-tool-hints.md](plans/P61-due-status-and-tool-hints.md) | #61 | feature/due-status-and-tool-hints-#61 | In Progress |
+| _none_ | | | |
 
 ---
 
@@ -45,6 +45,8 @@ Future features - not yet started. Add GitHub issue number when created.
 | - | ARM64 Linux support: pre-built release + Termux hosting | medium | enable self-hosting on Android/ARM64 devices; add arm64 target to CI release pipeline |
 | #49 | CD pipeline - auto-deploy to GCP via GitHub Actions | medium | complete the CI/CD loop; trigger on release tag |
 | #56 | Public-demo MCP on GCP | medium | extend v2.10 MCP to the demo; depends on #52 rate limits |
+| #60 | Extract useClickOutside hook + revisit poll-pause scope | low | from #59 review (R3/R4) |
+| #62 | Set TZ on GCP deploy for correct demo dueStatus | low | from #61 review (R1) |
 
 ---
 
@@ -75,6 +77,7 @@ Recently completed work (keep last 10):
 
 | # | Title | Type | Closed |
 |---|-------|------|--------|
+| #61 | Computed dueStatus field + MCP tool-description shape hints (v2.10.3) | feature | 2026-05-27 |
 | #59 | Update task (title/deadline) + edit modal + quick deadline (v2.10.2) | feature | 2026-05-27 |
 | #57 | MCP task filtering + tool consolidation (v2.10.1) | feature | 2026-05-26 |
 | #50 | MCP server for claude.ai custom connector | feature | 2026-05-20 |
@@ -84,7 +87,6 @@ Recently completed work (keep last 10):
 | #45 | Frontend .next dir missing from distributable | bug | 2026-04-03 |
 | #44 | CI and Cross-Platform Distribution | feature | 2026-03-31 |
 | #42 | Feature: Background Auto-Refresh | feature | 2026-03-25 |
-| #37 | Feature: Downloadable Package | feature | 2026-03-20 |
 
 ---
 
