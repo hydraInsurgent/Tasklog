@@ -1,11 +1,16 @@
 /**
  * MCP tools for task operations.
  *
- * Eight tools wrap the seven task-related Tasklog API endpoints. Two of them
- * (complete_task and uncomplete_task) share the same underlying endpoint
- * (PATCH /api/tasks/{id}/complete) but are split into separate tools so the
- * LLM can pick the right one from natural language: "mark X done" vs
- * "I did not finish X after all, undo it".
+ * Seven tools wrap the seven task-related Tasklog API endpoints. The
+ * completion toggle is a single tool (set_task_completion) that takes a
+ * boolean - earlier versions split it into separate complete_task and
+ * uncomplete_task tools, but the LLM picks the right value from natural
+ * language reliably and one tool reduces the surface area.
+ *
+ * list_tasks accepts an optional filter object that the backend translates
+ * into a query string on GET /api/tasks. Filters AND across dimensions and
+ * OR within projectIds and labelIds arrays - matches the web UI's filter
+ * panel semantics.
  */
 
 import { z } from 'zod';
@@ -19,12 +24,69 @@ export function registerTaskTools(server: McpServer): void {
     {
       title: 'List Tasks',
       description:
-        'List all tasks in Tasklog. Returns each task with id, title, ' +
-        'deadline, completion status, assigned project, and labels. Use ' +
-        'when the user asks about pending work, what is due, or what is on ' +
-        'their list.',
+        'List tasks, with optional filters. Call with no params to list all ' +
+        'tasks. Provide filters to narrow the result: project, inbox-only, ' +
+        'labels, deadline range, completion status, or substring in the title. ' +
+        'Filters AND together across dimensions; within projectIds and ' +
+        'labelIds arrays the semantics are OR (matches if task has any of the ' +
+        'given values). Use when the user asks "what tasks do I have", ' +
+        '"what is due this week", "what is in the Work project", "tasks ' +
+        'tagged urgent", etc. ' +
+        'Returns each task with id, title, deadline (ISO date or null), ' +
+        'isCompleted, completedAt, projectId, project, labels[].',
+      inputSchema: {
+        projectIds: z
+          .array(z.number().int().positive())
+          .optional()
+          .describe(
+            'Filter by project ids. Tasks in ANY of the listed projects ' +
+              'match. Cannot be combined with inbox=true.',
+          ),
+        inbox: z
+          .boolean()
+          .optional()
+          .describe(
+            'When true, returns only tasks with no project assigned (Inbox). ' +
+              'Cannot be combined with a non-empty projectIds list.',
+          ),
+        labelIds: z
+          .array(z.number().int().positive())
+          .optional()
+          .describe(
+            'Filter by label ids. Tasks tagged with ANY of the listed ' +
+              'labels match.',
+          ),
+        dueBefore: z
+          .string()
+          .optional()
+          .describe(
+            'ISO 8601 date (e.g. "2026-12-31"). Returns tasks with a ' +
+              'deadline on or before this date. Tasks with no deadline are ' +
+              'excluded.',
+          ),
+        dueAfter: z
+          .string()
+          .optional()
+          .describe(
+            'ISO 8601 date. Returns tasks with a deadline on or after this ' +
+              'date. Tasks with no deadline are excluded.',
+          ),
+        completed: z
+          .boolean()
+          .optional()
+          .describe(
+            'true = only completed tasks, false = only pending. Omit for both.',
+          ),
+        text: z
+          .string()
+          .optional()
+          .describe(
+            'Case-insensitive substring match on task title. Useful for ' +
+              '"find the task about X" queries.',
+          ),
+      },
     },
-    async () => runTool('list_tasks', () => api.listTasks()),
+    async (filter) => runTool('list_tasks', () => api.listTasks(filter)),
   );
 
   server.registerTool(
@@ -99,34 +161,26 @@ export function registerTaskTools(server: McpServer): void {
   );
 
   server.registerTool(
-    'complete_task',
+    'set_task_completion',
     {
-      title: 'Complete Task',
+      title: 'Set Task Completion',
       description:
-        'Mark a task as done. Use when the user says "I finished X", "mark X ' +
-        'complete", "X is done", etc. Sets the task\'s completedAt timestamp.',
+        'Toggle a task\'s completion state. Use with isCompleted=true when the ' +
+        'user says "I finished X", "mark X complete", "X is done"; use ' +
+        'isCompleted=false when the user says "I did not actually finish X", ' +
+        '"undo X", "reopen X". Sets the task\'s completedAt timestamp when ' +
+        'isCompleted=true; clears it when false. Returns the updated task.',
       inputSchema: {
-        id: z.number().int().positive().describe('The task id to complete.'),
+        id: z.number().int().positive().describe('The task id.'),
+        isCompleted: z
+          .boolean()
+          .describe(
+            'true to mark the task complete, false to reopen a completed task.',
+          ),
       },
     },
-    async ({ id }) =>
-      runTool('complete_task', () => api.setTaskComplete(id, true)),
-  );
-
-  server.registerTool(
-    'uncomplete_task',
-    {
-      title: 'Uncomplete Task',
-      description:
-        'Reopen a completed task. Use when the user says "I did not actually ' +
-        'finish X", "undo the completion of X", or marks something as not ' +
-        'done. Clears the task\'s completedAt timestamp.',
-      inputSchema: {
-        id: z.number().int().positive().describe('The task id to uncomplete.'),
-      },
-    },
-    async ({ id }) =>
-      runTool('uncomplete_task', () => api.setTaskComplete(id, false)),
+    async ({ id, isCompleted }) =>
+      runTool('set_task_completion', () => api.setTaskComplete(id, isCompleted)),
   );
 
   server.registerTool(

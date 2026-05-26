@@ -6,21 +6,32 @@ import { Label, Project } from "@/lib/api";
 import { labelColor } from "@/lib/format";
 
 // The full set of filter criteria. "none" on dateFilter means no date filter applied.
+// `text` is a case-insensitive substring filter on the task title; empty string means
+// no text filter.
 export interface FilterState {
   labelIds: number[];
   projectIds: number[];
   dateFilter: "none" | "today" | "this-week" | "overdue";
+  text: string;
 }
 
 export const EMPTY_FILTER: FilterState = {
   labelIds: [],
   projectIds: [],
   dateFilter: "none",
+  text: "",
 };
 
 // Returns true if any filter is active (i.e. differs from the empty state).
+// Whitespace-only text is treated as "no filter" - consistent with how the
+// backend's text filter treats it.
 export function hasActiveFilters(fs: FilterState): boolean {
-  return fs.labelIds.length > 0 || fs.projectIds.length > 0 || fs.dateFilter !== "none";
+  return (
+    fs.labelIds.length > 0 ||
+    fs.projectIds.length > 0 ||
+    fs.dateFilter !== "none" ||
+    fs.text.trim() !== ""
+  );
 }
 
 // Count the number of active filter dimensions (for the badge).
@@ -28,7 +39,8 @@ export function activeFilterCount(fs: FilterState): number {
   return (
     (fs.labelIds.length > 0 ? 1 : 0) +
     (fs.projectIds.length > 0 ? 1 : 0) +
-    (fs.dateFilter !== "none" ? 1 : 0)
+    (fs.dateFilter !== "none" ? 1 : 0) +
+    (fs.text.trim() !== "" ? 1 : 0)
   );
 }
 
@@ -143,6 +155,24 @@ export default function FilterPanel({
         </div>
 
         <div className="px-4 py-3 space-y-4 max-h-64 overflow-y-auto">
+          {/* Text search section */}
+          <section>
+            <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-2">
+              Search
+            </p>
+            <input
+              type="text"
+              value={draft.text}
+              onChange={(e) => setDraft((prev) => ({ ...prev, text: e.target.value }))}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleApply();
+              }}
+              placeholder="Search by title..."
+              aria-label="Search tasks by title"
+              className="w-full px-2.5 py-1.5 text-sm border border-zinc-300 rounded-md text-zinc-700 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition-colors duration-150"
+            />
+          </section>
+
           {/* Labels section */}
           {allLabels.length > 0 && (
             <section>

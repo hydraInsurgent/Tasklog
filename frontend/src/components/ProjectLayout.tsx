@@ -27,7 +27,10 @@ export default function ProjectLayout() {
     if (typeof window === "undefined") return EMPTY_FILTER;
     try {
       const saved = sessionStorage.getItem("tasklog_filter_state");
-      return saved ? JSON.parse(saved) : EMPTY_FILTER;
+      // Merge over EMPTY_FILTER so a state persisted before a new field was
+      // added (e.g. `text`) still has every key. Without this, an old stored
+      // value would leave `text` undefined and break `.trim()` downstream.
+      return saved ? { ...EMPTY_FILTER, ...JSON.parse(saved) } : EMPTY_FILTER;
     } catch {
       return EMPTY_FILTER;
     }

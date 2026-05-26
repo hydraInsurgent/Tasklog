@@ -19,6 +19,9 @@ public class TasksControllerTests
 
     // --- GetAll ---
 
+    // No-filter call (the historical contract): every task back, newest first.
+    private static TaskFilterQuery EmptyFilter() => new(null, null, null, null, null, null, null);
+
     [Fact]
     public async Task GetAll_ReturnsTasksOrderedNewestFirst()
     {
@@ -30,12 +33,250 @@ public class TasksControllerTests
         await context.SaveChangesAsync();
         var controller = new TasksController(context);
 
-        var result = await controller.GetAll();
+        var result = await controller.GetAll(EmptyFilter());
 
         var ok = result.Should().BeOfType<OkObjectResult>().Subject;
         var tasks = ok.Value.Should().BeAssignableTo<IEnumerable<TaskModel>>().Subject.ToList();
         tasks[0].Title.Should().Be("Newer");
         tasks[1].Title.Should().Be("Older");
+    }
+
+    // --- GetAll: filters ---
+
+    [Fact]
+    public async Task GetAll_FilterByProjectIds_ReturnsOnlyTasksInThoseProjects()
+    {
+        using var context = CreateContext();
+        var work = new Project { Name = "Work", CreatedAt = DateTime.Now };
+        var personal = new Project { Name = "Personal", CreatedAt = DateTime.Now };
+        var other = new Project { Name = "Other", CreatedAt = DateTime.Now };
+        context.Projects.AddRange(work, personal, other);
+        await context.SaveChangesAsync();
+
+        context.Tasks.AddRange(
+            new TaskModel { Title = "Work task", CreatedAt = DateTime.Now, ProjectId = work.Id },
+            new TaskModel { Title = "Personal task", CreatedAt = DateTime.Now, ProjectId = personal.Id },
+            new TaskModel { Title = "Other task", CreatedAt = DateTime.Now, ProjectId = other.Id },
+            new TaskModel { Title = "Inbox task", CreatedAt = DateTime.Now, ProjectId = null }
+        );
+        await context.SaveChangesAsync();
+
+        var controller = new TasksController(context);
+        var result = await controller.GetAll(EmptyFilter() with { ProjectIds = new[] { work.Id, personal.Id } });
+
+        var tasks = ExtractTasks(result);
+        tasks.Should().HaveCount(2);
+        tasks.Select(t => t.Title).Should().BeEquivalentTo(new[] { "Work task", "Personal task" });
+    }
+
+    [Fact]
+    public async Task GetAll_FilterByInbox_ReturnsOnlyTasksWithNoProject()
+    {
+        using var context = CreateContext();
+        var work = new Project { Name = "Work", CreatedAt = DateTime.Now };
+        context.Projects.Add(work);
+        await context.SaveChangesAsync();
+
+        context.Tasks.AddRange(
+            new TaskModel { Title = "Work task", CreatedAt = DateTime.Now, ProjectId = work.Id },
+            new TaskModel { Title = "Inbox task 1", CreatedAt = DateTime.Now, ProjectId = null },
+            new TaskModel { Title = "Inbox task 2", CreatedAt = DateTime.Now, ProjectId = null }
+        );
+        await context.SaveChangesAsync();
+
+        var controller = new TasksController(context);
+        var result = await controller.GetAll(EmptyFilter() with { Inbox = true });
+
+        var tasks = ExtractTasks(result);
+        tasks.Should().HaveCount(2);
+        tasks.Should().OnlyContain(t => t.ProjectId == null);
+    }
+
+    [Fact]
+    public async Task GetAll_FilterByInboxAndProjectIds_Returns400()
+    {
+        using var context = CreateContext();
+        var controller = new TasksController(context);
+
+        var result = await controller.GetAll(EmptyFilter() with { Inbox = true, ProjectIds = new[] { 1 } });
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetAll_FilterByLabelIds_ReturnsTasksWithAnyOfThoseLabels()
+    {
+        using var context = CreateContext();
+        var urgent = new Label { Name = "urgent", ColorIndex = 0, CreatedAt = DateTime.Now };
+        var today = new Label { Name = "today", ColorIndex = 1, CreatedAt = DateTime.Now };
+        var other = new Label { Name = "other", ColorIndex = 2, CreatedAt = DateTime.Now };
+        context.Labels.AddRange(urgent, today, other);
+        await context.SaveChangesAsync();
+
+        var t1 = new TaskModel { Title = "Urgent only", CreatedAt = DateTime.Now };
+        t1.Labels.Add(urgent);
+        var t2 = new TaskModel { Title = "Today only", CreatedAt = DateTime.Now };
+        t2.Labels.Add(today);
+        var t3 = new TaskModel { Title = "Other only", CreatedAt = DateTime.Now };
+        t3.Labels.Add(other);
+        var t4 = new TaskModel { Title = "No labels", CreatedAt = DateTime.Now };
+
+        context.Tasks.AddRange(t1, t2, t3, t4);
+        await context.SaveChangesAsync();
+
+        var controller = new TasksController(context);
+        var result = await controller.GetAll(EmptyFilter() with { LabelIds = new[] { urgent.Id, today.Id } });
+
+        var tasks = ExtractTasks(result);
+        tasks.Select(t => t.Title).Should().BeEquivalentTo(new[] { "Urgent only", "Today only" });
+    }
+
+    [Fact]
+    public async Task GetAll_FilterByDueBefore_ExcludesTasksWithNoDeadline()
+    {
+        using var context = CreateContext();
+        var cutoff = new DateTime(2026, 6, 1);
+        context.Tasks.AddRange(
+            new TaskModel { Title = "Past", CreatedAt = DateTime.Now, Deadline = new DateTime(2026, 1, 1) },
+            new TaskModel { Title = "At cutoff", CreatedAt = DateTime.Now, Deadline = cutoff },
+            new TaskModel { Title = "Future", CreatedAt = DateTime.Now, Deadline = new DateTime(2026, 12, 31) },
+            new TaskModel { Title = "No deadline", CreatedAt = DateTime.Now, Deadline = null }
+        );
+        await context.SaveChangesAsync();
+
+        var controller = new TasksController(context);
+        var result = await controller.GetAll(EmptyFilter() with { DueBefore = cutoff });
+
+        var tasks = ExtractTasks(result);
+        tasks.Select(t => t.Title).Should().BeEquivalentTo(new[] { "Past", "At cutoff" });
+    }
+
+    [Fact]
+    public async Task GetAll_FilterByDueAfter_ExcludesTasksWithNoDeadline()
+    {
+        using var context = CreateContext();
+        var cutoff = new DateTime(2026, 6, 1);
+        context.Tasks.AddRange(
+            new TaskModel { Title = "Past", CreatedAt = DateTime.Now, Deadline = new DateTime(2026, 1, 1) },
+            new TaskModel { Title = "At cutoff", CreatedAt = DateTime.Now, Deadline = cutoff },
+            new TaskModel { Title = "Future", CreatedAt = DateTime.Now, Deadline = new DateTime(2026, 12, 31) },
+            new TaskModel { Title = "No deadline", CreatedAt = DateTime.Now, Deadline = null }
+        );
+        await context.SaveChangesAsync();
+
+        var controller = new TasksController(context);
+        var result = await controller.GetAll(EmptyFilter() with { DueAfter = cutoff });
+
+        var tasks = ExtractTasks(result);
+        tasks.Select(t => t.Title).Should().BeEquivalentTo(new[] { "At cutoff", "Future" });
+    }
+
+    [Fact]
+    public async Task GetAll_FilterByCompleted_True_ReturnsOnlyCompletedTasks()
+    {
+        using var context = CreateContext();
+        context.Tasks.AddRange(
+            new TaskModel { Title = "Done 1", CreatedAt = DateTime.Now, IsCompleted = true },
+            new TaskModel { Title = "Done 2", CreatedAt = DateTime.Now, IsCompleted = true },
+            new TaskModel { Title = "Pending", CreatedAt = DateTime.Now, IsCompleted = false }
+        );
+        await context.SaveChangesAsync();
+
+        var controller = new TasksController(context);
+        var result = await controller.GetAll(EmptyFilter() with { Completed = true });
+
+        var tasks = ExtractTasks(result);
+        tasks.Should().HaveCount(2);
+        tasks.Should().OnlyContain(t => t.IsCompleted);
+    }
+
+    [Fact]
+    public async Task GetAll_FilterByCompleted_False_ReturnsOnlyPendingTasks()
+    {
+        using var context = CreateContext();
+        context.Tasks.AddRange(
+            new TaskModel { Title = "Done", CreatedAt = DateTime.Now, IsCompleted = true },
+            new TaskModel { Title = "Pending 1", CreatedAt = DateTime.Now, IsCompleted = false },
+            new TaskModel { Title = "Pending 2", CreatedAt = DateTime.Now, IsCompleted = false }
+        );
+        await context.SaveChangesAsync();
+
+        var controller = new TasksController(context);
+        var result = await controller.GetAll(EmptyFilter() with { Completed = false });
+
+        var tasks = ExtractTasks(result);
+        tasks.Should().HaveCount(2);
+        tasks.Should().OnlyContain(t => !t.IsCompleted);
+    }
+
+    [Fact]
+    public async Task GetAll_FilterByText_CaseInsensitiveSubstringOnTitle()
+    {
+        using var context = CreateContext();
+        context.Tasks.AddRange(
+            new TaskModel { Title = "Review PR by Friday", CreatedAt = DateTime.Now },
+            new TaskModel { Title = "Reply to email", CreatedAt = DateTime.Now },
+            new TaskModel { Title = "Buy groceries", CreatedAt = DateTime.Now }
+        );
+        await context.SaveChangesAsync();
+
+        var controller = new TasksController(context);
+
+        // Lowercase query against mixed-case titles - should still match.
+        var result = await controller.GetAll(EmptyFilter() with { Text = "review" });
+        var tasks = ExtractTasks(result);
+        tasks.Select(t => t.Title).Should().BeEquivalentTo(new[] { "Review PR by Friday" });
+    }
+
+    [Fact]
+    public async Task GetAll_MultipleFilters_AndAcrossDimensions()
+    {
+        using var context = CreateContext();
+        var work = new Project { Name = "Work", CreatedAt = DateTime.Now };
+        var urgent = new Label { Name = "urgent", ColorIndex = 0, CreatedAt = DateTime.Now };
+        context.Projects.Add(work);
+        context.Labels.Add(urgent);
+        await context.SaveChangesAsync();
+
+        // The one task that matches everything: Work project + urgent label + future deadline + pending.
+        var match = new TaskModel
+        {
+            Title = "The match",
+            CreatedAt = DateTime.Now,
+            ProjectId = work.Id,
+            Deadline = new DateTime(2026, 8, 1),
+            IsCompleted = false,
+        };
+        match.Labels.Add(urgent);
+
+        // Various "almost matches" that fail one of the dimensions.
+        var noLabel = new TaskModel { Title = "No label", CreatedAt = DateTime.Now, ProjectId = work.Id, Deadline = new DateTime(2026, 8, 1) };
+        var wrongProject = new TaskModel { Title = "Other project", CreatedAt = DateTime.Now, Deadline = new DateTime(2026, 8, 1) };
+        wrongProject.Labels.Add(urgent);
+        var completed = new TaskModel { Title = "Completed", CreatedAt = DateTime.Now, ProjectId = work.Id, Deadline = new DateTime(2026, 8, 1), IsCompleted = true };
+        completed.Labels.Add(urgent);
+
+        context.Tasks.AddRange(match, noLabel, wrongProject, completed);
+        await context.SaveChangesAsync();
+
+        var controller = new TasksController(context);
+        var result = await controller.GetAll(EmptyFilter() with
+        {
+            ProjectIds = new[] { work.Id },
+            LabelIds = new[] { urgent.Id },
+            DueAfter = new DateTime(2026, 7, 1),
+            Completed = false,
+        });
+
+        var tasks = ExtractTasks(result);
+        tasks.Select(t => t.Title).Should().BeEquivalentTo(new[] { "The match" });
+    }
+
+    // Helper to unwrap the OkObjectResult task list, keeps individual tests readable.
+    private static List<TaskModel> ExtractTasks(IActionResult result)
+    {
+        var ok = result.Should().BeOfType<OkObjectResult>().Subject;
+        return ok.Value.Should().BeAssignableTo<IEnumerable<TaskModel>>().Subject.ToList();
     }
 
     // --- GetById ---

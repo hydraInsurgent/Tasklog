@@ -17,13 +17,79 @@ namespace Tasklog.Api.Controllers
         }
 
         // GET /api/tasks
-        // Returns all tasks ordered by creation date, newest first.
+        // Returns tasks ordered by creation date, newest first.
         // Labels are eagerly loaded so callers don't need a second request.
+        //
+        // All query parameters are optional. When omitted, the endpoint behaves
+        // as before and returns every task. When provided, filters AND together
+        // across dimensions; within projectIds/labelIds arrays the semantics are
+        // OR (task matches if it has any of the given values).
+        //
+        // The new MCP `list_tasks` tool calls this endpoint with filter params
+        // so claude.ai can answer natural queries like "what's due this week in
+        // the Work project" with one round-trip instead of fetching everything
+        // and filtering client-side.
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll([FromQuery] TaskFilterQuery filter)
         {
-            var tasks = await _context.Tasks
-                .Include(t => t.Labels)
+            // inbox=true means "tasks with no project". Specifying both inbox
+            // and a non-empty projectIds is contradictory; fail loudly so callers
+            // notice rather than silently picking one.
+            if (filter.Inbox == true && filter.ProjectIds is { Length: > 0 })
+            {
+                return BadRequest(new
+                {
+                    message = "Use either inbox=true or projectIds, not both.",
+                });
+            }
+
+            IQueryable<TaskModel> query = _context.Tasks.Include(t => t.Labels);
+
+            if (filter.Inbox == true)
+            {
+                query = query.Where(t => t.ProjectId == null);
+            }
+            else if (filter.ProjectIds is { Length: > 0 })
+            {
+                // OR-within: task matches if its ProjectId is in the supplied list.
+                query = query.Where(t => t.ProjectId != null && filter.ProjectIds.Contains(t.ProjectId.Value));
+            }
+
+            if (filter.LabelIds is { Length: > 0 })
+            {
+                // OR-within across labels: task matches if it has ANY of the requested labels.
+                query = query.Where(t => t.Labels.Any(l => filter.LabelIds.Contains(l.Id)));
+            }
+
+            if (filter.DueBefore.HasValue)
+            {
+                // Tasks with no deadline are excluded from deadline-range filters.
+                // Inclusive: deadline <= dueBefore.
+                query = query.Where(t => t.Deadline.HasValue && t.Deadline.Value <= filter.DueBefore.Value);
+            }
+
+            if (filter.DueAfter.HasValue)
+            {
+                query = query.Where(t => t.Deadline.HasValue && t.Deadline.Value >= filter.DueAfter.Value);
+            }
+
+            if (filter.Completed.HasValue)
+            {
+                query = query.Where(t => t.IsCompleted == filter.Completed.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(filter.Text))
+            {
+                // Explicit lowercase both sides so the filter is case-insensitive
+                // in both production (SQLite) and unit tests (EF Core InMemory).
+                // InMemory uses C# string.Contains which is case-sensitive; lowering
+                // both sides sidesteps that without losing the SQLite optimisation
+                // (EF Core translates ToLower() to SQL LOWER()).
+                var lowered = filter.Text.ToLower();
+                query = query.Where(t => t.Title.ToLower().Contains(lowered));
+            }
+
+            var tasks = await query
                 .OrderByDescending(t => t.CreatedAt)
                 .ToListAsync();
 
@@ -173,4 +239,21 @@ namespace Tasklog.Api.Controllers
 
     // Request body shape for replacing a task's full label set.
     public record SetTaskLabelsRequest(int[] LabelIds);
+
+    // Query-string shape for filtering the task list. All fields optional.
+    // [FromQuery] binds:
+    //   projectIds  - comma-separated ints handled natively by ASP.NET model binding
+    //                 (e.g. "?projectIds=3,5" or "?projectIds=3&projectIds=5")
+    //   labelIds    - same shape
+    //   dueBefore / dueAfter - ISO 8601 dates (yyyy-MM-dd)
+    //   completed / inbox    - "true" or "false"
+    //   text                  - free substring for case-insensitive title match
+    public record TaskFilterQuery(
+        int[]? ProjectIds,
+        bool? Inbox,
+        int[]? LabelIds,
+        DateTime? DueBefore,
+        DateTime? DueAfter,
+        bool? Completed,
+        string? Text);
 }

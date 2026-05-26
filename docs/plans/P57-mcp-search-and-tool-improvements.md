@@ -1,6 +1,6 @@
 # Feature Implementation Plan: MCP search/filter + tool surface improvements
 
-**Overall Progress:** `0%`
+**Overall Progress:** `85%`
 
 **Tracking issue:** [#57](https://github.com/hydraInsurgent/Tasklog/issues/57)
 **Branch:** `feature/mcp-search-and-tool-improvements-#57`
@@ -85,37 +85,37 @@ set_task_completion (MCP tool) - new, replaces complete_task + uncomplete_task:
 
 ## Tasks
 
-- [ ] 🟥 **Step 1: Backend - extend `GET /api/tasks` with filter query params** `[sequential]` → depends on: nothing
-  - [ ] 🟥 1.1 Add query-param binding to `TasksController.GetAll()`: `projectIds`, `inbox`, `labelIds`, `dueBefore`, `dueAfter`, `completed`, `text`. Use `[FromQuery]` model binding with a `TaskFilterQuery` record for shape.
-  - [ ] 1.2 🟥 Implement filter logic via EF Core. Build `IQueryable<TaskModel>` from `_context.Tasks.Include(t => t.Labels)`; conditionally apply each filter; preserve `OrderByDescending(t => t.CreatedAt)`.
-  - [ ] 1.3 🟥 Validate `inbox=true` + non-empty `projectIds` → 400 with descriptive error.
-  - [ ] 1.4 🟥 Unit tests in `backend/Tasklog.Api.Tests/`: each filter dimension individually, AND-across, OR-within, no-args (full list), edge cases (empty arrays, invalid dates, contradictory inbox+projectIds).
-  - [ ] 1.5 🟥 Smoke test via `curl`: a few representative queries against the running backend.
+- [x] 🟩 **Step 1: Backend - extend `GET /api/tasks` with filter query params** `[sequential]` → depends on: nothing
+  - [x] 🟩 1.1 Added `TaskFilterQuery` record + `[FromQuery]` binding on `TasksController.GetAll()`.
+  - [x] 🟩 1.2 EF Core IQueryable composition: each filter applied conditionally, preserves `OrderByDescending(CreatedAt)`.
+  - [x] 🟩 1.3 `inbox=true` + non-empty `projectIds` returns 400.
+  - [x] 🟩 1.4 12 new tests in `TasksControllerTests.cs`. Total backend tests: 53/53 passing. Note: text filter required explicit `ToLower()` on both sides because EF Core InMemory doesn't simulate SQLite's case-insensitive `LIKE`.
+  - [ ] 🟥 1.5 Smoke test via curl - defer until after Step 2 so we can curl with real data via the live backend.
 
-- [ ] 🟥 **Step 2: MCP - extend `listTasks()` and `list_tasks` tool with filter support** `[sequential]` → depends on: Step 1
-  - [ ] 2.1 🟥 Extend `api.listTasks()` in `mcp/src/api-client.ts` to accept optional `TaskFilter` object; serialize each provided field into the query string (omit undefined fields).
-  - [ ] 2.2 🟥 Extend the `list_tasks` tool's Zod input schema in `mcp/src/tools/tasks.ts` with all filter params optional.
-  - [ ] 2.3 🟥 Update the tool description to mention filtering, with one-line "Returns:" hint per the new toolkit pattern. Include example phrasing the LLM can match ("tasks due this week", "in Work project", "tagged urgent").
-  - [ ] 2.4 🟥 Add unit tests in `mcp/src/tools/tasks.test.ts` (new file - matches the test layer convention from P50) covering the filter wiring: no-args, single dimension, multi-dimension AND, OR-within array, edge cases.
-  - [ ] 2.5 🟥 Verify end-to-end by running the MCP server locally and calling `list_tasks` with a few filter combinations via the test harness or a manual JSON-RPC payload.
+- [x] 🟩 **Step 2: MCP - extend `listTasks()` and `list_tasks` tool with filter support** `[sequential]` → depends on: Step 1
+  - [x] 🟩 2.1 `api.listTasks(filter?)` + `buildTaskQuery()` helper in `api-client.ts`; omits undefined/empty fields, comma-joins arrays.
+  - [x] 🟩 2.2 `list_tasks` Zod schema extended with all 7 optional filter params.
+  - [x] 🟩 2.3 Tool description updated with filter explanation, example phrasings, and a "Returns:" shape hint.
+  - [x] 🟩 2.4 13 tests in new `mcp/src/api-client.test.ts` covering `buildTaskQuery` serialization (undefined omit, empty-array omit, comma-join, boolean false survives, whitespace text omit, combined). 59/59 MCP tests pass. (Tested the query-builder directly rather than the tool passthrough - higher value, no fetch mocking.)
+  - [ ] 🟥 2.5 End-to-end verification deferred to Step 6 (deploy + live phone test).
 
-- [ ] 🟥 **Step 3: MCP - merge `complete_task` + `uncomplete_task` into `set_task_completion`** `[sequential]` → depends on: Step 2
-  - [ ] 3.1 🟥 Remove `complete_task` and `uncomplete_task` tool registrations from `mcp/src/tools/tasks.ts`.
-  - [ ] 3.2 🟥 Add `set_task_completion(id, isCompleted)` tool. Reuse the existing `api.setTaskComplete(id, isCompleted)` client function (already takes the boolean - no api-client change needed).
-  - [ ] 3.3 🟥 Description: explicit guidance for the LLM that this is the toggle for both "mark done" and "undo completion".
-  - [ ] 3.4 🟥 Update tests to remove old tool references and add `set_task_completion` coverage.
+- [x] 🟩 **Step 3: MCP - merge `complete_task` + `uncomplete_task` into `set_task_completion`** `[sequential]` → depends on: Step 2
+  - [x] 🟩 3.1 Removed both old tool registrations.
+  - [x] 🟩 3.2 Added `set_task_completion(id, isCompleted)`, reuses existing `api.setTaskComplete`.
+  - [x] 🟩 3.3 Description guides the LLM on both directions (mark done / reopen).
+  - [x] 🟩 3.4 No test changes needed - the old tools had no unit tests; the file header comment updated to reflect 7 tools.
 
-- [ ] 🟥 **Step 4: Web UI - add text-search input to `FilterPanel`** `[parallel]` → delivers: client-side text search on the existing filter panel (independent of Steps 1-3; touches frontend files only)
-  - [ ] 4.1 🟥 Extend `FilterState` interface in `FilterPanel.tsx` with `text: string`.
-  - [ ] 4.2 🟥 Update `EMPTY_FILTER`, `hasActiveFilters`, `activeFilterCount` to account for `text`.
-  - [ ] 4.3 🟥 Add a text input field at the top of the FilterPanel popover (above Labels section). Apply on Apply button click (consistent with rest of panel - no live filtering).
-  - [ ] 4.4 🟥 Apply the text filter in `TasksClient.tsx`'s client-side filter logic: case-insensitive `.includes()` on `task.title`.
-  - [ ] 4.5 🟥 Visual check across desktop and mobile breakpoints. Confirm focus indicator on the input meets the existing WCAG AA expectation.
+- [x] 🟩 **Step 4: Web UI - add text-search input to `FilterPanel`** `[parallel]` → delivers: client-side text search on the existing filter panel
+  - [x] 🟩 4.1 `FilterState` gained `text: string`.
+  - [x] 🟩 4.2 `EMPTY_FILTER`, `hasActiveFilters`, `activeFilterCount` updated (whitespace-only text = inactive).
+  - [x] 🟩 4.3 Text input at the top of the panel (above Labels). Applies on Apply click or Enter key. Matches existing input styling + focus ring.
+  - [x] 🟩 4.4 Filter clause #5 in `TasksClient.tsx`: case-insensitive `.includes()` on title.
+  - [x] 🟩 4.5 Frontend type-check + 37 jest tests pass. **Extra:** hardened `ProjectLayout` sessionStorage restore to merge over `EMPTY_FILTER`, so a filter state persisted before the `text` field existed doesn't break `.trim()`.
 
-- [ ] 🟥 **Step 5: Docs + CHANGELOG** `[sequential]` → depends on: Steps 1-4
-  - [ ] 5.1 🟥 Update `docs/architecture.md` API endpoints table: `GET /api/tasks` now accepts query params (one-line note + link to this plan for the full shape).
-  - [ ] 5.2 🟥 Update `CHANGELOG.md` with a v2.10.1 section describing the new filter capability and the tool consolidation.
-  - [ ] 5.3 🟥 Update `docs/tests/coverage.md` with the new test counts for the MCP layer and the backend layer.
+- [x] 🟩 **Step 5: Docs + CHANGELOG** `[sequential]` → depends on: Steps 1-4
+  - [x] 🟩 5.1 architecture.md: `GET /api/tasks` filter params documented in the endpoint table; MCP tool count corrected 16 → 15 (two spots) + list_tasks/set_task_completion note in the tool-layer section.
+  - [x] 🟩 5.2 CHANGELOG.md: new v2.10.1 section (Added: filters + UI search; Changed: tool merge, no-deadline + contradictory-param rules).
+  - [x] 🟩 5.3 coverage.md: backend 53 tests, MCP 59 tests, api-client.ts coverage bumped, last-updated date.
 
 - [ ] 🟥 **Step 6: Deploy + smoke test on phone** `[sequential]` → depends on: Step 5. Script changes none; just running the existing deploy.
   - [ ] 6.1 🟥 Run `./scripts/deploy-phone.sh` from the laptop.

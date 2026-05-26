@@ -1,6 +1,6 @@
 # Test Coverage
 
-**Last updated:** 2026-05-19 (MCP server #50 - oauth middleware/store/token + tools/result)
+**Last updated:** 2026-05-24 (#57 - task filter on GetAll + api-client query serialization)
 
 ---
 
@@ -14,7 +14,7 @@
 
 | Class | Lines | Branches | Notes |
 |---|---|---|---|
-| TasksController | 100% | 100% | All methods and branches covered |
+| TasksController | 100% | 100% | All methods and branches covered. +12 tests for GetAll filters (#57) - 53 backend tests total |
 | ProjectsController | 100% | 100% | All methods and branches covered |
 | TasklogDbContext | 100% | 100% | |
 | Program.cs | 0% | - | Framework wiring - not a test target |
@@ -29,7 +29,7 @@
 | oauth/store.ts | 92.28% | 100% | 83.33% | Uncovered lines are TS interface declarations (no runtime code) |
 | oauth/token.ts | 99% | 87.18% | 100% | L22 + L65 (defensive content-type / grant_type checks not exercised) |
 | tools/result.ts | 100% | 100% | 100% | |
-| api-client.ts | 71% | 83% | 20% | Tested indirectly via runTool; timeout path is integration territory |
+| api-client.ts | ~80% | ~85% | 30% | `buildTaskQuery` now directly covered by 13 tests in api-client.test.ts (#57). HTTP/timeout paths still integration territory |
 | config.ts | 89.83% | 40% | 100% | Production-only validation branches not fired in tests |
 | oauth/authorize.ts | - | - | - | Not unit-tested; end-to-end smoke-tested via claude.ai connector |
 | oauth/github.ts | - | - | - | Same - integration territory (GitHub fetch + signed cookie + redirect chain) |
@@ -37,7 +37,7 @@
 | oauth/well-known.ts | - | - | - | Returns fixed JSON metadata |
 | server.ts | - | - | - | Hono mount order + request logger; covered by middleware tests + end-to-end smoke |
 
-**46 tests, 0 failures.** Run with: `npm test --prefix mcp` (auto-rebuilds better-sqlite3 for host arch via pretest hook if needed).
+**59 tests, 0 failures** (was 46; +13 in api-client.test.ts for #57). Run with: `npm test --prefix mcp` (auto-rebuilds better-sqlite3 for host arch via pretest hook if needed).
 
 ### Next.js Frontend - last run 2026-03-14
 

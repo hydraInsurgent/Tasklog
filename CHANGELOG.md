@@ -2,6 +2,22 @@
 
 ---
 
+## v2.10.1 - MCP task filtering + tool consolidation
+*May 2026*
+
+### Added
+
+- `GET /api/tasks` now accepts optional filter query params: `projectIds`, `inbox`, `labelIds`, `dueBefore`, `dueAfter`, `completed`, and `text` (case-insensitive title substring). Filters AND together across dimensions; within `projectIds`/`labelIds` the semantics are OR. No params returns all tasks as before (#57)
+- The MCP `list_tasks` tool surfaces all of those filters, so Claude can answer "what's due this week in the Work project?" or "tasks tagged urgent" with a single server-side filtered call instead of fetching everything
+- Text-search box on the web UI's filter panel (client-side title substring match)
+
+### Changed
+
+- MCP `complete_task` and `uncomplete_task` merged into a single `set_task_completion(id, isCompleted)` tool. MCP tool count: 16 → 15
+- Tasks with no deadline are excluded from `dueBefore`/`dueAfter` filters. Sending `inbox=true` together with a non-empty `projectIds` returns 400 (contradictory)
+
+---
+
 ## v2.10 - MCP server for claude.ai custom connector
 *May 2026*
 
