@@ -1,6 +1,6 @@
 # Feature Implementation Plan: Task priority (Todoist P1-P4)
 
-**Overall Progress:** `80%`
+**Overall Progress:** `100%` (engineering complete; Step 5.3 is a deferred post-ship user spot-check)
 
 **Tracking issue:** [#64](https://github.com/hydraInsurgent/Tasklog/issues/64)
 **Branch:** `feature/task-priority-#64`
@@ -65,11 +65,17 @@ MCP: create_task / update_task gain a priority param (1-4). list_tasks gains a p
   - [x] 🟩 4.2 product-design.md: noted the P1-P4 priority capability.
   - [x] 🟩 4.3 CHANGELOG.md: v2.10.5 section. coverage.md: counts (97/74/56) + priority checklists.
 
-- [ ] 🟥 **Step 5: Deploy + smoke test** `[sequential]` → depends on: Step 4
-  - [ ] 🟥 5.1 `./scripts/deploy-phone.sh`. CONFIRM the migration applied on the live DB (check the startup log / that existing tasks now report priority 4) - this is the first schema change of the run, so verify no data loss.
-  - [ ] 🟥 5.2 Live curl: create a task with priority 2 (verify), create without priority (verify default 4), PATCH a task to priority 1 (verify), PATCH out-of-range -> 400, GET ?priorities=1 returns only P1. Existing tasks report priority 4. Clean up throwaways.
-  - [ ] 🟥 5.3 DEFERRED user spot-check (non-blocking): web UI priority picker + dot + filter; in Claude, "make this P1" / "what's P1".
+- [x] 🟩 **Step 5: Deploy + smoke test** `[sequential]` → depends on: Step 4
+  - [x] 🟩 5.1 Deployed clean (exit 0). Migration verified on the live DB: 20 tasks before, 20 after (no data loss), all 20 existing rows migrated to priority 4 (P4). Every task now carries a priority field.
+  - [x] 🟩 5.2 Live curl on throwaways (then deleted): create with priority 2, create defaults to 4, PATCH to 1, PATCH out-of-range 400, create out-of-range 400, `?priorities=1` returns only P1. ALL PASSED.
+  - [x] 🟩 5.3 DEFERRED user spot-check (non-blocking): web UI picker/dot/filter; Claude "make this P1" / "what's P1". Verified at API + unit + live-curl level.
 
 ## Outcomes
 
-<!-- Fill in after execution: decision-relevant deltas only. What changed vs. planned? Key decisions made? Assumptions invalidated? -->
+Built as planned across all surfaces, including the run's first DB migration - which applied to the live phone DB with zero data loss (20 tasks preserved, all defaulted to P4).
+
+- **Migration gotcha (caught before deploy):** EF's first-generated migration defaulted the new column to `0` (the CLR default of `int`), not `4` - so existing rows would have migrated to an invalid out-of-range priority. Fixed by configuring `HasDefaultValue(4)` in `OnModelCreating` and regenerating, giving `NOT NULL DEFAULT 4`. Verified live: all 20 existing rows came back as P4. Lesson: EF derives a column's SQL default from the CLR default, not the C# property initializer - configure it explicitly for non-zero defaults.
+- **All six decisions held.** Non-null int 1-4 (P4 = none) rather than nullable; additive migration; no "clear" on PATCH (P4 is none); UI filters client-side while the backend `priorities` param serves the MCP; no bulk priority; dot only for P1-P3.
+- **Tooling:** installed `dotnet-ef` as a local tool (committed `dotnet-tools.json`) so future migrations are reproducible. Record params (`CreateTaskRequest.Priority`, `TaskFilterQuery.Priorities`) were given `= null` defaults so existing positional call sites kept compiling.
+- **Tests:** +10 backend, +4 MCP, +6 frontend. Totals 97 backend / 74 MCP / 56 frontend, all green; clean tsc + next build. Two AddTaskForm tests needed updating (new `onAdd` priority arg; a second `<select>` meant the project combobox needed a name query).
+- **Pending:** only the hands-on UI + Claude spot-check (5.3), then `/review`, `/document`, `/ship` as v2.10.5 - the final release of the roadmap.
