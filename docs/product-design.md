@@ -118,9 +118,9 @@ A reminder or alert system would be a meaningful scope addition.
 - Every action produces visible feedback.
 - Errors are shown clearly rather than silently ignored.
 
-**AI integration (v2.10)**
+**AI integration (v2.10, filtering added v2.10.1)**
 - Tasklog is reachable from claude.ai via a Model Context Protocol custom connector.
-- All 15 Tasklog API endpoints are exposed as MCP tools (16 tool definitions; complete/uncomplete are split for cleaner LLM tool selection).
+- The Tasklog API is exposed as 15 MCP tools. `list_tasks` accepts optional filters (project, inbox, labels, deadline range, completion, title substring) so Claude can answer scoped questions like "what's due this week in Work" with one call. Completion is a single `set_task_completion(id, isCompleted)` toggle.
 - The connector works on claude.ai web and mobile (Pro / Max plan).
 - Connecting requires logging in with GitHub once; only the allow-listed username is permitted.
 - All tool calls execute against the same SQLite database the web UI reads from. Tasks created via Claude appear instantly in the web UI on next refresh.

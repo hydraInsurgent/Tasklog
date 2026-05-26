@@ -218,7 +218,7 @@ app.post('/mcp', async (c) => {
 });
 ```
 
-Cost: ~16 tool handler bindings per request. In practice negligible (<1ms). Trying to reuse a single stateless transport across requests is what the SDK refuses ("Stateless transport cannot be reused across requests. Create a new transport per request.").
+Cost: ~15 tool handler bindings per request. In practice negligible (<1ms). Trying to reuse a single stateless transport across requests is what the SDK refuses ("Stateless transport cannot be reused across requests. Create a new transport per request.").
 
 ### 5. Always run request + header logging from day one
 
