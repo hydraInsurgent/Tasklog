@@ -244,8 +244,11 @@ namespace Tasklog.Api.Controllers
 
     // Query-string shape for filtering the task list. All fields optional.
     // [FromQuery] binds:
-    //   projectIds  - comma-separated ints handled natively by ASP.NET model binding
-    //                 (e.g. "?projectIds=3,5" or "?projectIds=3&projectIds=5")
+    //   projectIds  - repeated keys, e.g. "?projectIds=3&projectIds=5" - this is
+    //                 what ASP.NET Core binds to int[]. Comma-separated
+    //                 ("?projectIds=3,5") does NOT bind (it parses "3,5" as one
+    //                 int and silently matches nothing). The MCP client serializes
+    //                 arrays as repeated keys for this reason.
     //   labelIds    - same shape
     //   dueBefore / dueAfter - ISO 8601 dates (yyyy-MM-dd)
     //   completed / inbox    - "true" or "false"

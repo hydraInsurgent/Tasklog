@@ -29,14 +29,15 @@ describe('buildTaskQuery', () => {
     assert.equal(buildTaskQuery({ labelIds: [] }), '');
   });
 
-  test('serializes projectIds as comma-separated', () => {
+  test('serializes projectIds as repeated keys (ASP.NET binds these to int[])', () => {
+    // NOT comma-separated: ?projectIds=3,5 fails to bind and matches nothing.
     const qs = buildTaskQuery({ projectIds: [3, 5] });
-    assert.equal(qs, '?projectIds=3%2C5');
+    assert.equal(qs, '?projectIds=3&projectIds=5');
   });
 
-  test('serializes labelIds as comma-separated', () => {
+  test('serializes labelIds as repeated keys', () => {
     const qs = buildTaskQuery({ labelIds: [1, 2, 7] });
-    assert.equal(qs, '?labelIds=1%2C2%2C7');
+    assert.equal(qs, '?labelIds=1&labelIds=2&labelIds=7');
   });
 
   test('serializes inbox=true', () => {
@@ -81,7 +82,7 @@ describe('buildTaskQuery', () => {
       text: 'urgent',
     });
     assert.match(qs, /^\?/);
-    assert.match(qs, /projectIds=3%2C5/);
+    assert.match(qs, /projectIds=3&projectIds=5/);
     assert.match(qs, /labelIds=1/);
     assert.match(qs, /dueBefore=2026-12-31/);
     assert.match(qs, /completed=false/);

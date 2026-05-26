@@ -169,7 +169,7 @@ LabelTaskModel  (join table - implicit many-to-many)
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/tasks` | Tasks ordered by `CreatedAt` descending. Optional filter query params: `projectIds` (comma-sep), `inbox`, `labelIds` (comma-sep), `dueBefore`, `dueAfter`, `completed`, `text`. AND across dimensions, OR within id arrays. No params = all tasks. `inbox=true` + `projectIds` → 400. See P57 plan for the full shape. |
+| GET | `/api/tasks` | Tasks ordered by `CreatedAt` descending. Optional filter query params: `projectIds` (repeated key), `inbox`, `labelIds` (repeated key), `dueBefore`, `dueAfter`, `completed`, `text`. Arrays use repeated keys (`?projectIds=3&projectIds=5`), not comma-separated. AND across dimensions, OR within id arrays. No params = all tasks. `inbox=true` + `projectIds` → 400. See P57 plan for the full shape. |
 | GET | `/api/tasks/{id}` | Single task by ID. 404 if not found |
 | POST | `/api/tasks` | Create task. Body: `{ title, deadline?, projectId? }` |
 | DELETE | `/api/tasks/{id}` | Delete task. 204 on success, 404 if not found |

@@ -47,9 +47,9 @@ No new MCP tool. No new API endpoint. No DB schema changes. Backwards compatible
 ```
 GET /api/tasks
   Query parameters (all optional):
-    projectIds  comma-separated ints, e.g. "3,5"       (OR-within)
+    projectIds  repeated key, e.g. "?projectIds=3&projectIds=5"  (OR-within)
     inbox       "true" | "false"                       (mutually exclusive with projectIds)
-    labelIds    comma-separated ints, e.g. "1,2,7"     (OR-within)
+    labelIds    repeated key, e.g. "?labelIds=1&labelIds=2"      (OR-within)
     dueBefore   ISO 8601 date, e.g. "2026-12-31"       (inclusive; excludes no-deadline tasks)
     dueAfter    ISO 8601 date                          (inclusive; excludes no-deadline tasks)
     completed   "true" | "false"                       (omit for both)

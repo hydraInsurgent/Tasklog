@@ -110,19 +110,21 @@ export interface TaskFilter {
 }
 
 // Serialize the filter object into URLSearchParams, omitting undefined fields.
-// Arrays become comma-separated values, which is what ASP.NET model binding
-// accepts natively. Empty arrays are also omitted so they don't accidentally
-// filter to "no tasks". Exported only for tests; in production it is used
-// internally by listTasks().
+// Arrays are emitted as REPEATED keys (?projectIds=3&projectIds=5), which is
+// what ASP.NET Core model binding binds to int[] natively. Comma-separated
+// (?projectIds=3,5) does NOT bind - it tries to parse "3,5" as a single int
+// and the filter silently matches nothing. Empty arrays are omitted so they
+// don't accidentally filter to "no tasks". Exported only for tests; in
+// production it is used internally by listTasks().
 export function buildTaskQuery(filter?: TaskFilter): string {
   if (!filter) return '';
   const params = new URLSearchParams();
   if (filter.projectIds && filter.projectIds.length > 0) {
-    params.set('projectIds', filter.projectIds.join(','));
+    for (const id of filter.projectIds) params.append('projectIds', String(id));
   }
   if (filter.inbox !== undefined) params.set('inbox', String(filter.inbox));
   if (filter.labelIds && filter.labelIds.length > 0) {
-    params.set('labelIds', filter.labelIds.join(','));
+    for (const id of filter.labelIds) params.append('labelIds', String(id));
   }
   if (filter.dueBefore) params.set('dueBefore', filter.dueBefore);
   if (filter.dueAfter) params.set('dueAfter', filter.dueAfter);
