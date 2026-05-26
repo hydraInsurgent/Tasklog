@@ -90,14 +90,14 @@ set_task_completion (MCP tool) - new, replaces complete_task + uncomplete_task:
   - [x] 🟩 1.2 EF Core IQueryable composition: each filter applied conditionally, preserves `OrderByDescending(CreatedAt)`.
   - [x] 🟩 1.3 `inbox=true` + non-empty `projectIds` returns 400.
   - [x] 🟩 1.4 12 new tests in `TasksControllerTests.cs`. Total backend tests: 53/53 passing. Note: text filter required explicit `ToLower()` on both sides because EF Core InMemory doesn't simulate SQLite's case-insensitive `LIKE`.
-  - [ ] 🟥 1.5 Smoke test via curl - defer until after Step 2 so we can curl with real data via the live backend.
+  - [x] 🟩 1.5 Smoke test via curl - done as the post-deploy real-data battery (every dimension, AND-across/OR-within, all correct; caught the comma-vs-repeated-key array bug).
 
 - [x] 🟩 **Step 2: MCP - extend `listTasks()` and `list_tasks` tool with filter support** `[sequential]` → depends on: Step 1
   - [x] 🟩 2.1 `api.listTasks(filter?)` + `buildTaskQuery()` helper in `api-client.ts`; omits undefined/empty fields, comma-joins arrays.
   - [x] 🟩 2.2 `list_tasks` Zod schema extended with all 7 optional filter params.
   - [x] 🟩 2.3 Tool description updated with filter explanation, example phrasings, and a "Returns:" shape hint.
   - [x] 🟩 2.4 13 tests in new `mcp/src/api-client.test.ts` covering `buildTaskQuery` serialization (undefined omit, empty-array omit, comma-join, boolean false survives, whitespace text omit, combined). 59/59 MCP tests pass. (Tested the query-builder directly rather than the tool passthrough - higher value, no fetch mocking.)
-  - [ ] 🟥 2.5 End-to-end verification deferred to Step 6 (deploy + live phone test).
+  - [x] 🟩 2.5 End-to-end verified: real-data curl battery against the live backend + the claude.ai connector transcript issuing a filtered `list_tasks` correctly.
 
 - [x] 🟩 **Step 3: MCP - merge `complete_task` + `uncomplete_task` into `set_task_completion`** `[sequential]` → depends on: Step 2
   - [x] 🟩 3.1 Removed both old tool registrations.
@@ -120,7 +120,7 @@ set_task_completion (MCP tool) - new, replaces complete_task + uncomplete_task:
 - [x] 🟩 **Step 6: Deploy + smoke test on phone** `[sequential]` → depends on: Step 5.
   - [x] 🟩 6.1 Ran `./scripts/deploy-phone.sh`. **Surfaced a latent deploy bug** (see Outcomes): `sv restart` does not restart proot-wrapped services, so all three (api/web/mcp) were left running pre-deploy code. Manually force-restarted each by killing the inner guest process; all three confirmed on new code.
   - [x] 🟩 6.2 Backend filter verified live on the phone via curl: `inbox+projectIds` → 400, `completed=true` → 1/20, `text=BLOG` → case-insensitive match. (Connector-level smoke test from Claude mobile pending user reconnect - see below.)
-  - [ ] 🟥 6.3 USER ACTION: reconnect the Tasklog connector on claude.ai so it refetches tool defs (this session and any open connector cache the pre-deploy tools). Then confirm filtered `list_tasks`, `set_task_completion`, and that `complete_task`/`uncomplete_task` are gone.
+  - [x] 🟩 6.3 Connector verified: transcript from Claude mobile showed the live new schema (incl. R5/R6 `maxLength`/`maxItems` caps) and a correctly filtered `list_tasks` call. `complete_task`/`uncomplete_task` gone (new schema in their place). `set_task_completion` not exercised via connector but is a trivial passthrough, unit-covered.
   - [x] 🟩 6.4 **Fixed the deploy bug:** `scripts/deploy-phone.sh` Step 7 rewritten to kill inner guest processes (runit auto-restarts with `--kill-on-exit`) instead of `sv restart`. Captured `docs/learnings/proot-signal-propagation.md`. Will validate on the Phase 2 deploy.
 
 ## Outcomes
