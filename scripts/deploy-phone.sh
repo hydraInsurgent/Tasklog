@@ -9,7 +9,8 @@
 #   4. Build arm64 node_modules in a Docker container on the laptop (QEMU emulation)
 #   5. rsync artifacts to the phone over SSH (services keep running on old files)
 #   6. Setup runit services on phone (idempotent) and ensure runsvdir supervisor is running
-#   7. sv restart - kills old services, starts new ones with fresh code
+#   7. Restart - kill inner proot guest processes; runit auto-restarts them
+#      with fresh code (sv restart does NOT work for proot - see Step 7 notes)
 #
 # Why Docker for node_modules:
 #   proot's syscall translation breaks npm's atomic cache rename intermittently
@@ -335,19 +336,42 @@ fi
 EOF
 
 # --- Step 7: Restart services ---
-# sv restart sends TERM, waits for clean exit, then starts the new run script.
-# Service is briefly down during the restart (~30s for proot login + dotnet boot).
+#
+# CRITICAL: do NOT use `sv restart` for these services. They run inside
+# `proot-distro login ubuntu`, and `sv restart` sends SIGTERM to the proot
+# WRAPPER, which does not forward the signal to the guest process (dotnet /
+# node / cloudflared). The result is a silent stale deploy: sv reports the
+# restart, the port still answers, but it is the OLD code - the new binaries
+# were rsynced to disk and never loaded. We hit this on every multi-service
+# deploy until we traced it (see docs/learnings/proot-signal-propagation.md).
+#
+# The reliable approach: kill the INNER guest process by a distinctive
+# command-line pattern. proot-distro login runs with --kill-on-exit by
+# default, so when the guest's main process dies, proot exits, and runsv
+# (which keeps "up" services running) auto-restarts the service from its
+# run script - picking up the freshly rsynced code. No `sv` command needed.
+#
+# Patterns must be mutually exclusive:
+#   tasklog-api    -> 'Tasklog.Api.dll'
+#   tasklog-mcp    -> 'dist/server.js'   (matches node dist/server.js only)
+#   tasklog-web    -> 'node server.js'   (does NOT match 'node dist/server.js')
+#   tasklog-tunnel -> 'cloudflared tunnel'
 
-step "Restarting services (sv restart)"
+step "Restarting services (kill inner proot guest -> runit auto-restarts)"
 
 ssh "$PHONE_HOST" bash <<EOF
 export SVDIR=${PHONE_SVDIR}
-sv restart tasklog-api tasklog-web tasklog-mcp tasklog-tunnel
 
-echo "--- waiting 35s for services to come up ---"
-sleep 35
+echo "--- killing inner guest processes (runit will auto-restart with new code) ---"
+pkill -9 -f 'Tasklog.Api.dll'   && echo "  tasklog-api: inner killed"    || echo "  tasklog-api: no inner process found"
+pkill -9 -f 'dist/server.js'    && echo "  tasklog-mcp: inner killed"    || echo "  tasklog-mcp: no inner process found"
+pkill -9 -f 'node server.js'    && echo "  tasklog-web: inner killed"    || echo "  tasklog-web: no inner process found"
+pkill -9 -f 'cloudflared tunnel' && echo "  tasklog-tunnel: inner killed" || echo "  tasklog-tunnel: no inner process found"
 
-echo "--- sv status ---"
+echo "--- waiting 40s for proot exit + runit auto-restart + app boot ---"
+sleep 40
+
+echo "--- sv status (uptimes should be small = fresh restart) ---"
 sv status tasklog-api tasklog-web tasklog-mcp tasklog-tunnel
 
 echo
@@ -357,6 +381,7 @@ tail -10 /data/data/com.termux/files/home/log/tasklog-api/current 2>/dev/null ||
 echo
 echo "--- smoke test (from inside the phone) ---"
 curl -sS -o /dev/null -w "  backend  /api/tasks  -> HTTP %{http_code}\n" http://localhost:${BACKEND_PORT}/api/tasks  || echo "  backend curl failed"
+curl -sS -o /dev/null -w "  backend  filter 400 check -> HTTP %{http_code} (expect 400)\n" "http://localhost:${BACKEND_PORT}/api/tasks?inbox=true&projectIds=1" || echo "  backend filter curl failed"
 curl -sS -o /dev/null -w "  frontend /            -> HTTP %{http_code}\n" http://localhost:${FRONTEND_PORT}/            || echo "  frontend curl failed"
 curl -sS -o /dev/null -w "  mcp      /.well-known/oauth-protected-resource -> HTTP %{http_code}\n" http://localhost:${MCP_PORT}/.well-known/oauth-protected-resource || echo "  mcp curl failed (expected if env not configured)"
 EOF

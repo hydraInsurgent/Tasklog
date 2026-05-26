@@ -1,6 +1,6 @@
 # Feature Implementation Plan: MCP search/filter + tool surface improvements
 
-**Overall Progress:** `85%`
+**Overall Progress:** `95%`
 
 **Tracking issue:** [#57](https://github.com/hydraInsurgent/Tasklog/issues/57)
 **Branch:** `feature/mcp-search-and-tool-improvements-#57`
@@ -117,11 +117,29 @@ set_task_completion (MCP tool) - new, replaces complete_task + uncomplete_task:
   - [x] 🟩 5.2 CHANGELOG.md: new v2.10.1 section (Added: filters + UI search; Changed: tool merge, no-deadline + contradictory-param rules).
   - [x] 🟩 5.3 coverage.md: backend 53 tests, MCP 59 tests, api-client.ts coverage bumped, last-updated date.
 
-- [ ] 🟥 **Step 6: Deploy + smoke test on phone** `[sequential]` → depends on: Step 5. Script changes none; just running the existing deploy.
-  - [ ] 6.1 🟥 Run `./scripts/deploy-phone.sh` from the laptop.
-  - [ ] 6.2 🟥 Smoke test from Claude on phone: "what tasks do I have in the Work project?" should call `list_tasks({projectIds: [...]})`. "Mark task 42 done" should call `set_task_completion({id:42, isCompleted:true})`.
-  - [ ] 6.3 🟥 Verify the old `complete_task` / `uncomplete_task` tools are gone from claude.ai's tool list after reconnecting the connector.
+- [x] 🟩 **Step 6: Deploy + smoke test on phone** `[sequential]` → depends on: Step 5.
+  - [x] 🟩 6.1 Ran `./scripts/deploy-phone.sh`. **Surfaced a latent deploy bug** (see Outcomes): `sv restart` does not restart proot-wrapped services, so all three (api/web/mcp) were left running pre-deploy code. Manually force-restarted each by killing the inner guest process; all three confirmed on new code.
+  - [x] 🟩 6.2 Backend filter verified live on the phone via curl: `inbox+projectIds` → 400, `completed=true` → 1/20, `text=BLOG` → case-insensitive match. (Connector-level smoke test from Claude mobile pending user reconnect - see below.)
+  - [ ] 🟥 6.3 USER ACTION: reconnect the Tasklog connector on claude.ai so it refetches tool defs (this session and any open connector cache the pre-deploy tools). Then confirm filtered `list_tasks`, `set_task_completion`, and that `complete_task`/`uncomplete_task` are gone.
+  - [x] 🟩 6.4 **Fixed the deploy bug:** `scripts/deploy-phone.sh` Step 7 rewritten to kill inner guest processes (runit auto-restarts with `--kill-on-exit`) instead of `sv restart`. Captured `docs/learnings/proot-signal-propagation.md`. Will validate on the Phase 2 deploy.
 
 ## Outcomes
 
-<!-- Fill in after execution: decision-relevant deltas only. What changed vs. planned? Key decisions made? Assumptions invalidated? -->
+**What shipped (Steps 1-5, code complete + deployed):**
+- `GET /api/tasks` filter params (projectIds/inbox/labelIds/dueBefore/dueAfter/completed/text), AND-across + OR-within. 12 new backend tests (53 total).
+- MCP `list_tasks` filter schema + `buildTaskQuery` serializer (13 tests, 59 MCP total). `complete_task`+`uncomplete_task` → `set_task_completion`. Tool count 16 → 15.
+- Web UI text-search box on FilterPanel (client-side). `ProjectLayout` sessionStorage restore hardened to merge over `EMPTY_FILTER`.
+
+**Deviations / decisions during execution:**
+- **Text filter case-insensitivity:** had to lowercase both sides explicitly (`Title.ToLower().Contains(...)`) because EF Core InMemory (test DB) doesn't replicate SQLite's case-insensitive `LIKE`. Without it, the unit test passed in prod-logic but failed in tests.
+- **Feature 7 (projectName lookup) dropped** during /explore - marginal value.
+- **Test gap found:** unit tests call `GetAll(filter)` directly and bypass HTTP `[FromQuery]` model binding. They all passed while the *binding* was untested. The deploy smoke test (a behavioral curl asserting 400) is what would have caught a binding failure - and is now baked into the deploy script.
+
+**The big one - latent deploy bug surfaced and fixed:**
+- `sv restart` does NOT restart proot-wrapped services. It SIGTERMs the proot wrapper, which doesn't forward the signal to the guest (dotnet/node/cloudflared). Every multi-service deploy since the phone setup has silently left old code running; we'd been force-killing mcp by hand without realizing the restart mechanism itself was broken.
+- Symptom: `sv status` shows `got TERM` with multi-hour uptime; the port answers but with old code.
+- Fix: `deploy-phone.sh` Step 7 now kills inner guest processes by distinctive command-line pattern. `proot-distro login --kill-on-exit` (the default) makes proot exit when the guest dies, and runit auto-restarts the service with fresh code. Proven live (api pid 8088 → 13920 on a bare inner-kill, no `sv` command).
+- Captured as [docs/learnings/proot-signal-propagation.md](../learnings/proot-signal-propagation.md), cross-linked from proot-on-android.md.
+- Validation deferred to the Phase 2 deploy (first deploy to exercise the new restart logic end to end).
+
+**Remaining:** user reconnects the claude.ai connector to refetch tool defs and smoke-test the new MCP surface from the phone, then /review → /document → /ship as v2.10.1.
