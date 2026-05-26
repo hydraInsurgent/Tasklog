@@ -57,6 +57,13 @@ BACKEND_PORT=5115
 FRONTEND_PORT=3000
 MCP_PORT=5180
 
+# Timezone for the .NET backend process. The phone's proot guest runs in UTC
+# (TZ unset), but the user is in IST and the frontend computes dates in the
+# browser's local zone. The backend's computed dueStatus uses DateTime.Today,
+# so the process must share the user's wall-clock day or "today" is wrong near
+# midnight. Set this to the deployment's local zone. See learnings if relocating.
+SERVER_TZ="Asia/Kolkata"
+
 # runit service definitions live in Termux's $PREFIX/var/service/.
 # SVDIR has to point here for `sv` commands to find them.
 PHONE_SVDIR='$PREFIX/var/service'
@@ -247,7 +254,9 @@ cat > \$PREFIX/var/service/tasklog-api/run <<'RUN'
 exec 2>&1
 # DOTNET_gcServer=0 -> workstation GC (server GC tries to reserve 256 GiB, fails in proot)
 # ASPNETCORE_URLS -> bind on every interface (LAN-friendly, see learnings/network-bind-addresses.md)
-exec proot-distro login ubuntu -- bash -c 'cd /root/tasklog/backend && exec env DOTNET_gcServer=0 ASPNETCORE_URLS=http://0.0.0.0:${BACKEND_PORT} ASPNETCORE_ENVIRONMENT=Production dotnet Tasklog.Api.dll'
+# TZ -> the guest runs in UTC otherwise; the backend's computed dueStatus uses
+#       DateTime.Today, so it must match the user's wall-clock day (see SERVER_TZ).
+exec proot-distro login ubuntu -- bash -c 'cd /root/tasklog/backend && exec env TZ=${SERVER_TZ} DOTNET_gcServer=0 ASPNETCORE_URLS=http://0.0.0.0:${BACKEND_PORT} ASPNETCORE_ENVIRONMENT=Production dotnet Tasklog.Api.dll'
 RUN
 chmod +x \$PREFIX/var/service/tasklog-api/run
 

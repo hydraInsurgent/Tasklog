@@ -158,6 +158,10 @@ Tasks
   CompletedAt TEXT     nullable  (ISO 8601 datetime string, set when marked complete, cleared on un-complete)
   ProjectId   INTEGER  nullable  foreign key -> Projects.Id (null = Inbox)
 
+  (response-only) dueStatus  string  computed, NOT a column. [NotMapped] getter on TaskModel,
+                  derived from Deadline relative to DateTime.Today at serialization time.
+                  One of: overdue / today / this_week (through upcoming Sunday) / later / none. (v2.10.3)
+
 Labels
   Id          INTEGER  primary key, autoincrement
   Name        TEXT     not null

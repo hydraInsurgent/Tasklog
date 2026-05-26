@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| _none_ | | | |
+| [P61-due-status-and-tool-hints.md](plans/P61-due-status-and-tool-hints.md) | #61 | feature/due-status-and-tool-hints-#61 | In Progress |
 
 ---
 

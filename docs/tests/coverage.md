@@ -1,6 +1,6 @@
 # Test Coverage
 
-**Last updated:** 2026-05-26 (#59 - PATCH /api/tasks/{id} + update_task tool + deadline presets)
+**Last updated:** 2026-05-27 (#61 - computed dueStatus field + MCP tool-description shape hints)
 
 ---
 
@@ -14,7 +14,8 @@
 
 | Class | Lines | Branches | Notes |
 |---|---|---|---|
-| TasksController | 100% | 100% | All methods and branches covered. +9 tests for Update/PATCH partial-update (#59) - 63 backend tests total |
+| TasksController | 100% | 100% | All methods and branches covered. +9 tests for Update/PATCH partial-update (#59) |
+| TaskModel.ComputeDueStatus | 100% | 100% | +11 tests for the dueStatus bucket logic (#61) - 74 backend tests total |
 | ProjectsController | 100% | 100% | All methods and branches covered |
 | TasklogDbContext | 100% | 100% | |
 | Program.cs | 0% | - | Framework wiring - not a test target |
@@ -37,7 +38,7 @@
 | oauth/well-known.ts | - | - | - | Returns fixed JSON metadata |
 | server.ts | - | - | - | Hono mount order + request logger; covered by middleware tests + end-to-end smoke |
 
-**65 tests, 0 failures** (was 60; +5 in api-client.test.ts for the `update_task` PATCH body contract, #59). Run with: `npm test --prefix mcp` (auto-rebuilds better-sqlite3 for host arch via pretest hook if needed).
+**66 tests, 0 failures** (was 65; +1 in api-client.test.ts for the `Task.dueStatus` shape contract, #61). Run with: `npm test --prefix mcp` (auto-rebuilds better-sqlite3 for host arch via pretest hook if needed). Note: a fresh `npm install` on the host installs better-sqlite3 without the native binary - run `npm rebuild better-sqlite3` once after install if the OAuth store/token tests fail with `ERR_DLOPEN_FAILED`.
 
 ### Next.js Frontend - last run 2026-05-26
 
@@ -87,6 +88,19 @@
 - [x] 🟩 Update - returns 400 on empty/whitespace title
 - [x] 🟩 Update - returns 400 on a malformed deadline string
 - [x] 🟩 Update - returns 404 when not found
+
+### TaskModel.ComputeDueStatus (dueStatus buckets, injected today)
+- [x] 🟩 null deadline -> none
+- [x] 🟩 from Wednesday: yesterday -> overdue
+- [x] 🟩 from Wednesday: today -> today
+- [x] 🟩 from Wednesday: Friday (same week) -> this_week
+- [x] 🟩 from Wednesday: upcoming Sunday (inclusive boundary) -> this_week
+- [x] 🟩 from Wednesday: Monday next week -> later
+- [x] 🟩 from Wednesday: far future -> later
+- [x] 🟩 on Sunday: tomorrow -> later (rest-of-week window empty)
+- [x] 🟩 on Saturday: Sunday -> this_week; Monday -> later
+- [x] 🟩 compares date-only, ignoring time of day -> today
+- [x] 🟩 DueStatus property wires ComputeDueStatus to DateTime.Today
 
 ### ProjectsController
 - [x] 🟩 GetAll - returns projects ordered alphabetically
@@ -231,6 +245,7 @@ its own subprocess, so in-memory DBs are isolated across files.
 - [x] 🟩 update_task - PATCH body includes a deadline value (set)
 - [x] 🟩 update_task - PATCH body with title only
 - [x] 🟩 update_task - PATCH body with both title and deadline
+- [x] 🟩 Task.dueStatus - type carries dueStatus as one of the five buckets (#61, pass-through contract)
 
 ### Not covered (and why)
 - `tools/tasks.ts`, `tools/projects.ts`, `tools/labels.ts` - thin api-client wrappers; behavior is exercised through `runTool` tests + the end-to-end smoke run with claude.ai.

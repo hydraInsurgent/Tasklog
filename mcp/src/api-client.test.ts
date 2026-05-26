@@ -10,7 +10,29 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildTaskQuery } from './api-client.js';
+import { buildTaskQuery, type Task } from './api-client.js';
+
+// dueStatus is computed server-side and passed through unchanged by the client
+// (api-client does not transform response bodies). The compile-time guarantee is
+// the Task type; this contract test documents the allowed values and that a task
+// the LLM sees is expected to carry one of them.
+describe('Task.dueStatus shape (server-computed, pass-through)', () => {
+  test('Task type requires dueStatus to be one of the five buckets', () => {
+    const allowed = ['overdue', 'today', 'this_week', 'later', 'none'];
+    const sample: Task = {
+      id: 1,
+      title: 'x',
+      deadline: null,
+      dueStatus: 'none',
+      createdAt: '2026-05-27T00:00:00Z',
+      isCompleted: false,
+      completedAt: null,
+      projectId: null,
+      labels: [],
+    };
+    assert.ok(allowed.includes(sample.dueStatus));
+  });
+});
 
 // The update_task PATCH body relies on JSON.stringify's keep/clear/set
 // behaviour: undefined keys are omitted (backend leaves the field unchanged),

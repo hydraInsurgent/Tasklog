@@ -10,6 +10,7 @@ const baseTask: Task = {
   title: 'Buy groceries',
   isCompleted: false,
   deadline: null,
+  dueStatus: 'none',
   projectId: null,
   createdAt: '2026-03-14T00:00:00Z',
   completedAt: null,

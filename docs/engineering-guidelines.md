@@ -38,6 +38,10 @@ When in doubt, prefer the simpler approach and evolve later.
 
 - **`JsonElement` partial PATCH (present-key detection)** - `TasksController.Update` (`PATCH /api/tasks/{id}`) binds the body to `[FromBody] JsonElement` and inspects each field with `TryGetProperty`, rather than binding to a typed record. This is the only way to distinguish "field omitted" (keep the current value) from "field set to `null`" (clear it). A typed record with nullable properties collapses both cases to `null`, so it cannot express a clear-vs-keep difference. Reach for this whenever a PATCH needs nullable-clear semantics. Unlike query-string array binding, the present-key logic is directly unit-testable: build a `JsonElement` from a JSON string with `JsonDocument.Parse(json).RootElement.Clone()` and pass it to the action, which exercises the same branching the HTTP body would.
 
+### Current patterns - additions from v2.10.3
+
+- **Computed response field via `[NotMapped]` getter** - `TaskModel.DueStatus` is a read-only property (`[NotMapped] public string DueStatus => ComputeDueStatus(Deadline, DateTime.Today);`) rather than a stored column or a DTO field. `[NotMapped]` (from `System.ComponentModel.DataAnnotations.Schema`) tells EF Core to ignore it for mapping/migrations, while System.Text.Json still serializes the getter. The effect: the field appears on every response that returns the model, with zero per-action wiring and no schema change, and it is always computed fresh (so a value relative to "now" never goes stale). Use this for derived, response-only fields that have no business being persisted. Pair it with a **pure static helper** that takes its time-dependency as a parameter (`ComputeDueStatus(deadline, today)`) so the logic is unit-testable without freezing the clock - the instance getter just wires in `DateTime.Today`. Keeps the project's no-DTO convention intact.
+
 ### Patterns not yet in use - and when to consider them
 
 **Repository pattern** - not used currently. DbContext is injected directly into controllers.

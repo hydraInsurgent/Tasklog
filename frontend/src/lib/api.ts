@@ -39,6 +39,9 @@ export interface Task {
   id: number;
   title: string;
   deadline: string | null; // ISO 8601 date string or null
+  // Server-computed due bucket relative to today. Read-only (the API never accepts it).
+  // Available for display; the deadline pill keeps its own color thresholds (see format.ts).
+  dueStatus: "overdue" | "today" | "this_week" | "later" | "none";
   createdAt: string;       // ISO 8601 date string
   isCompleted: boolean;    // Whether the task has been marked done
   completedAt: string | null; // ISO 8601 datetime when completed, or null
