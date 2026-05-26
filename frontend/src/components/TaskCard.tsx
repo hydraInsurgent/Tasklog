@@ -6,6 +6,7 @@ import { MoreVertical, Trash2, Loader2, Pencil } from "lucide-react";
 import { Task, Project } from "@/lib/api";
 import { formatDate, deadlineColorClass, projectName, labelColor } from "@/lib/format";
 import DeadlinePopover from "./DeadlinePopover";
+import PriorityDot from "./PriorityDot";
 
 interface Props {
   task: Task;
@@ -113,11 +114,12 @@ export default function TaskCard({
       <div className="flex-1 min-w-0 py-1">
         <Link
           href={`/tasks/${task.id}`}
-          className={`block text-sm font-medium text-zinc-900 hover:text-blue-600 focus:outline-none focus:underline transition-colors duration-150 break-words cursor-pointer${
+          className={`flex items-center gap-1.5 text-sm font-medium text-zinc-900 hover:text-blue-600 focus:outline-none focus:underline transition-colors duration-150 break-words cursor-pointer${
             isCompletedAndVisible ? " line-through" : ""
           }`}
         >
-          {task.title}
+          <PriorityDot priority={task.priority} />
+          <span className="min-w-0 break-words">{task.title}</span>
         </Link>
 
         {/* Footer row: project name, deadline, and labels */}

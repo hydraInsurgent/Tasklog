@@ -18,6 +18,11 @@ namespace Tasklog.Api.Models
         public int? ProjectId { get; set; }
         public Project? Project { get; set; }
 
+        // Priority on the Todoist P1-P4 scale: 1 = Urgent, 2 = High, 3 = Medium, 4 = None.
+        // P1 is the highest urgency (ascending sort = most urgent first). Non-null;
+        // P4 is the default "no priority" state, so existing rows migrate to 4.
+        public int Priority { get; set; } = 4;
+
         // Labels applied to this task. Many-to-many - a task can have multiple labels.
         public ICollection<Label> Labels { get; set; } = new List<Label>();
 

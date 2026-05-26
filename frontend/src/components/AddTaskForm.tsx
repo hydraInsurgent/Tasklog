@@ -3,13 +3,13 @@
 import { useState, useEffect, useRef, FormEvent } from "react";
 import { Plus } from "lucide-react";
 import { Project, Label, createLabel } from "@/lib/api";
-import { labelColor } from "@/lib/format";
+import { labelColor, PRIORITY_OPTIONS } from "@/lib/format";
 import LabelChip from "./LabelChip";
 
 interface Props {
   // Called by the parent when the form submits. Parent handles the API call
   // and any feedback display, so this component stays focused on form state.
-  onAdd: (title: string, deadline?: string, projectId?: number | null, labelIds?: number[]) => Promise<void>;
+  onAdd: (title: string, deadline?: string, projectId?: number | null, labelIds?: number[], priority?: number) => Promise<void>;
   // Projects list for the optional project dropdown. Omit to hide the dropdown.
   projects?: Project[];
   // Which project to pre-select (e.g. the current sidebar view). Null = Inbox.
@@ -21,6 +21,8 @@ interface Props {
 export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabels }: Props) {
   const [title, setTitle] = useState("");
   const [deadline, setDeadline] = useState("");
+  // Priority on the P1-P4 scale; default 4 (none).
+  const [priority, setPriority] = useState(4);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   // Separate error state for label creation so it doesn't interfere with
@@ -146,10 +148,11 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
 
     setLoading(true);
     try {
-      await onAdd(title.trim(), deadline || undefined, projectId, labelIds);
+      await onAdd(title.trim(), deadline || undefined, projectId, labelIds, priority);
       // Clear the form on success.
       setTitle("");
       setDeadline("");
+      setPriority(4);
       setSelectedLabels([]);
       setLabelInput("");
     } catch (err) {
@@ -241,6 +244,29 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
             </select>
           </div>
         )}
+
+        {/* Priority picker */}
+        <div className="sm:w-32">
+          <label
+            htmlFor="task-priority"
+            className="block text-sm font-medium text-zinc-700 mb-1"
+          >
+            Priority
+          </label>
+          <select
+            id="task-priority"
+            value={String(priority)}
+            onChange={(e) => setPriority(parseInt(e.target.value, 10))}
+            disabled={loading}
+            className="w-full px-3 py-2 border border-zinc-200 rounded-md text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-shadow duration-150 cursor-pointer bg-white"
+          >
+            {PRIORITY_OPTIONS.map(({ value, meta }) => (
+              <option key={value} value={String(value)}>
+                {meta.label} - {meta.name}
+              </option>
+            ))}
+          </select>
+        </div>
 
         {/* Labels autocomplete - only shown when allLabels is provided and non-empty */}
         {showLabelsField && (

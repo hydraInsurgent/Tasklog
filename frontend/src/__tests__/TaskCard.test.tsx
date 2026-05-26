@@ -11,6 +11,7 @@ const baseTask: Task = {
   isCompleted: false,
   deadline: null,
   dueStatus: 'none',
+  priority: 4,
   projectId: null,
   createdAt: '2026-03-14T00:00:00Z',
   completedAt: null,
@@ -121,5 +122,15 @@ describe('TaskCard', () => {
   it('shows the selection checkbox as checked when selected', () => {
     render(<TaskCard {...makeProps({ selectionMode: true, selected: true })} />)
     expect(screen.getByRole('checkbox', { name: /select "buy groceries"/i })).toBeChecked()
+  })
+
+  it('renders a priority dot for P1-P3', () => {
+    render(<TaskCard {...makeProps({ task: { ...baseTask, priority: 1 } })} />)
+    expect(screen.getByRole('img', { name: /priority p1/i })).toBeInTheDocument()
+  })
+
+  it('renders no priority dot for P4 (none)', () => {
+    render(<TaskCard {...makeProps({ task: { ...baseTask, priority: 4 } })} />)
+    expect(screen.queryByRole('img', { name: /priority/i })).not.toBeInTheDocument()
   })
 })

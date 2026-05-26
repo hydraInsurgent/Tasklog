@@ -1,4 +1,4 @@
-import { deadlineColorClass, formatDate, projectName } from '@/lib/format'
+import { deadlineColorClass, formatDate, projectName, priorityMeta, PRIORITY_OPTIONS } from '@/lib/format'
 
 describe('deadlineColorClass', () => {
   beforeEach(() => {
@@ -56,5 +56,28 @@ describe('projectName', () => {
 
   it('returns "Unknown" when no project matches the id', () => {
     expect(projectName(99, projects)).toBe('Unknown')
+  })
+})
+
+describe('priorityMeta', () => {
+  it('P1-P3 have a dot color, P4 has none', () => {
+    expect(priorityMeta(1).dotColor).toBeTruthy()
+    expect(priorityMeta(2).dotColor).toBeTruthy()
+    expect(priorityMeta(3).dotColor).toBeTruthy()
+    expect(priorityMeta(4).dotColor).toBeNull()
+  })
+
+  it('labels are P1..P4', () => {
+    expect(priorityMeta(1).label).toBe('P1')
+    expect(priorityMeta(4).label).toBe('P4')
+  })
+
+  it('falls back to P4 (none) for out-of-range values', () => {
+    expect(priorityMeta(0).label).toBe('P4')
+    expect(priorityMeta(99).dotColor).toBeNull()
+  })
+
+  it('PRIORITY_OPTIONS lists all four in order P1..P4', () => {
+    expect(PRIORITY_OPTIONS.map((o) => o.value)).toEqual([1, 2, 3, 4])
   })
 })

@@ -42,6 +42,8 @@ export interface Task {
   // Server-computed due bucket relative to today. Read-only (the API never accepts it).
   // Available for display; the deadline pill keeps its own color thresholds (see format.ts).
   dueStatus: "overdue" | "today" | "this_week" | "later" | "none";
+  // Todoist priority: 1=P1 (urgent) .. 4=P4 (none, default). Always present.
+  priority: number;
   createdAt: string;       // ISO 8601 date string
   isCompleted: boolean;    // Whether the task has been marked done
   completedAt: string | null; // ISO 8601 datetime when completed, or null
@@ -69,12 +71,13 @@ export async function getTask(id: number): Promise<Task> {
 export async function createTask(
   title: string,
   deadline?: string,
-  projectId?: number | null
+  projectId?: number | null,
+  priority?: number
 ): Promise<Task> {
   const res = await fetch(`${getApiUrl()}/api/tasks`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title, deadline: deadline ?? null, projectId: projectId ?? null }),
+    body: JSON.stringify({ title, deadline: deadline ?? null, projectId: projectId ?? null, priority }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
@@ -95,7 +98,7 @@ export async function deleteTask(id: number): Promise<void> {
 // Returns the updated task.
 export async function updateTask(
   id: number,
-  fields: { title?: string; deadline?: string | null },
+  fields: { title?: string; deadline?: string | null; priority?: number },
 ): Promise<Task> {
   const res = await fetch(`${getApiUrl()}/api/tasks/${id}`, {
     method: "PATCH",

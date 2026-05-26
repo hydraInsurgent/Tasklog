@@ -1,6 +1,6 @@
 # Feature Implementation Plan: Task priority (Todoist P1-P4)
 
-**Overall Progress:** `0%`
+**Overall Progress:** `80%`
 
 **Tracking issue:** [#64](https://github.com/hydraInsurgent/Tasklog/issues/64)
 **Branch:** `feature/task-priority-#64`
@@ -40,30 +40,30 @@ MCP: create_task / update_task gain a priority param (1-4). list_tasks gains a p
 
 ## Tasks
 
-- [ ] 🟥 **Step 1: Backend - model, migration, endpoints, filter** `[sequential]` → depends on: nothing
-  - [ ] 🟥 1.1 Add `public int Priority { get; set; } = 4;` to `TaskModel` (default 4 in code too, so new entities are P4 even before SaveChanges).
-  - [ ] 🟥 1.2 Create the EF migration `AddPriority` (`Priority INTEGER NOT NULL DEFAULT 4`). Install `dotnet-ef` (local tool) if missing. Verify the generated migration + snapshot.
-  - [ ] 🟥 1.3 `CreateTaskRequest` gains `int? Priority`; Create validates 1-4 (else 400) and defaults null/omitted to 4.
-  - [ ] 🟥 1.4 `Update` (JsonElement PATCH): handle a `priority` key - if present, must be a number 1-4 (else 400); set it. Omitted = keep.
-  - [ ] 🟥 1.5 `TaskFilterQuery` gains `int[]? Priorities`; GetAll filters `query.Where(t => filter.Priorities.Contains(t.Priority))` (OR within).
-  - [ ] 🟥 1.6 Tests: create default=4; create with priority; create out-of-range 400; update sets priority; update out-of-range 400; update omit keeps; GetAll priorities filter (single + multi, OR).
+- [x] 🟩 **Step 1: Backend - model, migration, endpoints, filter** `[sequential]` → depends on: nothing
+  - [x] 🟩 1.1 Added `public int Priority { get; set; } = 4;` to `TaskModel`.
+  - [x] 🟩 1.2 Migration `AddPriority` created (installed dotnet-ef local tool). First gen defaulted to 0 (CLR default); fixed by `HasDefaultValue(4)` in the DbContext + regenerating, so the column is `NOT NULL DEFAULT 4` and existing rows migrate to P4.
+  - [x] 🟩 1.3 `CreateTaskRequest` gained `int? Priority = null`; Create validates 1-4 (400) and defaults to 4.
+  - [x] 🟩 1.4 `Update` handles a `priority` key (number 1-4 else 400; omitted = keep). No clear (P4 is none).
+  - [x] 🟩 1.5 `TaskFilterQuery` gained `int[]? Priorities = null`; GetAll filters OR-within. (Record params defaulted so existing positional call sites still compile.)
+  - [x] 🟩 1.6 10 tests (create default 4 / set / out-of-range 400 x2; update set / omit-keeps / bad x3; priorities filter single + multi-OR). 97 backend tests pass.
 
-- [ ] 🟥 **Step 2: MCP - priority param + filter + type + descriptions** `[sequential]` → depends on: Step 1
-  - [ ] 🟥 2.1 Add `priority: number` to the `Task` interface; `priority?` to `createTask`/`updateTask` bodies; `priorities?: number[]` to `TaskFilter` + `buildTaskQuery` (repeated keys).
-  - [ ] 🟥 2.2 `create_task` + `update_task` gain a `priority` Zod param (int 1-4, optional) with a description of the P1-P4 meaning. `list_tasks` gains a `priorities` filter param. Update the relevant "Returns:" hints to mention priority.
-  - [ ] 🟥 2.3 Tests: buildTaskQuery serializes priorities as repeated keys; create/update body includes priority; Task type carries priority.
+- [x] 🟩 **Step 2: MCP - priority param + filter + type + descriptions** `[sequential]` → depends on: Step 1
+  - [x] 🟩 2.1 Added `priority: number` to `Task`; `priority?` to createTask/updateTask bodies; `priorities?: number[]` to `TaskFilter` + `buildTaskQuery` (repeated keys).
+  - [x] 🟩 2.2 `create_task` + `update_task` gained a `priority` Zod param (int 1-4) with P1-P4 descriptions; `list_tasks` gained a `priorities` filter; Returns hint + descriptions mention priority. Tool count stays 19 (params, not new tools).
+  - [x] 🟩 2.3 +4 tests (create/update priority body, priorities repeated-key serialization + empty-array omit; updated the dueStatus shape test for the new field). Typecheck clean; 74 MCP tests pass.
 
-- [ ] 🟥 **Step 3: Web UI - types, dot, picker, filter** `[sequential]` → depends on: Step 1 `[UI]`
-  - [ ] 🟥 3.1 Add `priority` to the frontend `Task` type + fixtures. `createTask`/`updateTask` accept priority; `FilterState` gains `priorities: number[]` (+ EMPTY_FILTER, hasActiveFilters, activeFilterCount).
-  - [ ] 🟥 3.2 `format.ts`: `priorityMeta(priority)` -> `{ label, dotColor }` for P1 (red) / P2 (orange) / P3 (blue) / P4 (none -> no dot). A small `PriorityDot` rendering, shown next to the title in TaskCard + the desktop table (P1-P3 only).
-  - [ ] 🟥 3.3 Priority picker (a labeled `<select>` P1-P4, default P4) in `AddTaskForm` (thread through `onAdd`) and `EditTaskModal` (diff + send on change).
-  - [ ] 🟥 3.4 Priority filter row in `FilterPanel` (toggle chips P1-P4); apply client-side in `TasksClient.filteredTasks`.
-  - [ ] 🟥 3.5 Fixtures/tests: add `priority` to Task literals; a focused test for `priorityMeta` and the dot showing for P1-P3 / hidden for P4. Keep existing tests green; clean tsc + build.
+- [x] 🟩 **Step 3: Web UI - types, dot, picker, filter** `[sequential]` → depends on: Step 1 `[UI]`
+  - [x] 🟩 3.1 `priority` on the frontend `Task` type + fixtures; createTask/updateTask accept priority; `FilterState` gained `priorities` (+ EMPTY_FILTER / hasActiveFilters / activeFilterCount).
+  - [x] 🟩 3.2 `format.ts`: `priorityMeta` + `PRIORITY_OPTIONS`. New `PriorityDot` component (P1 red / P2 orange / P3 blue; P4 = nothing) with an accessible label, shown next to the title in TaskCard + the desktop table.
+  - [x] 🟩 3.3 Priority `<select>` (P1-P4, default P4) in `AddTaskForm` (threaded through `onAdd`) and `EditTaskModal` (diff + send only on change).
+  - [x] 🟩 3.4 Priority filter row (toggle chips) in `FilterPanel`; applied client-side in `TasksClient.filteredTasks` (OR within).
+  - [x] 🟩 3.5 +6 tests (priorityMeta/PRIORITY_OPTIONS, dot shown P1 / hidden P4); fixed 2 AddTaskForm tests for the new onAdd arg + the second combobox. 56 frontend tests pass; clean tsc + next build.
 
-- [ ] 🟥 **Step 4: Docs + CHANGELOG** `[sequential]` → depends on: Steps 1-3
-  - [ ] 🟥 4.1 architecture.md: add `Priority` to the Tasks data model (real column, with the migration); note priority on create/update/filter; bump nothing else structural.
-  - [ ] 🟥 4.2 product-design.md: note tasks now have a priority (P1-P4).
-  - [ ] 🟥 4.3 CHANGELOG.md: v2.10.5 section. coverage.md: new counts + checklists.
+- [x] 🟩 **Step 4: Docs + CHANGELOG** `[sequential]` → depends on: Steps 1-3
+  - [x] 🟩 4.1 architecture.md: added `Priority` column to the Tasks data model + the create/update/filter endpoint notes + `PriorityDot` in the tree.
+  - [x] 🟩 4.2 product-design.md: noted the P1-P4 priority capability.
+  - [x] 🟩 4.3 CHANGELOG.md: v2.10.5 section. coverage.md: counts (97/74/56) + priority checklists.
 
 - [ ] 🟥 **Step 5: Deploy + smoke test** `[sequential]` → depends on: Step 4
   - [ ] 🟥 5.1 `./scripts/deploy-phone.sh`. CONFIRM the migration applied on the live DB (check the startup log / that existing tasks now report priority 4) - this is the first schema change of the run, so verify no data loss.

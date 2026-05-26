@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { X, Check } from "lucide-react";
 import { Label, Project } from "@/lib/api";
-import { labelColor } from "@/lib/format";
+import { labelColor, PRIORITY_OPTIONS } from "@/lib/format";
 
 // The full set of filter criteria. "none" on dateFilter means no date filter applied.
 // `text` is a case-insensitive substring filter on the task title; empty string means
@@ -13,6 +13,7 @@ export interface FilterState {
   projectIds: number[];
   dateFilter: "none" | "today" | "this-week" | "overdue";
   text: string;
+  priorities: number[];
 }
 
 export const EMPTY_FILTER: FilterState = {
@@ -20,6 +21,7 @@ export const EMPTY_FILTER: FilterState = {
   projectIds: [],
   dateFilter: "none",
   text: "",
+  priorities: [],
 };
 
 // Returns true if any filter is active (i.e. differs from the empty state).
@@ -30,7 +32,8 @@ export function hasActiveFilters(fs: FilterState): boolean {
     fs.labelIds.length > 0 ||
     fs.projectIds.length > 0 ||
     fs.dateFilter !== "none" ||
-    fs.text.trim() !== ""
+    fs.text.trim() !== "" ||
+    fs.priorities.length > 0
   );
 }
 
@@ -40,7 +43,8 @@ export function activeFilterCount(fs: FilterState): number {
     (fs.labelIds.length > 0 ? 1 : 0) +
     (fs.projectIds.length > 0 ? 1 : 0) +
     (fs.dateFilter !== "none" ? 1 : 0) +
-    (fs.text.trim() !== "" ? 1 : 0)
+    (fs.text.trim() !== "" ? 1 : 0) +
+    (fs.priorities.length > 0 ? 1 : 0)
   );
 }
 
@@ -104,6 +108,16 @@ export default function FilterPanel({
       projectIds: prev.projectIds.includes(id)
         ? prev.projectIds.filter((p) => p !== id)
         : [...prev.projectIds, id],
+    }));
+  }
+
+  // Toggle a priority value in the draft.
+  function togglePriority(value: number) {
+    setDraft((prev) => ({
+      ...prev,
+      priorities: prev.priorities.includes(value)
+        ? prev.priorities.filter((p) => p !== value)
+        : [...prev.priorities, value],
     }));
   }
 
@@ -254,6 +268,36 @@ export default function FilterPanel({
                   <span className="text-sm text-zinc-700">{opt.label}</span>
                 </label>
               ))}
+            </div>
+          </section>
+
+          {/* Priority section - toggle chips, OR semantics (matches labels) */}
+          <section>
+            <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-2">
+              Priority
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {PRIORITY_OPTIONS.map(({ value, meta }) => {
+                const active = draft.priorities.includes(value);
+                // P4 has no color; use a neutral zinc dot in the chip so it still reads.
+                const color = meta.dotColor ?? "#a1a1aa";
+                return (
+                  <button
+                    key={value}
+                    onClick={() => togglePriority(value)}
+                    aria-pressed={active}
+                    className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer min-h-[32px]"
+                    style={
+                      active
+                        ? { backgroundColor: color, borderColor: color, color: "#fff" }
+                        : { backgroundColor: "#fff", borderColor: "#e4e4e7", color: "#3f3f46" }
+                    }
+                  >
+                    {active && <Check size={10} aria-hidden="true" />}
+                    {meta.label}
+                  </button>
+                );
+              })}
             </div>
           </section>
         </div>

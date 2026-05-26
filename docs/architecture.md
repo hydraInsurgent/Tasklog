@@ -103,7 +103,8 @@ Tasklog/
 │       │   ├── CompleteTaskButton.tsx  Complete/incomplete toggle on detail page (Client Component)
 │       │   ├── EditTaskModal.tsx   Full task edit (title/deadline/project/labels), diff-and-fan-out save (Client Component, v2.10.2)
 │       │   ├── DeadlinePopover.tsx Quick deadline preset picker on the deadline pill (Client Component, v2.10.2)
-│       │   └── BulkActionsBar.tsx  Sticky bulk-actions bar for multi-select mode (Client Component, v2.10.4)
+│       │   ├── BulkActionsBar.tsx  Sticky bulk-actions bar for multi-select mode (Client Component, v2.10.4)
+│       │   └── PriorityDot.tsx    Small colored priority dot (P1-P3) next to a task title (v2.10.5)
 │       │   (list is representative - other components: TaskCard, FilterPanel, LabelsClient, etc.)
 │       └── lib/
 │           ├── api.ts             Typed API call functions (used by both server and client)
@@ -159,6 +160,7 @@ Tasks
   IsCompleted INTEGER  not null  default 0  (boolean: 0 = pending, 1 = complete)
   CompletedAt TEXT     nullable  (ISO 8601 datetime string, set when marked complete, cleared on un-complete)
   ProjectId   INTEGER  nullable  foreign key -> Projects.Id (null = Inbox)
+  Priority    INTEGER  not null  default 4  (Todoist P1-P4: 1=urgent .. 4=none; existing rows migrated to 4) (v2.10.5)
 
   (response-only) dueStatus  string  computed, NOT a column. [NotMapped] getter on TaskModel,
                   derived from Deadline relative to DateTime.Today at serialization time.
@@ -179,10 +181,10 @@ LabelTaskModel  (join table - implicit many-to-many)
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/tasks` | Tasks ordered by `CreatedAt` descending. Optional filter query params: `projectIds` (repeated key), `inbox`, `labelIds` (repeated key), `dueBefore`, `dueAfter`, `completed`, `text`. Arrays use repeated keys (`?projectIds=3&projectIds=5`), not comma-separated. AND across dimensions, OR within id arrays. No params = all tasks. `inbox=true` + `projectIds` → 400. See P57 plan for the full shape. |
+| GET | `/api/tasks` | Tasks ordered by `CreatedAt` descending. Optional filter query params: `projectIds` (repeated key), `inbox`, `labelIds` (repeated key), `dueBefore`, `dueAfter`, `completed`, `text`, `priorities` (repeated key, P1-P4). Arrays use repeated keys (`?projectIds=3&projectIds=5`), not comma-separated. AND across dimensions, OR within id arrays. No params = all tasks. `inbox=true` + `projectIds` → 400. See P57 plan for the full shape. |
 | GET | `/api/tasks/{id}` | Single task by ID. 404 if not found |
-| POST | `/api/tasks` | Create task. Body: `{ title, deadline?, projectId? }` |
-| PATCH | `/api/tasks/{id}` | Partial update of title and/or deadline. JSON body, present-key detection: omit=keep, `deadline: null`=clear, value=set. 400 on empty title or bad date. Returns the updated task |
+| POST | `/api/tasks` | Create task. Body: `{ title, deadline?, projectId?, priority? }`. priority is 1-4 (default 4 = none); 400 if out of range |
+| PATCH | `/api/tasks/{id}` | Partial update of title, deadline, and/or priority. JSON body, present-key detection: omit=keep, `deadline: null`=clear, value=set. priority must be 1-4 (no clear - P4 is none). 400 on empty title / bad date / bad priority. Returns the updated task |
 | DELETE | `/api/tasks/{id}` | Delete task. 204 on success, 404 if not found |
 | PATCH | `/api/tasks/{id}/complete` | Mark task complete or incomplete. Body: `{ isCompleted: bool }`. Returns updated task |
 | PATCH | `/api/tasks/{id}/project` | Reassign task to a project or Inbox. Body: `{ projectId: int? }` |

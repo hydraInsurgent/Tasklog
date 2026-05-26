@@ -1,6 +1,6 @@
 # Test Coverage
 
-**Last updated:** 2026-05-27 (#63 - bulk task operations: endpoint + 3 MCP tools + multi-select UI)
+**Last updated:** 2026-05-27 (#64 - task priority P1-P4: migration + endpoints + MCP + UI)
 
 ---
 
@@ -16,7 +16,8 @@
 |---|---|---|---|
 | TasksController | 100% | 100% | All methods and branches covered. +9 tests for Update/PATCH partial-update (#59) |
 | TaskModel.ComputeDueStatus | 100% | 100% | +11 tests for the dueStatus bucket logic (#61) |
-| TasksController.Bulk | 100% | 100% | +13 tests for POST /api/tasks/bulk (#63, incl. the 500-id cap) - 87 backend tests total |
+| TasksController.Bulk | 100% | 100% | +13 tests for POST /api/tasks/bulk (#63, incl. the 500-id cap) |
+| TasksController (priority) | 100% | 100% | +10 tests for priority on create/update/filter (#64) - 97 backend tests total |
 | ProjectsController | 100% | 100% | All methods and branches covered |
 | TasklogDbContext | 100% | 100% | |
 | Program.cs | 0% | - | Framework wiring - not a test target |
@@ -39,7 +40,7 @@
 | oauth/well-known.ts | - | - | - | Returns fixed JSON metadata |
 | server.ts | - | - | - | Hono mount order + request logger; covered by middleware tests + end-to-end smoke |
 
-**70 tests, 0 failures** (was 66; +4 in api-client.test.ts for the bulk POST body contract, #63). Run with: `npm test --prefix mcp` (auto-rebuilds better-sqlite3 for host arch via pretest hook if needed). Note: a fresh `npm install` on the host installs better-sqlite3 without the native binary - run `npm rebuild better-sqlite3` once after install if the OAuth store/token tests fail with `ERR_DLOPEN_FAILED`.
+**74 tests, 0 failures** (was 70; +4 in api-client.test.ts for the priority wire contract, #64). Run with: `npm test --prefix mcp` (auto-rebuilds better-sqlite3 for host arch via pretest hook if needed). Note: a fresh `npm install` on the host installs better-sqlite3 without the native binary - run `npm rebuild better-sqlite3` once after install if the OAuth store/token tests fail with `ERR_DLOPEN_FAILED`.
 
 ### Next.js Frontend - last run 2026-05-26
 
@@ -51,7 +52,8 @@
 | deadlinePresets.ts | 95.23% | 87.5% | 100% | L41 (one unreachable preset branch); pure resolver, 10 tests (#59) |
 | TaskCard.tsx | ~80% | ~88% | ~80% | deadline popover open + edit wiring exercised via TasksClient; +3 tests for selection-mode checkbox (#63) |
 | BulkActionsBar.tsx | 0% | 0% | 0% | New (#63). Integration candidate; the bar is presentational (buttons + a reused DeadlinePopover) and is exercised via the live smoke + manual UI |
-| format.ts | 85% | 83.33% | 85.71% | 20-21 |
+| format.ts | ~88% | ~85% | ~88% | +4 tests for priorityMeta / PRIORITY_OPTIONS (#64) |
+| PriorityDot.tsx | covered | - | - | Rendered + asserted via TaskCard tests (dot for P1, none for P4) (#64) |
 | AddTaskForm.tsx | 45.09% | 40.74% | 49.45% | Project dropdown + label autocomplete render paths (grew since v2.4; not a regression) |
 | DeadlinePopover.tsx | 10.52% | 0% | 11.76% | Behavior covered indirectly: `resolvePreset` is unit-tested; the popover is a thin button list. Direct render test is an integration candidate |
 | EditTaskModal.tsx | 0% | 0% | 0% | Integration test candidate (fan-out PATCH + getTask flow); the diffing logic is the thing worth covering if it grows |
@@ -103,6 +105,16 @@
 - [x] 🟩 on Saturday: Sunday -> this_week; Monday -> later
 - [x] 🟩 compares date-only, ignoring time of day -> today
 - [x] 🟩 DueStatus property wires ComputeDueStatus to DateTime.Today
+
+### TasksController (priority, #64)
+- [x] 🟩 Create - defaults priority to 4 when omitted
+- [x] 🟩 Create - sets priority when provided
+- [x] 🟩 Create - out-of-range priority (0, 5) -> 400
+- [x] 🟩 Update - sets priority when provided
+- [x] 🟩 Update - omitted priority leaves it unchanged
+- [x] 🟩 Update - bad priority (0, 9, non-number) -> 400
+- [x] 🟩 GetAll - priorities filter, single value
+- [x] 🟩 GetAll - priorities filter, multiple values (OR within)
 
 ### TasksController.Bulk (POST /api/tasks/bulk)
 - [x] 🟩 complete true - sets IsCompleted + CompletedAt on all
@@ -183,6 +195,14 @@
 - [x] 🟩 no selection checkbox when not in selection mode (#63)
 - [x] 🟩 selection checkbox appears + calls onToggleSelect in select mode (#63)
 - [x] 🟩 selection checkbox reflects the selected prop (#63)
+- [x] 🟩 renders a priority dot for P1 (#64)
+- [x] 🟩 renders no priority dot for P4 / none (#64)
+
+### format.ts (priority, #64)
+- [x] 🟩 priorityMeta - P1-P3 have a dot color, P4 has none
+- [x] 🟩 priorityMeta - labels P1..P4
+- [x] 🟩 priorityMeta - out-of-range falls back to P4
+- [x] 🟩 PRIORITY_OPTIONS - all four in order P1..P4
 
 ### deadlinePresets (resolvePreset, injected `now`)
 - [x] 🟩 today - returns today's local date
@@ -269,6 +289,8 @@ its own subprocess, so in-memory DBs are isolated across files.
 - [x] 🟩 bulk - complete body carries operation + taskIds + isCompleted (#63)
 - [x] 🟩 bulk - assignProject null survives serialization (Inbox) (#63)
 - [x] 🟩 bulk - setDeadline value sets / null clears (#63)
+- [x] 🟩 priority - create/update body carries priority (#64)
+- [x] 🟩 priority - buildTaskQuery serializes priorities as repeated keys + omits empty (#64)
 
 ### Not covered (and why)
 - `tools/tasks.ts`, `tools/projects.ts`, `tools/labels.ts` - thin api-client wrappers; behavior is exercised through `runTool` tests + the end-to-end smoke run with claude.ai.
