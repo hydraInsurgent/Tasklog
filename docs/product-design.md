@@ -86,6 +86,7 @@ A reminder or alert system would be a meaningful scope addition.
 - A "Show completed" toggle reveals all completed tasks. Completion can be undone.
 - CompletedAt timestamp is recorded when a task is marked done and cleared if un-completed.
 - Deadlines are visible to the user but the app does not enforce or act on them.
+- Every task carries a server-computed \`dueStatus\` (overdue / today / this_week / later / none), derived from the deadline relative to today (v2.10.3). It centralizes the due-bucket logic so Claude and any future client get a consistent answer without recomputing it.
 - A task can belong to a project (optional). Tasks with no project are in Inbox.
 
 **Projects**

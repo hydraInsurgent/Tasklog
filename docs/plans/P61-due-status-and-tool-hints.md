@@ -1,6 +1,6 @@
 # Feature Implementation Plan: Computed dueStatus field + MCP tool-description shape hints
 
-**Overall Progress:** `0%`
+**Overall Progress:** `80%`
 
 **Tracking issue:** [#61](https://github.com/hydraInsurgent/Tasklog/issues/61)
 **Branch:** `feature/due-status-and-tool-hints-#61`
@@ -41,26 +41,26 @@ No request shape changes. No new endpoints. No DB migration.
 
 ## Tasks
 
-- [ ] 🟥 **Step 1: Backend - computed `dueStatus`** `[sequential]` → depends on: nothing
-  - [ ] 🟥 1.1 Add `using System.ComponentModel.DataAnnotations.Schema;` and a pure `public static string ComputeDueStatus(DateTime? deadline, DateTime today)` to `TaskModel` implementing the Decision-2 buckets (date-only compare, upcoming-Sunday boundary).
-  - [ ] 🟥 1.2 Add `[NotMapped] public string DueStatus => ComputeDueStatus(Deadline, DateTime.Today);` so it serializes everywhere the model is returned.
-  - [ ] 🟥 1.3 Unit tests for `ComputeDueStatus` with injected `today`: none (null deadline), overdue (yesterday), today, this_week (mid-week + boundary upcoming Sunday), later (just past Sunday), plus a weekday-sensitivity case (today==Sunday -> tomorrow is later). Confirm a GetAll/GetById response includes `dueStatus`.
+- [x] 🟩 **Step 1: Backend - computed `dueStatus`** `[sequential]` → depends on: nothing
+  - [x] 🟩 1.1 Added the `Schema` using + pure static `ComputeDueStatus(DateTime? deadline, DateTime today)` to `TaskModel` (date-only compare, upcoming-Sunday boundary).
+  - [x] 🟩 1.2 Added `[NotMapped] public string DueStatus => ComputeDueStatus(Deadline, DateTime.Today);`.
+  - [x] 🟩 1.3 11 unit tests in `TaskModelTests.cs` (none/overdue/today/this_week+boundary/later, Sunday-tomorrow-is-later, Saturday-Sunday-is-this_week, date-only/time-ignored, property wiring). 74 backend tests pass. Live response check deferred to Step 5.2.
 
-- [ ] 🟥 **Step 2: MCP - `dueStatus` in type + "Returns:" hints on all 16 tools** `[sequential]` → depends on: Step 1
-  - [ ] 🟥 2.1 Add `dueStatus: string;` to the `Task` interface in `mcp/src/api-client.ts` (flows through unchanged - the client returns the API JSON as-is).
-  - [ ] 🟥 2.2 Append a one-line "Returns: ..." sentence to each of the 16 tool descriptions in `mcp/src/tools/{tasks,projects,labels}.ts`. Task-returning tools (`list_tasks`, `get_task`, `create_task`, `update_task`, `set_task_completion`, `assign_task_to_project`, `set_task_labels`) list the task fields including the new `dueStatus`. Non-task tools describe their own shapes (e.g. `delete_*` -> `{ id, deleted: true }`).
-  - [ ] 🟥 2.3 Add/extend an MCP test asserting the `Task` shape includes `dueStatus` (or that the api-client passes it through). Keep it light - the field is pass-through.
+- [x] 🟩 **Step 2: MCP - `dueStatus` in type + "Returns:" hints on all 16 tools** `[sequential]` → depends on: Step 1
+  - [x] 🟩 2.1 Added `dueStatus: 'overdue'|'today'|'this_week'|'later'|'none'` to the `Task` interface in `mcp/src/api-client.ts` (pass-through).
+  - [x] 🟩 2.2 Appended "Returns: ..." to all 16 tool descriptions. The 7 task-returning tools cite the list_tasks shape including `dueStatus`; delete_* return `{ id, deleted: true, note }`; list/create/rename project + label tools spell their own field shapes.
+  - [x] 🟩 2.3 Light contract test in api-client.test.ts asserting the `Task` type carries `dueStatus` as one of the five buckets. Typecheck clean; 66 MCP tests pass (had to `npm install` + `npm rebuild better-sqlite3` to restore host dev deps stripped by the last deploy).
 
-- [ ] 🟥 **Step 3: Frontend - `dueStatus` on the `Task` type + fixtures** `[sequential]` → depends on: Step 1 `[UI]`
-  - [ ] 🟥 3.1 Add `dueStatus: "overdue" | "today" | "this_week" | "later" | "none";` to the `Task` interface in `frontend/src/lib/api.ts`.
-  - [ ] 🟥 3.2 Update test fixtures (`TaskCard.test.tsx` `baseTask`, any other Task literals) to include `dueStatus`. Keep `deadlineColorClass` and the deadline pill unchanged (Decision 3).
-  - [ ] 🟥 3.3 (Optional, low-risk) Surface the human-readable due status as the deadline pill's `title`/tooltip so the computed value is visible without changing colors. Skip if it adds noise.
+- [x] 🟩 **Step 3: Frontend - `dueStatus` on the `Task` type + fixtures** `[sequential]` → depends on: Step 1 `[UI]`
+  - [x] 🟩 3.1 Added the `dueStatus` union to the `Task` interface in `frontend/src/lib/api.ts`.
+  - [x] 🟩 3.2 Updated the `baseTask` fixture in `TaskCard.test.tsx`. Typecheck confirmed no other full Task literals needed it (optimistic updates spread an existing task and preserve the field). Color logic untouched. 47 frontend tests pass.
+  - [x] 🟩 3.3 SKIPPED deliberately. A dueStatus tooltip next to a pill colored by the 3-day rule would mislead (this_week is a calendar-week bucket, not 3 days). Field stays available in the type for forward-compat + MCP; no UI surfacing this release. No `[UI]` visual change shipped, so no design-spec check needed.
 
-- [ ] 🟥 **Step 4: Docs + CHANGELOG** `[sequential]` → depends on: Steps 1-3
-  - [ ] 🟥 4.1 architecture.md: note `dueStatus` on the Tasks data-model/response shape (computed, not a column).
-  - [ ] 🟥 4.2 engineering-guidelines.md: record the `[NotMapped]` computed-property-as-serialized-field pattern (first use).
-  - [ ] 🟥 4.3 product-design.md: note tasks now expose a computed due bucket; bump nothing else.
-  - [ ] 🟥 4.4 CHANGELOG.md: v2.10.3 section. coverage.md: new test counts.
+- [x] 🟩 **Step 4: Docs + CHANGELOG** `[sequential]` → depends on: Steps 1-3
+  - [x] 🟩 4.1 architecture.md: added `dueStatus` as a response-only computed field under the Tasks data model.
+  - [x] 🟩 4.2 engineering-guidelines.md: recorded the `[NotMapped]` computed-response-field + pure-static-helper pattern (additions from v2.10.3).
+  - [x] 🟩 4.3 product-design.md: noted the server-computed dueStatus due bucket on tasks.
+  - [x] 🟩 4.4 CHANGELOG.md: v2.10.3 section. coverage.md: counts (74/66/47) + ComputeDueStatus checklist + dueStatus shape test + better-sqlite3 rebuild note.
 
 - [ ] 🟥 **Step 5: Deploy + smoke test** `[sequential]` → depends on: Step 4
   - [ ] 🟥 5.1 `./scripts/deploy-phone.sh`.

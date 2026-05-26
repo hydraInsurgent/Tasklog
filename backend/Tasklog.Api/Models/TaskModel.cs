@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations.Schema;
+
 namespace Tasklog.Api.Models
 {
     public class TaskModel
@@ -18,5 +20,30 @@ namespace Tasklog.Api.Models
 
         // Labels applied to this task. Many-to-many - a task can have multiple labels.
         public ICollection<Label> Labels { get; set; } = new List<Label>();
+
+        // Read-only "due bucket" relative to today. [NotMapped] keeps EF Core from
+        // treating it as a column (so it is always computed fresh, never stored);
+        // System.Text.Json still serializes the getter, so every action that returns
+        // a TaskModel includes dueStatus automatically with no per-action wiring.
+        [NotMapped]
+        public string DueStatus => ComputeDueStatus(Deadline, DateTime.Today);
+
+        // Pure due-bucket computation, separated from DateTime.Today so it is unit-testable
+        // with an injected "today". Compares date parts only (deadlines are dates, not instants).
+        // Buckets: none (no deadline) / overdue (before today) / today / this_week (after today
+        // through the upcoming Sunday, i.e. the rest of the current week) / later (beyond that).
+        public static string ComputeDueStatus(DateTime? deadline, DateTime today)
+        {
+            if (deadline is null) return "none";
+            var due = deadline.Value.Date;
+            var todayDate = today.Date;
+            if (due < todayDate) return "overdue";
+            if (due == todayDate) return "today";
+            // Upcoming Sunday = end of the current week. DayOfWeek: Sunday = 0 .. Saturday = 6,
+            // so on Sunday this is 0 days away and the this_week window is empty (tomorrow is later).
+            var daysUntilSunday = (7 - (int)todayDate.DayOfWeek) % 7;
+            var endOfWeek = todayDate.AddDays(daysUntilSunday);
+            return due <= endOfWeek ? "this_week" : "later";
+        }
     }
 }

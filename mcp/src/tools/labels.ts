@@ -18,9 +18,9 @@ export function registerLabelTools(server: McpServer): void {
     {
       title: 'List Labels',
       description:
-        'List all labels in Tasklog. Returns each label with id, name, and ' +
-        'colorIndex. Use to find label ids before applying them to a task ' +
-        'via set_task_labels.',
+        'List all labels in Tasklog. Use to find label ids before applying ' +
+        'them to a task via set_task_labels. Returns: array of labels, each ' +
+        'with id, name, colorIndex (0-9), createdAt.',
     },
     async () => runTool('list_labels', () => api.listLabels()),
   );
@@ -31,7 +31,8 @@ export function registerLabelTools(server: McpServer): void {
       title: 'Create Label',
       description:
         'Create a new label. Labels are global tags that can be applied to ' +
-        'any task across any project.',
+        'any task across any project. Returns: the created label ' +
+        '{ id, name, colorIndex, createdAt }.',
       inputSchema: {
         name: z.string().min(1).describe('The label name. Required, non-empty.'),
         colorIndex: z
@@ -56,7 +57,8 @@ export function registerLabelTools(server: McpServer): void {
       description:
         'Update a label\'s name and/or color. Both name and colorIndex are ' +
         'required by the API; pass the existing value for the field you do ' +
-        'not want to change (call list_labels first if needed).',
+        'not want to change (call list_labels first if needed). Returns: the ' +
+        'updated label { id, name, colorIndex, createdAt }.',
       inputSchema: {
         id: z.number().int().positive().describe('The label id to update.'),
         name: z.string().min(1).describe('The new (or unchanged) label name.'),
@@ -78,7 +80,8 @@ export function registerLabelTools(server: McpServer): void {
       title: 'Delete Label',
       description:
         'Permanently delete a label. The label is unlinked from all tasks ' +
-        'but the tasks themselves remain (no cascade delete).',
+        'but the tasks themselves remain (no cascade delete). Returns: ' +
+        '{ id, deleted: true, note }.',
       inputSchema: {
         id: z.number().int().positive().describe('The label id to delete.'),
       },

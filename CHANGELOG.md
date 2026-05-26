@@ -2,6 +2,20 @@
 
 ---
 
+## v2.10.3 - Computed dueStatus field + MCP tool-description shape hints
+*May 2026*
+
+### Added
+
+- Every task now carries a server-computed, read-only `dueStatus` field alongside `deadline`: one of `overdue`, `today`, `this_week` (through the upcoming Sunday), `later`, or `none`. Computed in the API layer relative to today (no DB column, always current), so Claude and the web UI get consistent due buckets without each recomputing them (#61)
+- The MCP `Task` shape and the web UI `Task` type both expose `dueStatus`. The web UI keeps its own deadline-pill colors (a 3-day threshold, intentionally distinct from the calendar-week `dueStatus` buckets)
+
+### Changed
+
+- All 16 MCP tool descriptions now end with a "Returns: ..." sentence describing their output shape, so LLM clients can reason about results before calling. The task-returning tools document the full task shape including the new `dueStatus`
+
+---
+
 ## v2.10.2 - Editable task title and deadline
 *May 2026*
 

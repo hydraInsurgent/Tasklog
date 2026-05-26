@@ -32,6 +32,8 @@ export interface Task {
   id: number;
   title: string;
   deadline: string | null;
+  // Computed server-side from the deadline relative to today. Read-only - never sent.
+  dueStatus: 'overdue' | 'today' | 'this_week' | 'later' | 'none';
   createdAt: string;
   isCompleted: boolean;
   completedAt: string | null;

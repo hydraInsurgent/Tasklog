@@ -32,8 +32,10 @@ export function registerTaskTools(server: McpServer): void {
         'given values). Use when the user asks "what tasks do I have", ' +
         '"what is due this week", "what is in the Work project", "tasks ' +
         'tagged urgent", etc. ' +
-        'Returns each task with id, title, deadline (ISO date or null), ' +
-        'isCompleted, completedAt, projectId, project, labels[].',
+        'Returns: array of tasks, each with id, title, deadline (ISO date or ' +
+        'null), dueStatus ("overdue" | "today" | "this_week" | "later" | ' +
+        '"none", computed server-side from the deadline), isCompleted, ' +
+        'completedAt, projectId, project, labels[].',
       inputSchema: {
         projectIds: z
           .array(z.number().int().positive())
@@ -96,7 +98,9 @@ export function registerTaskTools(server: McpServer): void {
     'get_task',
     {
       title: 'Get Task',
-      description: 'Fetch a single task by id. Returns 404 if not found.',
+      description:
+        'Fetch a single task by id. Returns: the task (same shape as ' +
+        'list_tasks items, including dueStatus) or 404 if not found.',
       inputSchema: {
         id: z.number().int().positive().describe('The task id.'),
       },
@@ -110,7 +114,8 @@ export function registerTaskTools(server: McpServer): void {
       title: 'Create Task',
       description:
         'Create a new task. Use when the user says "add a task", "remind me ' +
-        'to", "I need to", etc. Returns the created task with its assigned id.',
+        'to", "I need to", etc. Returns: the created task with its assigned id ' +
+        '(same shape as list_tasks items, including dueStatus).',
       inputSchema: {
         title: z
           .string()
@@ -155,8 +160,8 @@ export function registerTaskTools(server: McpServer): void {
         'next week", "clear X\'s deadline", etc. Only the fields you pass are ' +
         'changed; omitted fields are left as-is. Pass deadline as null to ' +
         'remove an existing deadline. To change a task\'s project or labels, ' +
-        'use assign_task_to_project or set_task_labels instead. Returns the ' +
-        'updated task.',
+        'use assign_task_to_project or set_task_labels instead. Returns: the ' +
+        'updated task (same shape as list_tasks items, including dueStatus).',
       inputSchema: {
         id: z.number().int().positive().describe('The task id to update.'),
         title: z
@@ -191,7 +196,7 @@ export function registerTaskTools(server: McpServer): void {
       description:
         'Permanently delete a task. Use when the user explicitly says ' +
         '"delete" or "remove" - not for completing tasks (use ' +
-        'set_task_completion).',
+        'set_task_completion). Returns: { id, deleted: true }.',
       inputSchema: {
         id: z.number().int().positive().describe('The task id to delete.'),
       },
@@ -212,7 +217,8 @@ export function registerTaskTools(server: McpServer): void {
         'user says "I finished X", "mark X complete", "X is done"; use ' +
         'isCompleted=false when the user says "I did not actually finish X", ' +
         '"undo X", "reopen X". Sets the task\'s completedAt timestamp when ' +
-        'isCompleted=true; clears it when false. Returns the updated task.',
+        'isCompleted=true; clears it when false. Returns: the updated task ' +
+        '(same shape as list_tasks items, including dueStatus).',
       inputSchema: {
         id: z.number().int().positive().describe('The task id.'),
         isCompleted: z
@@ -233,7 +239,8 @@ export function registerTaskTools(server: McpServer): void {
       description:
         'Move a task to a different project, or remove it from any project ' +
         '(move to Inbox). Use when the user says "put X under project Y" or ' +
-        '"move X to Inbox".',
+        '"move X to Inbox". Returns: the updated task (same shape as ' +
+        'list_tasks items, including dueStatus).',
       inputSchema: {
         taskId: z.number().int().positive().describe('The task id to move.'),
         projectId: z
@@ -260,7 +267,8 @@ export function registerTaskTools(server: McpServer): void {
       description:
         'Replace the full set of labels on a task. Pass the FINAL desired ' +
         'list of label ids - this is not additive. Pass an empty array to ' +
-        'remove all labels from the task.',
+        'remove all labels from the task. Returns: the updated task with its ' +
+        'new labels[] (same shape as list_tasks items, including dueStatus).',
       inputSchema: {
         taskId: z
           .number()
