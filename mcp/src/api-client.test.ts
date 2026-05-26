@@ -24,6 +24,7 @@ describe('Task.dueStatus shape (server-computed, pass-through)', () => {
       title: 'x',
       deadline: null,
       dueStatus: 'none',
+      priority: 4,
       createdAt: '2026-05-27T00:00:00Z',
       isCompleted: false,
       completedAt: null,
@@ -31,6 +32,26 @@ describe('Task.dueStatus shape (server-computed, pass-through)', () => {
       labels: [],
     };
     assert.ok(allowed.includes(sample.dueStatus));
+    assert.equal(sample.priority, 4);
+  });
+});
+
+// Priority flows through create/update bodies and the list filter (#64).
+describe('priority wire contract', () => {
+  test('create body carries priority when set', () => {
+    assert.equal(
+      JSON.stringify({ title: 'x', priority: 1 }),
+      '{"title":"x","priority":1}',
+    );
+  });
+  test('update body carries priority (no clear - 4 is none)', () => {
+    assert.equal(JSON.stringify({ priority: 4 }), '{"priority":4}');
+  });
+  test('buildTaskQuery serializes priorities as repeated keys', () => {
+    assert.equal(buildTaskQuery({ priorities: [1, 2] }), '?priorities=1&priorities=2');
+  });
+  test('buildTaskQuery omits an empty priorities array', () => {
+    assert.equal(buildTaskQuery({ priorities: [] }), '');
   });
 });
 

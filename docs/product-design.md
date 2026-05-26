@@ -89,6 +89,7 @@ A reminder or alert system would be a meaningful scope addition.
 - Every task carries a server-computed \`dueStatus\` (overdue / today / this_week / later / none), derived from the deadline relative to today (v2.10.3). It centralizes the due-bucket logic so Claude and any future client get a consistent answer without recomputing it.
 - A task can belong to a project (optional). Tasks with no project are in Inbox.
 - Bulk actions (v2.10.4): a "Select" mode on the task list lets you pick several tasks and, from a bulk-actions bar, complete/reopen them, move them to a project (or Inbox), or set/clear their deadline in one step. The same three operations are available to Claude via bulk MCP tools. There is no bulk delete - deletion stays one task at a time.
+- Priority (v2.10.5): each task has a priority on the Todoist P1-P4 scale (P1 = Urgent, P2 = High, P3 = Medium, P4 = None, the default). It is set on the add/edit forms, shown as a small colored dot (P1-P3), filterable, and editable/queryable via Claude. P4 tasks show no dot, keeping the default view clean.
 
 **Projects**
 - Projects let the user categorize tasks.

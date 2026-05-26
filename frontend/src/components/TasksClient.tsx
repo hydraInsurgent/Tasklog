@@ -11,6 +11,7 @@ import TaskCard from "./TaskCard";
 import EditTaskModal from "./EditTaskModal";
 import DeadlinePopover from "./DeadlinePopover";
 import BulkActionsBar from "./BulkActionsBar";
+import PriorityDot from "./PriorityDot";
 import FilterPanel, { FilterState, EMPTY_FILTER, hasActiveFilters, activeFilterCount } from "./FilterPanel";
 
 // Feedback shown briefly after an action (replaces TempData flash messages from v1).
@@ -167,12 +168,12 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
 
   // Called by AddTaskForm on submit. Updates local state so no full reload is needed.
   // When viewing a specific project, new tasks are assigned to that project automatically.
-  async function handleAdd(title: string, deadline?: string, projectId?: number | null, labelIds?: number[]) {
+  async function handleAdd(title: string, deadline?: string, projectId?: number | null, labelIds?: number[], priority?: number) {
     // If the caller didn't pass a projectId but we're viewing a specific project,
     // default to that project. Inbox / All views default to null (Inbox).
     const resolvedProjectId =
       projectId !== undefined ? projectId : typeof activeView === "number" ? activeView : null;
-    let task = await createTask(title, deadline, resolvedProjectId);
+    let task = await createTask(title, deadline, resolvedProjectId, priority);
 
     // Apply labels immediately after creation if any were selected.
     // setTaskLabels returns the updated task with labels populated.
@@ -306,6 +307,11 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
     const text = filterState.text.trim().toLowerCase();
     if (text !== "") {
       if (!t.title.toLowerCase().includes(text)) return false;
+    }
+
+    // 6. Priority filter - OR within the selected priorities (matches labels).
+    if (filterState.priorities.length > 0) {
+      if (!filterState.priorities.includes(t.priority)) return false;
     }
 
     return true;
@@ -540,12 +546,13 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
                         />
                       </td>
 
-                      {/* Task title: links to detail page */}
+                      {/* Task title: links to detail page, with a priority dot */}
                       <td className="px-6 py-4">
                         <Link
                           href={`/tasks/${task.id}`}
-                          className="text-zinc-900 font-medium hover:text-blue-600 focus:outline-none focus:underline transition-colors duration-150"
+                          className="inline-flex items-center gap-1.5 text-zinc-900 font-medium hover:text-blue-600 focus:outline-none focus:underline transition-colors duration-150"
                         >
+                          <PriorityDot priority={task.priority} />
                           {task.title}
                         </Link>
                       </td>

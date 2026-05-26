@@ -656,6 +656,118 @@ public class TasksControllerTests
         result.Should().BeOfType<NotFoundObjectResult>();
     }
 
+    // --- Priority (#64) ---
+
+    [Fact]
+    public async Task Create_DefaultsPriorityTo4_WhenOmitted()
+    {
+        using var context = CreateContext();
+        var controller = new TasksController(context);
+
+        var result = await controller.Create(new CreateTaskRequest("No priority", null, null));
+
+        var created = result.Should().BeOfType<CreatedAtActionResult>().Subject.Value.Should().BeOfType<TaskModel>().Subject;
+        created.Priority.Should().Be(4);
+    }
+
+    [Fact]
+    public async Task Create_SetsPriority_WhenProvided()
+    {
+        using var context = CreateContext();
+        var controller = new TasksController(context);
+
+        var result = await controller.Create(new CreateTaskRequest("Urgent", null, null, 1));
+
+        var created = result.Should().BeOfType<CreatedAtActionResult>().Subject.Value.Should().BeOfType<TaskModel>().Subject;
+        created.Priority.Should().Be(1);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(5)]
+    public async Task Create_OutOfRangePriority_Returns400(int priority)
+    {
+        using var context = CreateContext();
+        var controller = new TasksController(context);
+
+        var result = await controller.Create(new CreateTaskRequest("Bad", null, null, priority));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task Update_SetsPriority_WhenProvided()
+    {
+        using var context = CreateContext();
+        var task = new TaskModel { Title = "T", CreatedAt = DateTime.Now, Priority = 4 };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.Update(task.Id, Json("{\"priority\": 2}"));
+
+        var updated = result.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeOfType<TaskModel>().Subject;
+        updated.Priority.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Update_OmittedPriority_LeavesItUnchanged()
+    {
+        using var context = CreateContext();
+        var task = new TaskModel { Title = "T", CreatedAt = DateTime.Now, Priority = 1 };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.Update(task.Id, Json("{\"title\": \"renamed\"}"));
+
+        var updated = result.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeOfType<TaskModel>().Subject;
+        updated.Priority.Should().Be(1);
+    }
+
+    [Theory]
+    [InlineData("{\"priority\": 0}")]
+    [InlineData("{\"priority\": 9}")]
+    [InlineData("{\"priority\": -1}")]   // negative is below the P1-P4 range
+    [InlineData("{\"priority\": 2.5}")]  // a float is not a valid priority (TryGetInt32 fails)
+    [InlineData("{\"priority\": \"high\"}")]
+    public async Task Update_BadPriority_Returns400(string json)
+    {
+        using var context = CreateContext();
+        var task = new TaskModel { Title = "T", CreatedAt = DateTime.Now };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.Update(task.Id, Json(json));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetAll_PrioritiesFilter_ReturnsMatchingTasks()
+    {
+        using var context = CreateContext();
+        context.Tasks.AddRange(
+            new TaskModel { Title = "p1", CreatedAt = DateTime.Now, Priority = 1 },
+            new TaskModel { Title = "p2", CreatedAt = DateTime.Now, Priority = 2 },
+            new TaskModel { Title = "p4", CreatedAt = DateTime.Now, Priority = 4 }
+        );
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        // Single value.
+        var single = await controller.GetAll(new TaskFilterQuery(null, null, null, null, null, null, null, new[] { 1 }));
+        var onlyP1 = single.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeAssignableTo<IEnumerable<TaskModel>>().Subject;
+        onlyP1.Should().OnlyContain(t => t.Priority == 1);
+
+        // Multiple values - OR within.
+        var multi = await controller.GetAll(new TaskFilterQuery(null, null, null, null, null, null, null, new[] { 1, 2 }));
+        var p1OrP2 = multi.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeAssignableTo<IEnumerable<TaskModel>>().Subject;
+        p1OrP2.Should().OnlyContain(t => t.Priority == 1 || t.Priority == 2);
+        p1OrP2.Should().HaveCount(2);
+    }
+
     // --- Bulk (POST /api/tasks/bulk) ---
 
     // Seeds three tasks and returns their ids alongside the controller + context.

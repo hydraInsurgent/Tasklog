@@ -2,6 +2,17 @@
 
 ---
 
+## v2.10.5 - Task priority (P1-P4)
+*May 2026*
+
+### Added
+
+- Tasks now have a priority on the Todoist P1-P4 scale: P1 = Urgent (red), P2 = High (orange), P3 = Medium (blue), P4 = None (the default). Stored as a new `Priority` column (DB migration; existing tasks default to P4) (#64)
+- Set priority on the add-task form and the edit modal; a small colored dot appears next to the title for P1-P3 (P4 shows nothing). A priority filter row on the filter panel narrows the list by one or more priorities
+- MCP: `create_task` and `update_task` accept a `priority` param (1-4), `list_tasks` accepts a `priorities` filter, and the priority is included in returned task objects - so Claude can "make this P1" or answer "what's P1 and due this week?" in one call
+
+---
+
 ## v2.10.4 - Bulk task operations
 *May 2026*
 

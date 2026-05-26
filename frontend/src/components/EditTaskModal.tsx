@@ -11,7 +11,7 @@ import {
   setTaskLabels,
   getTask,
 } from "@/lib/api";
-import { labelColor } from "@/lib/format";
+import { labelColor, PRIORITY_OPTIONS } from "@/lib/format";
 
 interface Props {
   // The task being edited. The modal is rendered only when this is non-null.
@@ -38,6 +38,7 @@ export default function EditTaskModal({ task, projects, allLabels, onSaved, onCl
     task.projectId != null ? String(task.projectId) : "inbox",
   );
   const [labelIds, setLabelIds] = useState<number[]>(task.labels.map((l) => l.id));
+  const [priority, setPriority] = useState(task.priority);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -87,22 +88,24 @@ export default function EditTaskModal({ task, projects, allLabels, onSaved, onCl
     // Without the `?? ""`, "still no deadline" (null vs "") would read as a change
     // and fire a pointless clear PATCH; with it, only a real add/change/clear counts.
     const deadlineChanged = (newDeadline ?? "") !== toDateInput(task.deadline);
+    const priorityChanged = priority !== task.priority;
     const projectChanged = projectId !== origProjectId;
     const labelsChanged =
       origLabelIds.length !== newLabelIds.length ||
       origLabelIds.some((id, i) => id !== newLabelIds[i]);
 
-    if (!titleChanged && !deadlineChanged && !projectChanged && !labelsChanged) {
+    if (!titleChanged && !deadlineChanged && !priorityChanged && !projectChanged && !labelsChanged) {
       onClose(); // nothing to do
       return;
     }
 
     setSaving(true);
     try {
-      if (titleChanged || deadlineChanged) {
-        const body: { title?: string; deadline?: string | null } = {};
+      if (titleChanged || deadlineChanged || priorityChanged) {
+        const body: { title?: string; deadline?: string | null; priority?: number } = {};
         if (titleChanged) body.title = trimmed;
         if (deadlineChanged) body.deadline = newDeadline;
+        if (priorityChanged) body.priority = priority;
         await updateTask(task.id, body);
       }
       if (projectChanged) {
@@ -227,6 +230,26 @@ export default function EditTaskModal({ task, projects, allLabels, onSaved, onCl
                 </select>
               </div>
             )}
+
+            {/* Priority */}
+            <div>
+              <label htmlFor="edit-priority" className="block text-sm font-medium text-zinc-700 mb-1">
+                Priority
+              </label>
+              <select
+                id="edit-priority"
+                value={String(priority)}
+                onChange={(e) => setPriority(parseInt(e.target.value, 10))}
+                disabled={saving}
+                className="w-full px-3 py-2 border border-zinc-200 rounded-md text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-shadow duration-150 cursor-pointer bg-white"
+              >
+                {PRIORITY_OPTIONS.map(({ value, meta }) => (
+                  <option key={value} value={String(value)}>
+                    {meta.label} - {meta.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
             {/* Labels - toggle chips for the existing labels */}
             {allLabels.length > 0 && (

@@ -24,7 +24,8 @@ describe('AddTaskForm', () => {
     await userEvent.click(screen.getByRole('button', { name: /add task/i }))
 
     await waitFor(() => {
-      expect(onAdd).toHaveBeenCalledWith('Buy milk', undefined, 1, undefined)
+      // 5th arg is the priority (default P4 = 4).
+      expect(onAdd).toHaveBeenCalledWith('Buy milk', undefined, 1, undefined, 4)
     })
   })
 
@@ -58,10 +59,11 @@ describe('AddTaskForm', () => {
       <AddTaskForm onAdd={jest.fn()} projects={projects} defaultProjectId={1} />
     )
 
-    expect(screen.getByRole('combobox')).toHaveValue('1')
+    // Target the project select specifically (a priority select is also present).
+    expect(screen.getByRole('combobox', { name: /project/i })).toHaveValue('1')
 
     rerender(<AddTaskForm onAdd={jest.fn()} projects={projects} defaultProjectId={2} />)
 
-    expect(screen.getByRole('combobox')).toHaveValue('2')
+    expect(screen.getByRole('combobox', { name: /project/i })).toHaveValue('2')
   })
 })

@@ -53,3 +53,33 @@ export function formatDate(iso: string): string {
     year: "numeric",
   });
 }
+
+// Priority metadata for the Todoist P1-P4 scale. P1 is the most urgent.
+// P4 (none) has no dot so the default view stays uncluttered. Colors follow the
+// agreed scheme: P1 red, P2 orange, P3 blue.
+export interface PriorityMeta {
+  label: string; // short label, e.g. "P1"
+  name: string; // human name, e.g. "Urgent"
+  dotColor: string | null; // hex for the dot, or null for P4 (no dot)
+}
+
+const PRIORITY_META: Record<number, PriorityMeta> = {
+  1: { label: "P1", name: "Urgent", dotColor: "#EF4444" }, // red
+  2: { label: "P2", name: "High", dotColor: "#F97316" }, // orange
+  3: { label: "P3", name: "Medium", dotColor: "#3B82F6" }, // blue
+  4: { label: "P4", name: "None", dotColor: null }, // no dot
+};
+
+// Display metadata for a priority value (1-4). Falls back to P4 (none) for any
+// out-of-range value so the UI never breaks on unexpected data.
+export function priorityMeta(priority: number): PriorityMeta {
+  return PRIORITY_META[priority] ?? PRIORITY_META[4];
+}
+
+// All four priorities in display order (P1 first), for pickers and filters.
+export const PRIORITY_OPTIONS: { value: number; meta: PriorityMeta }[] = [
+  { value: 1, meta: PRIORITY_META[1] },
+  { value: 2, meta: PRIORITY_META[2] },
+  { value: 3, meta: PRIORITY_META[3] },
+  { value: 4, meta: PRIORITY_META[4] },
+];

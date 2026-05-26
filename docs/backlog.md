@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| _none_ | | | |
+| [P64-task-priority.md](plans/P64-task-priority.md) | #64 | feature/task-priority-#64 | In Progress |
 
 ---
 

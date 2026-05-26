@@ -34,6 +34,8 @@ export interface Task {
   deadline: string | null;
   // Computed server-side from the deadline relative to today. Read-only - never sent.
   dueStatus: 'overdue' | 'today' | 'this_week' | 'later' | 'none';
+  // Todoist-style priority: 1 = P1 (urgent) .. 4 = P4 (none, default). Always present.
+  priority: number;
   createdAt: string;
   isCompleted: boolean;
   completedAt: string | null;
@@ -109,6 +111,7 @@ export interface TaskFilter {
   dueAfter?: string;
   completed?: boolean;
   text?: string;
+  priorities?: number[]; // P1-P4 values; OR within
 }
 
 // Serialize the filter object into URLSearchParams, omitting undefined fields.
@@ -134,6 +137,9 @@ export function buildTaskQuery(filter?: TaskFilter): string {
   // Send the trimmed value so the wire query matches what the backend and the
   // frontend match on (all three trim before comparing).
   if (filter.text && filter.text.trim() !== '') params.set('text', filter.text.trim());
+  if (filter.priorities && filter.priorities.length > 0) {
+    for (const p of filter.priorities) params.append('priorities', String(p));
+  }
   const qs = params.toString();
   return qs ? `?${qs}` : '';
 }
@@ -147,6 +153,7 @@ export const createTask = (body: {
   title: string;
   deadline?: string;
   projectId?: number;
+  priority?: number;
 }): Promise<Task> =>
   request('/api/tasks', { method: 'POST', body: JSON.stringify(body) });
 
@@ -159,7 +166,7 @@ export const deleteTask = (id: number): Promise<void> =>
 // sets it. Pass {} and nothing changes.
 export const updateTask = (
   id: number,
-  body: { title?: string; deadline?: string | null },
+  body: { title?: string; deadline?: string | null; priority?: number },
 ): Promise<Task> =>
   request(`/api/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
 

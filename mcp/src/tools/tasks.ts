@@ -33,11 +33,12 @@ export function registerTaskTools(server: McpServer): void {
         'labelIds arrays the semantics are OR (matches if task has any of the ' +
         'given values). Use when the user asks "what tasks do I have", ' +
         '"what is due this week", "what is in the Work project", "tasks ' +
-        'tagged urgent", etc. ' +
+        'tagged urgent", "what is P1", etc. ' +
         'Returns: array of tasks, each with id, title, deadline (ISO date or ' +
         'null), dueStatus ("overdue" | "today" | "this_week" | "later" | ' +
-        '"none", computed server-side from the deadline), isCompleted, ' +
-        'completedAt, projectId, project, labels[].',
+        '"none", computed server-side from the deadline), priority (1-4, ' +
+        '1=P1 urgent .. 4=P4 none), isCompleted, completedAt, projectId, ' +
+        'project, labels[].',
       inputSchema: {
         projectIds: z
           .array(z.number().int().positive())
@@ -91,6 +92,14 @@ export function registerTaskTools(server: McpServer): void {
             'Case-insensitive substring match on task title. Useful for ' +
               '"find the task about X" queries.',
           ),
+        priorities: z
+          .array(z.number().int().min(1).max(4))
+          .max(4)
+          .optional()
+          .describe(
+            'Filter by priority. Tasks with ANY of the listed priorities match ' +
+              '(1=P1 urgent, 2=P2 high, 3=P3 medium, 4=P4 none). E.g. [1] for "what is P1".',
+          ),
       },
     },
     async (filter) => runTool('list_tasks', () => api.listTasks(filter)),
@@ -139,12 +148,22 @@ export function registerTaskTools(server: McpServer): void {
             'Optional project id to assign the task to. Omit to put the ' +
               'task in Inbox (no project).',
           ),
+        priority: z
+          .number()
+          .int()
+          .min(1)
+          .max(4)
+          .optional()
+          .describe(
+            'Optional priority: 1=P1 (urgent), 2=P2 (high), 3=P3 (medium), ' +
+              '4=P4 (none). Omit to default to P4 (no priority).',
+          ),
       },
     },
-    async ({ title, deadline, projectId }) =>
+    async ({ title, deadline, projectId, priority }) =>
       runTool(
         'create_task',
-        () => api.createTask({ title, deadline, projectId }),
+        () => api.createTask({ title, deadline, projectId, priority }),
         (t) =>
           `Created task #${t.id}: "${t.title}"` +
           (t.deadline ? ` (due ${t.deadline})` : '') +
@@ -157,13 +176,13 @@ export function registerTaskTools(server: McpServer): void {
     {
       title: 'Update Task',
       description:
-        'Change a task\'s title and/or deadline. Use when the user says ' +
+        'Change a task\'s title, deadline, and/or priority. Use when the user says ' +
         '"rename task X", "change the deadline of X to Friday", "move X to ' +
-        'next week", "clear X\'s deadline", etc. Only the fields you pass are ' +
-        'changed; omitted fields are left as-is. Pass deadline as null to ' +
-        'remove an existing deadline. To change a task\'s project or labels, ' +
-        'use assign_task_to_project or set_task_labels instead. Returns: the ' +
-        'updated task (same shape as list_tasks items, including dueStatus).',
+        'next week", "clear X\'s deadline", "make X a P1", etc. Only the fields ' +
+        'you pass are changed; omitted fields are left as-is. Pass deadline as ' +
+        'null to remove an existing deadline. To change a task\'s project or ' +
+        'labels, use assign_task_to_project or set_task_labels instead. Returns: ' +
+        'the updated task (same shape as list_tasks items, including dueStatus).',
       inputSchema: {
         id: z.number().int().positive().describe('The task id to update.'),
         title: z
@@ -179,14 +198,25 @@ export function registerTaskTools(server: McpServer): void {
             'New deadline as an ISO 8601 date string (e.g. "2026-12-31"). ' +
               'Pass null to clear the deadline. Omit to leave it unchanged.',
           ),
+        priority: z
+          .number()
+          .int()
+          .min(1)
+          .max(4)
+          .optional()
+          .describe(
+            'New priority: 1=P1 (urgent), 2=P2 (high), 3=P3 (medium), 4=P4 ' +
+              '(none). Omit to leave it unchanged. There is no "clear" - use 4 for none.',
+          ),
       },
     },
-    async ({ id, title, deadline }) => {
+    async ({ id, title, deadline, priority }) => {
       // Build the PATCH body preserving the keep/clear/set distinction:
-      // undefined = omit (keep), null = clear, string = set.
-      const body: { title?: string; deadline?: string | null } = {};
+      // undefined = omit (keep), null = clear (deadline only), value = set.
+      const body: { title?: string; deadline?: string | null; priority?: number } = {};
       if (title !== undefined) body.title = title;
       if (deadline !== undefined) body.deadline = deadline;
+      if (priority !== undefined) body.priority = priority;
       return runTool('update_task', () => api.updateTask(id, body));
     },
   );

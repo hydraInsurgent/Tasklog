@@ -92,6 +92,13 @@ namespace Tasklog.Api.Controllers
                 query = query.Where(t => t.Title.ToLower().Contains(lowered));
             }
 
+            // priorities: OR within the list - a task matches if its priority is any of
+            // the requested values (e.g. ?priorities=1&priorities=2 = P1 or P2).
+            if (filter.Priorities is { Length: > 0 })
+            {
+                query = query.Where(t => filter.Priorities.Contains(t.Priority));
+            }
+
             var tasks = await query
                 .OrderByDescending(t => t.CreatedAt)
                 .ToListAsync();
@@ -124,13 +131,20 @@ namespace Tasklog.Api.Controllers
             if (string.IsNullOrWhiteSpace(request.Title))
                 return BadRequest(new { message = "Title is required." });
 
+            // Priority is optional on create; omitted defaults to 4 (P4 = none).
+            // When provided it must be on the P1-P4 scale.
+            var priority = request.Priority ?? 4;
+            if (priority < 1 || priority > 4)
+                return BadRequest(new { message = "Priority must be between 1 (P1) and 4 (P4)." });
+
             var task = new TaskModel
             {
                 Title = request.Title.Trim(),
                 Deadline = request.Deadline,
                 CreatedAt = DateTime.Now,
                 // Null means the task goes to Inbox (uncategorized).
-                ProjectId = request.ProjectId
+                ProjectId = request.ProjectId,
+                Priority = priority
             };
 
             _context.Tasks.Add(task);
@@ -185,6 +199,15 @@ namespace Tasklog.Api.Controllers
                 {
                     return BadRequest(new { message = "Deadline must be an ISO 8601 date string or null." });
                 }
+            }
+
+            // priority: present must be a number on the P1-P4 scale (1-4). There is no
+            // "clear" - P4 is the no-priority state. Absent leaves it unchanged.
+            if (body.TryGetProperty("priority", out var priorityEl))
+            {
+                if (priorityEl.ValueKind != JsonValueKind.Number || !priorityEl.TryGetInt32(out var p) || p < 1 || p > 4)
+                    return BadRequest(new { message = "Priority must be a number between 1 (P1) and 4 (P4)." });
+                task.Priority = p;
             }
 
             await _context.SaveChangesAsync();
@@ -356,8 +379,8 @@ namespace Tasklog.Api.Controllers
         }
     }
 
-    // Request body shape for task creation.
-    public record CreateTaskRequest(string Title, DateTime? Deadline, int? ProjectId);
+    // Request body shape for task creation. Priority is optional (defaults to 4 = none).
+    public record CreateTaskRequest(string Title, DateTime? Deadline, int? ProjectId, int? Priority = null);
 
     // Request body shape for toggling task completion.
     public record CompleteTaskRequest(bool IsCompleted);
@@ -386,6 +409,7 @@ namespace Tasklog.Api.Controllers
     //   dueBefore / dueAfter - ISO 8601 dates (yyyy-MM-dd)
     //   completed / inbox    - "true" or "false"
     //   text                  - free substring for case-insensitive title match
+    //   priorities            - repeated keys (P1-P4 values), OR within
     public record TaskFilterQuery(
         int[]? ProjectIds,
         bool? Inbox,
@@ -393,5 +417,6 @@ namespace Tasklog.Api.Controllers
         DateTime? DueBefore,
         DateTime? DueAfter,
         bool? Completed,
-        string? Text);
+        string? Text,
+        int[]? Priorities = null);
 }
