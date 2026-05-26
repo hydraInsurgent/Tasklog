@@ -1,6 +1,6 @@
 # Feature Implementation Plan: Bulk task operations
 
-**Overall Progress:** `80%`
+**Overall Progress:** `100%` (engineering complete; Step 5.3 is a deferred post-ship user spot-check)
 
 **Tracking issue:** [#63](https://github.com/hydraInsurgent/Tasklog/issues/63)
 **Branch:** `feature/bulk-operations-#63`
@@ -73,11 +73,19 @@ MCP tools:
   - [x] 🟩 4.2 product-design.md: noted bulk actions (UI select mode + Claude), no bulk delete.
   - [x] 🟩 4.3 CHANGELOG.md: v2.10.4 section. coverage.md: counts (86/70/50) + Bulk + selection + bulk-body checklists.
 
-- [ ] 🟥 **Step 5: Deploy + smoke test** `[sequential]` → depends on: Step 4
-  - [ ] 🟥 5.1 `./scripts/deploy-phone.sh`.
-  - [ ] 🟥 5.2 Live curl against the deployed backend: bulk complete N, bulk move N to a project (and to Inbox/null), bulk set + clear deadline, then verify and clean up. Confirm a bad operation/empty list returns 400 and a missing project returns 400.
-  - [ ] 🟥 5.3 DEFERRED user spot-check (non-blocking): in the web UI, enter select mode, select a few tasks, run each bulk action; in Claude, "move these 3 tasks to Work" / "mark these done".
+- [x] 🟩 **Step 5: Deploy + smoke test** `[sequential]` → depends on: Step 4
+  - [x] 🟩 5.1 `./scripts/deploy-phone.sh` clean (exit 0); services restarted; built-in smoke green.
+  - [x] 🟩 5.2 Live curl on throwaway tasks (then deleted): bulk complete x3, assignProject to a project x3 + null/Inbox x3, setDeadline set x3 + clear x3, and all four 400 paths (empty ids, unknown op, missing project, bad date). ALL PASSED.
+  - [x] 🟩 5.3 DEFERRED user spot-check (non-blocking): web-UI select mode + each bulk action; Claude bulk tools. Verified at API + unit + live-curl level.
 
 ## Outcomes
 
-<!-- Fill in after execution: decision-relevant deltas only. What changed vs. planned? Key decisions made? Assumptions invalidated? -->
+Built as planned across all three surfaces; no design assumptions invalidated.
+
+- **Single endpoint + three MCP tools held up well.** The transactional `POST /api/tasks/bulk` keeps validation and the one `SaveChanges` in one place, while the three named MCP tools keep the LLM surface clear. Live curl confirmed all three operations (and the four 400 paths) against the deployed backend on the first try - no timezone/binding surprises this time, partly because the bulk ops set one explicit value (no present-key ambiguity).
+- **assignProject validates the target project** (400 on missing), which is stricter than the single-task endpoint (#19 tracks that gap). Cheap to do once for the batch.
+- **UI: unified select-mode, not long-press.** A "Select"/"Done" header toggle drives selection checkboxes on both layouts (desktop column + select-all, mobile card checkboxes) and a sticky `BulkActionsBar`. Polling pauses in select mode and the selection clears on any view/filter change so we never act on hidden tasks. Bulk-completed tasks simply drop out of the default view (no per-row animation, which is fine for a batch).
+- **TaskCard selection props are optional (default off)**, so no existing test or call site needed changing - only +3 new tests for the selection checkbox.
+- **Tests:** +12 backend (Bulk), +4 MCP (bulk body contract), +3 frontend (selection). Totals 86 backend / 70 MCP / 50 frontend, all green; clean tsc + next build.
+- **Recurring build-env friction:** the phone deploy prunes `mcp/node_modules` dev deps, so `npm install` + `npm rebuild better-sqlite3` was needed again before MCP typecheck/test (now noted in memory + coverage.md).
+- **Pending:** only the hands-on UI + Claude spot-check (5.3), then `/review`, `/document`, `/ship` as v2.10.4.
