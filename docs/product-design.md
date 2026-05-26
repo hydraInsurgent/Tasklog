@@ -80,6 +80,7 @@ A reminder or alert system would be a meaningful scope addition.
 
 **Tasks**
 - A task has a title (required) and an optional deadline.
+- Title and deadline are editable after creation (v2.10.2): an Edit action on each task opens a modal for title, deadline, project, and labels, and the deadline pill has a quick-set popover with presets (Today, Tomorrow, This weekend, Next week, None). The deadline can be cleared. Editing preserves the task's created date and completion history (unlike delete-and-recreate).
 - A task exists until it is deleted.
 - Tasks can be marked complete via a checkbox. Completed tasks hide from the default view with a brief animation.
 - A "Show completed" toggle reveals all completed tasks. Completion can be undone.
@@ -90,7 +91,7 @@ A reminder or alert system would be a meaningful scope addition.
 **Projects**
 - Projects let the user categorize tasks.
 - The sidebar shows All Tasks, Inbox, and each project as separate views.
-- Tasks can be assigned to a project at creation or reassigned from the task detail page.
+- Tasks can be assigned to a project at creation, reassigned from the task detail page, or changed in the edit modal.
 - Deleting a project also deletes all its tasks (cascade delete, always confirmed first).
 - Project names can be renamed after creation.
 
@@ -118,9 +119,9 @@ A reminder or alert system would be a meaningful scope addition.
 - Every action produces visible feedback.
 - Errors are shown clearly rather than silently ignored.
 
-**AI integration (v2.10, filtering added v2.10.1)**
+**AI integration (v2.10, filtering added v2.10.1, editing added v2.10.2)**
 - Tasklog is reachable from claude.ai via a Model Context Protocol custom connector.
-- The Tasklog API is exposed as 15 MCP tools. `list_tasks` accepts optional filters (project, inbox, labels, deadline range, completion, title substring) so Claude can answer scoped questions like "what's due this week in Work" with one call. Completion is a single `set_task_completion(id, isCompleted)` toggle.
+- The Tasklog API is exposed as 16 MCP tools. `list_tasks` accepts optional filters (project, inbox, labels, deadline range, completion, title substring) so Claude can answer scoped questions like "what's due this week in Work" with one call. Completion is a single `set_task_completion(id, isCompleted)` toggle. `update_task(id, title?, deadline?)` lets Claude rename a task or change/clear its deadline without delete-and-recreate.
 - The connector works on claude.ai web and mobile (Pro / Max plan).
 - Connecting requires logging in with GitHub once; only the allow-listed username is permitted.
 - All tool calls execute against the same SQLite database the web UI reads from. Tasks created via Claude appear instantly in the web UI on next refresh.

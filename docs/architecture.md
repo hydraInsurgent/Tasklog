@@ -99,9 +99,13 @@ Tasklog/
 │       │   ├── AddTaskForm.tsx    Add task form with optional project dropdown (Client Component)
 │       │   ├── AssignProjectButton.tsx  Project reassignment on detail page (Client Component)
 │       │   ├── DeleteTaskButton.tsx  Delete action on detail page (Client Component)
-│       │   └── CompleteTaskButton.tsx  Complete/incomplete toggle on detail page (Client Component)
+│       │   ├── CompleteTaskButton.tsx  Complete/incomplete toggle on detail page (Client Component)
+│       │   ├── EditTaskModal.tsx   Full task edit (title/deadline/project/labels), diff-and-fan-out save (Client Component, v2.10.2)
+│       │   └── DeadlinePopover.tsx Quick deadline preset picker on the deadline pill (Client Component, v2.10.2)
+│       │   (list is representative - other components: TaskCard, FilterPanel, LabelsClient, etc.)
 │       └── lib/
-│           └── api.ts             Typed API call functions (used by both server and client)
+│           ├── api.ts             Typed API call functions (used by both server and client)
+│           └── deadlinePresets.ts Pure resolvePreset() for the quick-deadline popover (v2.10.2)
 │
 ├── docs/
 │   ├── architecture.md            This file
