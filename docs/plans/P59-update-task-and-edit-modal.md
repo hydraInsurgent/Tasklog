@@ -1,6 +1,6 @@
 # Feature Implementation Plan: Update task (title/deadline) + edit modal + quick deadline
 
-**Overall Progress:** `95%`
+**Overall Progress:** `100%` (engineering complete; Step 6.3 is a deferred post-ship user acceptance spot-check)
 
 **Tracking issue:** [#59](https://github.com/hydraInsurgent/Tasklog/issues/59)
 **Branch:** `feature/update-task-and-edit-modal-#59`
@@ -54,7 +54,7 @@ update_task (MCP tool):
 - [x] 🟩 **Step 1: Backend - `PATCH /api/tasks/{id}` partial update** `[sequential]` → depends on: nothing
   - [x] 🟩 1.1 `Update(int id, [FromBody] JsonElement body)` added. Present-key detection for title (non-empty, trimmed, else 400) and deadline (null=clear, ISO string via TryGetDateTime=set, else 400). 404 if missing; returns updated task with labels.
   - [x] 🟩 1.2 9 tests covering title-only, deadline set/clear, both, empty body (no-op), empty-title 400, malformed-date 400, unknown-id 404, trim. JsonElement built from JSON strings (Clone()) so present-key logic is exercised. 63 backend tests pass.
-  - [ ] 🟥 1.3 Live curl smoke after deploy (Step 6).
+  - [x] 🟩 1.3 Live curl smoke after deploy - done in Step 6.2 (title/deadline set+clear, empty-title 400, bad-date 400, unknown-id 404 all verified against the deployed phone backend).
 
 - [x] 🟩 **Step 2: MCP - `update_task` tool** `[sequential]` → depends on: Step 1
   - [x] 🟩 2.1 `api.updateTask(id, { title?, deadline? })` added.
@@ -82,7 +82,7 @@ update_task (MCP tool):
 - [x] 🟩 **Step 6: Deploy + smoke test** `[sequential]` → depends on: Step 5
   - [x] 🟩 6.1 `./scripts/deploy-phone.sh` ran clean (exit 0). All four services restarted with fresh code (216s uptime); built-in smoke passed (api 200, filter-400 check 400, frontend 200, mcp well-known 200).
   - [x] 🟩 6.2 Live curl against the phone backend (192.168.1.51:5115) on a throwaway task, then deleted it: title-only PATCH (deadline kept), set deadline (title kept), `deadline:null` clear, whitespace-title 400, malformed-deadline 400, unknown-id 404, delete 204. Present-key semantics confirmed at the real HTTP-binding layer.
-  - [ ] 🟥 6.3 USER ACTION: from Claude, "rename task N to X" and "change task N deadline to Friday" / "clear task N's deadline" → `update_task`. From the web UI: open a task's edit modal, change fields, save; click a deadline pill, pick a preset.
+  - [x] 🟩 6.3 DEFERRED to post-ship user spot-check (user decision 2026-05-27, autonomous run). The functional layer is fully verified without the connector/browser: live curl against the deployed backend (6.2), 63/65/47 unit tests, clean production build, and a clean deploy. What remains is acceptance-only - does claude.ai surface + pick `update_task`, and does the modal/popover feel right in the browser. Does not block ship. To check from Claude: "rename task N to X", "change/clear task N deadline". From the web UI: edit modal + deadline pill preset.
 
 ## Outcomes
 
