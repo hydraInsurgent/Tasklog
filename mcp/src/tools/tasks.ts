@@ -1,7 +1,7 @@
 /**
  * MCP tools for task operations.
  *
- * Seven tools wrap the seven task-related Tasklog API endpoints. The
+ * Eight tools wrap the task-related Tasklog API endpoints. The
  * completion toggle is a single tool (set_task_completion) that takes a
  * boolean - earlier versions split it into separate complete_task and
  * uncomplete_task tools, but the LLM picks the right value from natural
@@ -143,6 +143,45 @@ export function registerTaskTools(server: McpServer): void {
           (t.deadline ? ` (due ${t.deadline})` : '') +
           (t.projectId ? ` in project ${t.projectId}` : ' in Inbox'),
       ),
+  );
+
+  server.registerTool(
+    'update_task',
+    {
+      title: 'Update Task',
+      description:
+        'Change a task\'s title and/or deadline. Use when the user says ' +
+        '"rename task X", "change the deadline of X to Friday", "move X to ' +
+        'next week", "clear X\'s deadline", etc. Only the fields you pass are ' +
+        'changed; omitted fields are left as-is. Pass deadline as null to ' +
+        'remove an existing deadline. To change a task\'s project or labels, ' +
+        'use assign_task_to_project or set_task_labels instead. Returns the ' +
+        'updated task.',
+      inputSchema: {
+        id: z.number().int().positive().describe('The task id to update.'),
+        title: z
+          .string()
+          .min(1)
+          .optional()
+          .describe('New title. Omit to leave the title unchanged.'),
+        deadline: z
+          .string()
+          .nullable()
+          .optional()
+          .describe(
+            'New deadline as an ISO 8601 date string (e.g. "2026-12-31"). ' +
+              'Pass null to clear the deadline. Omit to leave it unchanged.',
+          ),
+      },
+    },
+    async ({ id, title, deadline }) => {
+      // Build the PATCH body preserving the keep/clear/set distinction:
+      // undefined = omit (keep), null = clear, string = set.
+      const body: { title?: string; deadline?: string | null } = {};
+      if (title !== undefined) body.title = title;
+      if (deadline !== undefined) body.deadline = deadline;
+      return runTool('update_task', () => api.updateTask(id, body));
+    },
   );
 
   server.registerTool(

@@ -27,6 +27,8 @@ function makeProps(overrides: Partial<Parameters<typeof TaskCard>[0]> = {}) {
     activeView: 'all' as const,
     onComplete: jest.fn(),
     onDelete: jest.fn(),
+    onEdit: jest.fn(),
+    onDeadlineChange: jest.fn(),
     deletingId: null,
     completingId: null,
     isHiding: false,

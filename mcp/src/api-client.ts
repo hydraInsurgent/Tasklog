@@ -151,6 +151,16 @@ export const createTask = (body: {
 export const deleteTask = (id: number): Promise<void> =>
   request(`/api/tasks/${id}`, { method: 'DELETE' });
 
+// Partial update of title and/or deadline. Only the keys present in `body` are
+// sent (JSON.stringify omits undefined), so the backend's present-key detection
+// leaves omitted fields unchanged. deadline: null clears the deadline; a string
+// sets it. Pass {} and nothing changes.
+export const updateTask = (
+  id: number,
+  body: { title?: string; deadline?: string | null },
+): Promise<Task> =>
+  request(`/api/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+
 export const setTaskComplete = (id: number, isCompleted: boolean): Promise<Task> =>
   request(`/api/tasks/${id}/complete`, {
     method: 'PATCH',

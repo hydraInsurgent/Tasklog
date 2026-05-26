@@ -3,11 +3,13 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { usePolling } from "@/hooks/usePolling";
 import Link from "next/link";
-import { Trash2, CheckCircle, XCircle, Loader2, MoreHorizontal, Plus } from "lucide-react";
-import { getTasks, createTask, deleteTask, completeTask, getLabels, setTaskLabels, Task, Project, Label } from "@/lib/api";
+import { Trash2, CheckCircle, XCircle, Loader2, MoreHorizontal, Plus, Pencil } from "lucide-react";
+import { getTasks, createTask, deleteTask, completeTask, getLabels, setTaskLabels, updateTask, getTask, Task, Project, Label } from "@/lib/api";
 import { formatDate, deadlineColorClass, projectName, labelColor } from "@/lib/format";
 import AddTaskForm from "./AddTaskForm";
 import TaskCard from "./TaskCard";
+import EditTaskModal from "./EditTaskModal";
+import DeadlinePopover from "./DeadlinePopover";
 import FilterPanel, { FilterState, EMPTY_FILTER, hasActiveFilters, activeFilterCount } from "./FilterPanel";
 
 // Feedback shown briefly after an action (replaces TempData flash messages from v1).
@@ -44,6 +46,11 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
   // Ref for the filter trigger button, used to position the panel.
   const filterButtonRef = useRef<HTMLDivElement>(null);
+  // The task currently open in the edit modal (null = modal closed).
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  // Which task's deadline quick-popover is open in the DESKTOP table (mobile
+  // cards manage their own popover state internally).
+  const [deadlinePopoverId, setDeadlinePopoverId] = useState<number | null>(null);
 
   // Fetch all tasks and labels in parallel. Called on mount.
   const loadTasks = useCallback(async () => {
@@ -68,7 +75,8 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
   // in-flight operation (delete, complete, hide animation) to avoid
   // overwriting optimistic state.
   const pollEnabled =
-    deletingId === null && completingId === null && hidingIds.size === 0;
+    deletingId === null && completingId === null && hidingIds.size === 0 &&
+    editingTask === null && deadlinePopoverId === null;
 
   usePolling(
     useCallback(async () => {
@@ -111,6 +119,26 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
 
     setTasks((prev) => [task, ...prev]);
     showFeedback("success", "Task created.");
+  }
+
+  // Called by EditTaskModal after a successful save with the canonical task.
+  // Replace it in local state so the list reflects the edit without a reload.
+  function handleSaved(updated: Task) {
+    setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    setEditingTask(null);
+    showFeedback("success", "Task updated.");
+  }
+
+  // Quick deadline change from the popover (desktop rows + mobile cards).
+  // Patches just the deadline and updates local state with the returned task.
+  async function handleDeadlineQuickSet(id: number, deadline: string | null) {
+    try {
+      const updated = await updateTask(id, { deadline });
+      setTasks((prev) => prev.map((t) => (t.id === id ? updated : t)));
+      showFeedback("success", deadline ? "Deadline updated." : "Deadline cleared.");
+    } catch {
+      showFeedback("error", "Failed to update deadline. Please try again.");
+    }
   }
 
   // Delete a task by ID. Updates local state on success.
@@ -422,13 +450,28 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
                         </td>
                       )}
 
-                      {/* Deadline with proximity-based color */}
-                      <td
-                        className={`px-6 py-4 ${deadlineColorClass(task.deadline)}`}
-                      >
-                        {task.deadline ? formatDate(task.deadline) : (
-                          <span className="text-zinc-300">--</span>
-                        )}
+                      {/* Deadline - click to open the quick-set popover */}
+                      <td className="px-6 py-4">
+                        <div className="relative inline-block">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setDeadlinePopoverId(deadlinePopoverId === task.id ? null : task.id)
+                            }
+                            aria-label={`Change deadline for ${task.title}`}
+                            className={`rounded px-1 -mx-1 hover:bg-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer transition-colors duration-150 ${deadlineColorClass(task.deadline)}`}
+                          >
+                            {task.deadline ? formatDate(task.deadline) : (
+                              <span className="text-zinc-300">Set date</span>
+                            )}
+                          </button>
+                          {deadlinePopoverId === task.id && (
+                            <DeadlinePopover
+                              onPick={(d) => handleDeadlineQuickSet(task.id, d)}
+                              onClose={() => setDeadlinePopoverId(null)}
+                            />
+                          )}
+                        </div>
                       </td>
 
                       {/* Creation date */}
@@ -464,24 +507,33 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
                         )}
                       </td>
 
-                      {/* Delete button: min 44px touch target, aria-label, disabled during request. */}
+                      {/* Edit + Delete actions */}
                       <td className="px-6 py-4">
-                        <button
-                          onClick={() => handleDelete(task.id)}
-                          disabled={deletingId === task.id}
-                          aria-label={`Delete task: ${task.title}`}
-                          className="flex items-center justify-center w-8 h-8 min-w-[44px] min-h-[44px] text-zinc-400 hover:text-red-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors duration-150 cursor-pointer"
-                        >
-                          {deletingId === task.id ? (
-                            <Loader2
-                              size={16}
-                              className="animate-spin"
-                              aria-hidden="true"
-                            />
-                          ) : (
-                            <Trash2 size={16} aria-hidden="true" />
-                          )}
-                        </button>
+                        <div className="flex items-center">
+                          <button
+                            onClick={() => setEditingTask(task)}
+                            aria-label={`Edit task: ${task.title}`}
+                            className="flex items-center justify-center w-8 h-8 min-w-[44px] min-h-[44px] text-zinc-400 hover:text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-1 rounded transition-colors duration-150 cursor-pointer"
+                          >
+                            <Pencil size={16} aria-hidden="true" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(task.id)}
+                            disabled={deletingId === task.id}
+                            aria-label={`Delete task: ${task.title}`}
+                            className="flex items-center justify-center w-8 h-8 min-w-[44px] min-h-[44px] text-zinc-400 hover:text-red-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors duration-150 cursor-pointer"
+                          >
+                            {deletingId === task.id ? (
+                              <Loader2
+                                size={16}
+                                className="animate-spin"
+                                aria-hidden="true"
+                              />
+                            ) : (
+                              <Trash2 size={16} aria-hidden="true" />
+                            )}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -500,6 +552,8 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
                 activeView={activeView}
                 onComplete={handleComplete}
                 onDelete={handleDelete}
+                onEdit={setEditingTask}
+                onDeadlineChange={handleDeadlineQuickSet}
                 deletingId={deletingId}
                 completingId={completingId}
                 isHiding={hidingIds.has(task.id)}
@@ -517,6 +571,17 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
         defaultProjectId={typeof activeView === "number" ? activeView : null}
         allLabels={allLabels}
       />
+
+      {/* Edit modal - rendered only when a task is being edited */}
+      {editingTask && (
+        <EditTaskModal
+          task={editingTask}
+          projects={projects}
+          allLabels={allLabels}
+          onSaved={handleSaved}
+          onClose={() => setEditingTask(null)}
+        />
+      )}
     </div>
   );
 }

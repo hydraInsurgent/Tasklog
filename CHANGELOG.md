@@ -2,6 +2,18 @@
 
 ---
 
+## v2.10.2 - Editable task title and deadline
+*May 2026*
+
+### Added
+
+- `PATCH /api/tasks/{id}` - partial update of a task's `title` and/or `deadline`. Present-key detection: an omitted field is left unchanged, `deadline: null` clears the deadline, and a value sets it. Returns 400 on an empty/whitespace title or an unparseable date, 404 if the task does not exist. Until now title and deadline could only be set at creation (#59)
+- MCP `update_task(id, title?, deadline?)` tool wrapping the new endpoint, so Claude can rename a task or change/clear its deadline without delete-and-recreate (which lost `createdAt` and completion history). MCP tool count: 15 → 16
+- Web UI edit modal (`EditTaskModal`) on the task three-dot menu and a desktop table edit action - edits title, deadline, project, and labels in one place, firing only the fields that changed
+- Web UI quick-deadline popover (`DeadlinePopover`) on the deadline pill: Today, Tomorrow, This weekend (upcoming Saturday), Next week (upcoming Monday), or None to clear
+
+---
+
 ## v2.10.1 - MCP task filtering + tool consolidation
 *May 2026*
 

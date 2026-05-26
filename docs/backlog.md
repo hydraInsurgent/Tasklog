@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| - | - | - | (none - Phase 2 of MCP+UI proposal is next) |
+| [P59-update-task-and-edit-modal.md](plans/P59-update-task-and-edit-modal.md) | #59 | feature/update-task-and-edit-modal-#59 | In Progress |
 
 ---
 
