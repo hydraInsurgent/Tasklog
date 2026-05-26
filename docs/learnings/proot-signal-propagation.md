@@ -38,13 +38,15 @@ So the reliable restart is to kill the **inner guest process** by a distinctive 
 # because proot --kill-on-exit makes proot exit when the guest dies.
 pkill -9 -f 'Tasklog.Api.dll'      # the .NET guest
 pkill -9 -f 'dist/server.js'       # the MCP node guest
-pkill -9 -f 'node server.js'       # the frontend node guest (note: does NOT
-                                   #   match 'node dist/server.js', so the MCP
-                                   #   service is left alone)
+pkill -9 -f 'next-server'          # the frontend guest - Next.js renames its
+                                   #   process to "next-server (vX.Y.Z)", NOT
+                                   #   "node server.js" (which matches nothing)
 pkill -9 -f 'cloudflared tunnel'   # the tunnel guest
 ```
 
-Patterns must be mutually exclusive, or one kill takes down a service you didn't mean to touch. The web-vs-mcp case is the subtle one: `node server.js` is a substring of itself but not of `node dist/server.js`, so the web pattern is safe.
+Patterns must be mutually exclusive, or one kill takes down a service you didn't mean to touch. Two traps caught us here:
+1. **Match the actual process name, not the launch command.** Next.js' standalone `node server.js` renames itself to `next-server (v16.1.6)` once running, so `pkill -f 'node server.js'` silently matched nothing and the web service was never restarted (it kept serving old code). Always verify with `ps -eo pid,args` what the running process *actually* looks like, not what the run script invoked.
+2. **MCP vs web disambiguation:** `dist/server.js` (MCP) and `next-server` (web) share no substring, so they're cleanly separable.
 
 ## Common misconceptions
 

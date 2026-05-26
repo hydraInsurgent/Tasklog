@@ -354,7 +354,9 @@ EOF
 # Patterns must be mutually exclusive:
 #   tasklog-api    -> 'Tasklog.Api.dll'
 #   tasklog-mcp    -> 'dist/server.js'   (matches node dist/server.js only)
-#   tasklog-web    -> 'node server.js'   (does NOT match 'node dist/server.js')
+#   tasklog-web    -> 'next-server'      (Next.js renames its process to
+#                                         "next-server (vX.Y.Z)" - it is NOT
+#                                         "node server.js", which matched nothing)
 #   tasklog-tunnel -> 'cloudflared tunnel'
 
 step "Restarting services (kill inner proot guest -> runit auto-restarts)"
@@ -363,9 +365,9 @@ ssh "$PHONE_HOST" bash <<EOF
 export SVDIR=${PHONE_SVDIR}
 
 echo "--- killing inner guest processes (runit will auto-restart with new code) ---"
-pkill -9 -f 'Tasklog.Api.dll'   && echo "  tasklog-api: inner killed"    || echo "  tasklog-api: no inner process found"
-pkill -9 -f 'dist/server.js'    && echo "  tasklog-mcp: inner killed"    || echo "  tasklog-mcp: no inner process found"
-pkill -9 -f 'node server.js'    && echo "  tasklog-web: inner killed"    || echo "  tasklog-web: no inner process found"
+pkill -9 -f 'Tasklog.Api.dll'    && echo "  tasklog-api: inner killed"    || echo "  tasklog-api: no inner process found"
+pkill -9 -f 'dist/server.js'     && echo "  tasklog-mcp: inner killed"    || echo "  tasklog-mcp: no inner process found"
+pkill -9 -f 'next-server'        && echo "  tasklog-web: inner killed"    || echo "  tasklog-web: no inner process found"
 pkill -9 -f 'cloudflared tunnel' && echo "  tasklog-tunnel: inner killed" || echo "  tasklog-tunnel: no inner process found"
 
 echo "--- waiting 40s for proot exit + runit auto-restart + app boot ---"
