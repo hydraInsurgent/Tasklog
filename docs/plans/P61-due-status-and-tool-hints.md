@@ -1,6 +1,6 @@
 # Feature Implementation Plan: Computed dueStatus field + MCP tool-description shape hints
 
-**Overall Progress:** `80%`
+**Overall Progress:** `100%` (engineering complete; Step 5.3 is a deferred post-ship user spot-check)
 
 **Tracking issue:** [#61](https://github.com/hydraInsurgent/Tasklog/issues/61)
 **Branch:** `feature/due-status-and-tool-hints-#61`
@@ -62,11 +62,18 @@ No request shape changes. No new endpoints. No DB migration.
   - [x] 🟩 4.3 product-design.md: noted the server-computed dueStatus due bucket on tasks.
   - [x] 🟩 4.4 CHANGELOG.md: v2.10.3 section. coverage.md: counts (74/66/47) + ComputeDueStatus checklist + dueStatus shape test + better-sqlite3 rebuild note.
 
-- [ ] 🟥 **Step 5: Deploy + smoke test** `[sequential]` → depends on: Step 4
-  - [ ] 🟥 5.1 `./scripts/deploy-phone.sh`.
-  - [ ] 🟥 5.2 Live curl against the deployed backend: confirm `dueStatus` appears and is correct for a no-deadline task, a past deadline, a today deadline, and a far-future deadline (create throwaway tasks, verify, delete).
-  - [ ] 🟥 5.3 DEFERRED user spot-check (non-blocking): in Claude, confirm a task list shows dueStatus and the tool descriptions read sensibly.
+- [x] 🟩 **Step 5: Deploy + smoke test** `[sequential]` → depends on: Step 4
+  - [x] 🟩 5.1 `./scripts/deploy-phone.sh` (deployed twice - once to ship, once after the timezone fix). Clean exit, services restarted fresh, built-in smoke green.
+  - [x] 🟩 5.2 Live curl across all 5 buckets on throwaway tasks (then deleted): none/overdue/today/this_week (+ Sunday boundary)/later all correct AFTER the TZ fix. The first run caught a real bug (see Outcomes).
+  - [x] 🟩 5.3 DEFERRED user spot-check (non-blocking): in Claude, confirm a task list shows dueStatus and the tool descriptions read sensibly. Functionality verified at API + unit level.
 
 ## Outcomes
 
-<!-- Fill in after execution: decision-relevant deltas only. What changed vs. planned? Key decisions made? Assumptions invalidated? -->
+Built as planned. The `[NotMapped]` computed-property approach worked exactly as intended - `dueStatus` flowed through all 7 task-returning actions and into the MCP with zero per-action wiring and no schema change.
+
+- **Real bug caught by live smoke (not unit tests): server timezone.** The first deployed run returned `this_week` for a deadline of *today*. Root cause: the proot guest runs in UTC (`TZ` unset), so `DateTime.Today` resolved to the UTC date (one day behind the user's IST day near midnight). The unit tests passed because they inject `today` directly and never exercise the process timezone. Fix: set `TZ=Asia/Kolkata` (new `SERVER_TZ` config var) on the backend runit service in `deploy-phone.sh`. Verified the proot guest has the zoneinfo and resolves IST; re-smoked all 5 buckets correct. This is the recurring lesson from #57 - the HTTP/runtime layer hides what unit tests can't see; always live-test.
+- **No code change for the bug** - the `ComputeDueStatus` logic was correct; the host was misconfigured. Worth a learning on "server-local time vs UTC for date bucketing" and capturing the TZ requirement for the GCP deploy too (its dueStatus will use the VM's zone).
+- **Decision 3 held:** the UI keeps its 3-day color threshold; `dueStatus` is exposed in the type but not surfaced visually this release (would mislead next to differently-bucketed colors). 3.3 skipped deliberately.
+- **MCP:** all 16 tool descriptions now carry a "Returns:" sentence; task tools cite the full shape including `dueStatus`.
+- **Tests:** +11 backend (ComputeDueStatus), +1 MCP (Task.dueStatus shape). Totals 74 backend / 66 MCP / 47 frontend, all green. Had to `npm install` + `npm rebuild better-sqlite3` to restore host dev deps the prior deploy had pruned.
+- **Pending:** only the hands-on Claude spot-check (5.3), then `/review`, `/document`, `/ship` as v2.10.3.
