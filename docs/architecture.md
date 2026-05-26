@@ -65,9 +65,9 @@ Tasklog/
 │   │   ├── server.ts              Hono HTTP entry, middleware wiring
 │   │   ├── config.ts              Env var loading + production validation
 │   │   ├── api-client.ts          Typed client for the Tasklog .NET API
-│   │   ├── tools/                 16 MCP tools wrapping every API endpoint
-│   │   │   ├── tasks.ts           8 task tools (list/get/create/delete/complete/
-│   │   │   │                      uncomplete/assign-project/set-labels)
+│   │   ├── tools/                 15 MCP tools wrapping every API endpoint
+│   │   │   ├── tasks.ts           7 task tools (list[+filters]/get/create/delete/
+│   │   │   │                      set-completion/assign-project/set-labels)
 │   │   │   ├── projects.ts        4 project tools
 │   │   │   ├── labels.ts          4 label tools
 │   │   │   ├── registry.ts        Aggregates and registers all tools
@@ -169,7 +169,7 @@ LabelTaskModel  (join table - implicit many-to-many)
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/tasks` | All tasks, ordered by `CreatedAt` descending |
+| GET | `/api/tasks` | Tasks ordered by `CreatedAt` descending. Optional filter query params: `projectIds` (repeated key), `inbox`, `labelIds` (repeated key), `dueBefore`, `dueAfter`, `completed`, `text`. Arrays use repeated keys (`?projectIds=3&projectIds=5`), not comma-separated. AND across dimensions, OR within id arrays. No params = all tasks. `inbox=true` + `projectIds` → 400. See P57 plan for the full shape. |
 | GET | `/api/tasks/{id}` | Single task by ID. 404 if not found |
 | POST | `/api/tasks` | Create task. Body: `{ title, deadline?, projectId? }` |
 | DELETE | `/api/tasks/{id}` | Delete task. 204 on success, 404 if not found |
@@ -363,7 +363,9 @@ POST /token                                     auth_code and refresh_token gran
 
 ### Tool layer
 
-16 MCP tools across three families (tasks: 8, projects: 4, labels: 4). Each tool is a thin wrapper around the corresponding Tasklog `/api` endpoint via `api-client.ts`. Input schemas use Zod and are inlined per tool. The `runTool()` helper in `result.ts` converts thrown `ApiError`s into MCP `isError: true` tool results (not JSON-RPC protocol errors), so the LLM can see and react to failures.
+15 MCP tools across three families (tasks: 7, projects: 4, labels: 4). Each tool is a thin wrapper around the corresponding Tasklog `/api` endpoint via `api-client.ts`. Input schemas use Zod and are inlined per tool. The `runTool()` helper in `result.ts` converts thrown `ApiError`s into MCP `isError: true` tool results (not JSON-RPC protocol errors), so the LLM can see and react to failures.
+
+The `list_tasks` tool accepts an optional filter object (project, inbox, labels, deadline range, completion, title substring) that `api-client.ts` serializes into a query string on `GET /api/tasks`. Completion is a single `set_task_completion(id, isCompleted)` tool - the earlier `complete_task` / `uncomplete_task` split was consolidated in v2.10.1.
 
 ### OAuth data model
 

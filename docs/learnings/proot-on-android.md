@@ -106,6 +106,7 @@ Phone storage is typically eMMC or UFS - fast read, slower random writes. For SQ
 
 ## Further reading
 
+- [proot-signal-propagation.md](proot-signal-propagation.md) - why signals (and therefore `sv restart`) don't cross the proot boundary, and how to restart a proot-wrapped service reliably. The single most important operational gotcha for supervising services in proot.
 - proot upstream: https://proot-me.github.io/
 - proot-distro on GitHub: https://github.com/termux/proot-distro
 - Termux wiki on Termux:Boot: https://wiki.termux.com/wiki/Termux:Boot

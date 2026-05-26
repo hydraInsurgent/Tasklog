@@ -94,7 +94,50 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 // --- Tasks ---
 
-export const listTasks = (): Promise<Task[]> => request('/api/tasks');
+// Filter shape for listTasks(). All fields optional - omit to skip that filter.
+// Mirrors the query-string shape on the backend (see TaskFilterQuery in
+// TasksController.cs). Combination semantics: AND across dimensions, OR within
+// projectIds / labelIds arrays. Tasks with no deadline are excluded from
+// dueBefore / dueAfter filters. inbox=true with non-empty projectIds is a 400.
+export interface TaskFilter {
+  projectIds?: number[];
+  inbox?: boolean;
+  labelIds?: number[];
+  dueBefore?: string; // ISO 8601 date
+  dueAfter?: string;
+  completed?: boolean;
+  text?: string;
+}
+
+// Serialize the filter object into URLSearchParams, omitting undefined fields.
+// Arrays are emitted as REPEATED keys (?projectIds=3&projectIds=5), which is
+// what ASP.NET Core model binding binds to int[] natively. Comma-separated
+// (?projectIds=3,5) does NOT bind - it tries to parse "3,5" as a single int
+// and the filter silently matches nothing. Empty arrays are omitted so they
+// don't accidentally filter to "no tasks". Exported only for tests; in
+// production it is used internally by listTasks().
+export function buildTaskQuery(filter?: TaskFilter): string {
+  if (!filter) return '';
+  const params = new URLSearchParams();
+  if (filter.projectIds && filter.projectIds.length > 0) {
+    for (const id of filter.projectIds) params.append('projectIds', String(id));
+  }
+  if (filter.inbox !== undefined) params.set('inbox', String(filter.inbox));
+  if (filter.labelIds && filter.labelIds.length > 0) {
+    for (const id of filter.labelIds) params.append('labelIds', String(id));
+  }
+  if (filter.dueBefore) params.set('dueBefore', filter.dueBefore);
+  if (filter.dueAfter) params.set('dueAfter', filter.dueAfter);
+  if (filter.completed !== undefined) params.set('completed', String(filter.completed));
+  // Send the trimmed value so the wire query matches what the backend and the
+  // frontend match on (all three trim before comparing).
+  if (filter.text && filter.text.trim() !== '') params.set('text', filter.text.trim());
+  const qs = params.toString();
+  return qs ? `?${qs}` : '';
+}
+
+export const listTasks = (filter?: TaskFilter): Promise<Task[]> =>
+  request(`/api/tasks${buildTaskQuery(filter)}`);
 
 export const getTask = (id: number): Promise<Task> => request(`/api/tasks/${id}`);
 

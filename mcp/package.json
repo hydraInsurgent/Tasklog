@@ -11,7 +11,7 @@
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "pretest": "node -e \"try{require('./node_modules/better-sqlite3')}catch{console.log('[pretest] better-sqlite3 is not loadable on this host (likely an arm64 binary from a phone deploy). Rebuilding for host arch...');require('child_process').execSync('npm rebuild better-sqlite3 --no-audit --no-fund --no-progress',{stdio:'inherit'})}\"",
-    "test": "AUTH_DB_PATH=':memory:' SESSION_SECRET='test-secret-not-for-production' node --import tsx --test src/oauth/crypto.test.ts src/oauth/middleware.test.ts src/oauth/store.test.ts src/oauth/token.test.ts src/tools/result.test.ts"
+    "test": "AUTH_DB_PATH=':memory:' SESSION_SECRET='test-secret-not-for-production' node --import tsx --test src/oauth/crypto.test.ts src/oauth/middleware.test.ts src/oauth/store.test.ts src/oauth/token.test.ts src/tools/result.test.ts src/api-client.test.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.0.2",

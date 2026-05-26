@@ -210,6 +210,13 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
       }
     }
 
+    // 5. Text filter - case-insensitive substring on the title. Whitespace-only
+    // text is treated as no filter (matches the backend behaviour).
+    const text = filterState.text.trim().toLowerCase();
+    if (text !== "") {
+      if (!t.title.toLowerCase().includes(text)) return false;
+    }
+
     return true;
   });
 
