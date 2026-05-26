@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| [P57-mcp-search-and-tool-improvements.md](plans/P57-mcp-search-and-tool-improvements.md) | #57 | feature/mcp-search-and-tool-improvements-#57 | In Progress |
+| - | - | - | (none - Phase 2 of MCP+UI proposal is next) |
 
 ---
 
@@ -75,6 +75,7 @@ Recently completed work (keep last 10):
 
 | # | Title | Type | Closed |
 |---|-------|------|--------|
+| #57 | MCP task filtering + tool consolidation (v2.10.1) | feature | 2026-05-26 |
 | #50 | MCP server for claude.ai custom connector | feature | 2026-05-20 |
 | #48 | Deploy Tasklog to GCP | feature | 2026-04-18 |
 | #47 | README overhaul and MIT license file | feature | 2026-04-04 |
