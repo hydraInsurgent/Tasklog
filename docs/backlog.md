@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| [P71-advanced-recurrence-grammar.md](plans/P71-advanced-recurrence-grammar.md) | #71 | feature/advanced-recurrence-grammar-#71 | In Progress |
+| _none_ | | | |
 
 ---
 
@@ -77,6 +77,7 @@ Recently completed work (keep last 10):
 
 | # | Title | Type | Closed |
 |---|-------|------|--------|
+| #71 | Advanced recurrence grammar (nth-weekday, end conditions, intervals) (v2.14.1) | feature | 2026-05-27 |
 | #70 | Recurrence core (recurring tasks) (v2.14.0) | feature | 2026-05-27 |
 | #69 | Task comments + completion-log foundation (v2.13.0) | feature | 2026-05-27 |
 | #68 | Deadline time-of-day (v2.12.0) | feature | 2026-05-27 |
@@ -86,7 +87,6 @@ Recently completed work (keep last 10):
 | #64 | Task priority (Todoist P1-P4) (v2.10.5) | feature | 2026-05-27 |
 | #63 | Bulk task operations (complete, move-to-project, set-deadline) (v2.10.4) | feature | 2026-05-27 |
 | #61 | Computed dueStatus field + MCP tool-description shape hints (v2.10.3) | feature | 2026-05-27 |
-| #59 | Update task (title/deadline) + edit modal + quick deadline (v2.10.2) | feature | 2026-05-27 |
 
 ---
 
