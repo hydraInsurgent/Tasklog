@@ -1,6 +1,6 @@
 # Feature Implementation Plan: Recurrence core (recurring tasks)
 
-**Overall Progress:** `0%`
+**Overall Progress:** `30%`
 
 **Tracking issue:** [#70](https://github.com/hydraInsurgent/Tasklog/issues/70)
 **Branch:** `feature/recurrence-core-#70`
@@ -71,14 +71,14 @@ MCP: create_task / update_task gain a `recurrence` string param (subset taught i
 
 ## Tasks
 
-- [ ] 🟥 **Step 1: Backend - model, migration, RecurrenceRule helper, controller** `[sequential]` → depends on: nothing
-  - [ ] 🟥 1.1 `TaskModel`: add `string? Recurrence`, `Guid? SeriesId`, and `[NotMapped] public bool IsRecurring => Recurrence != null`. No `OnModelCreating` change (both nullable, null = non-recurring).
-  - [ ] 🟥 1.2 `AddRecurrence` migration via **global** dotnet-ef (no local tool manifest). Adds the two nullable columns; verify the generated migration has no surprise default.
-  - [ ] 🟥 1.3 New `backend/Tasklog.Api/Services/RecurrenceRule.cs` - pure static helper: `Parse(string)` -> typed struct (`Freq` enum Daily/Weekly/Monthly, `int Interval`, `DayOfWeek[] Weekdays`, `int MonthDay`); `Serialize()`; `NextDeadline(DateTime current)` (clock-free, preserves `TimeOfDay`; monthly clamps `MonthDay` > days-in-month to month end); `Validate` rejecting the unsupported grammar. Mirrors `ComputeDueStatus` (pure, parameterized, testable).
-  - [ ] 🟥 1.4 `Create`: `CreateTaskRequest` gains `string? Recurrence = null`. Validate (recurrence requires `Deadline` -> 400; parse+validate rule -> 400 on failure). Set `SeriesId = Guid.NewGuid()` for a recurring task.
-  - [ ] 🟥 1.5 `Update` (JsonElement PATCH): handle the `recurrence` present-key. Set -> validate (rule valid; task has a deadline) + assign `SeriesId` if currently null; clear (null) -> null `Recurrence` and `SeriesId`.
-  - [ ] 🟥 1.6 `Complete`: when `IsCompleted==true` AND `Recurrence!=null` AND `Deadline!=null` -> mark current done, compute `next = RecurrenceRule.Parse(rule).NextDeadline(Deadline.Value)`, create a new `TaskModel` (carry Title/ProjectId/Priority/Description/Recurrence/SeriesId + Labels via the join; `Deadline=next`; `IsCompleted=false`; `CreatedAt=now`), add a completion `TaskComment` to the completed task, save. Return the completed task (unchanged contract). Bulk path untouched.
-  - [ ] 🟥 1.7 Tests: `RecurrenceRuleTests` (parse/serialize round-trip; `NextDeadline` daily / every-N / weekly-single / weekly-multi / monthly / monthly-clamp + time-of-day preserved; validation rejects each unsupported form) + `TasksControllerTests` (create recurring sets SeriesId; recurrence-without-deadline 400; bad rule 400; complete recurring spawns next with carried fields + same SeriesId + completion comment + original done; complete non-recurring unchanged; update set/clear recurrence). All backend tests green.
+- [x] 🟩 **Step 1: Backend - model, migration, RecurrenceRule helper, controller** `[sequential]` → depends on: nothing
+  - [x] 🟩 1.1 `TaskModel`: `string? Recurrence`, `Guid? SeriesId`, `[NotMapped] IsRecurring`. No `OnModelCreating` change.
+  - [x] 🟩 1.2 `AddRecurrence` migration via global dotnet-ef. Two nullable columns (Recurrence TEXT, SeriesId TEXT/Guid), no default - existing rows -> NULL = non-recurring.
+  - [x] 🟩 1.3 `Services/RecurrenceRule.cs` pure static helper: `TryParse` (validate subset, reject unsupported with a clear error), `Serialize` (canonical), `NextDeadline` (clock-free, preserves TimeOfDay, monthly clamps to month end). Freq enum Daily/Weekly/Monthly.
+  - [x] 🟩 1.4 `Create`: `CreateTaskRequest` gained `string? Recurrence = null`; validates (deadline required, rule valid) and stamps SeriesId; stores canonical form.
+  - [x] 🟩 1.5 `Update`: `recurrence` present-key (set validates + assigns SeriesId via `??=`; clear nulls both). Set respects a deadline set in the same PATCH.
+  - [x] 🟩 1.6 `Complete`: open->completed transition guard (no double-spawn); spawns next occurrence (carries fields + labels, same SeriesId), logs a completion comment; returns the completed task. Bulk untouched.
+  - [x] 🟩 1.7 Tests: `RecurrenceRuleTests` + `TasksControllerTests` recurrence cases. **190 backend tests pass** (was 143, +47).
 
 - [ ] 🟥 **Step 2: MCP - recurrence on create/update + in the Task shape** `[sequential]` → depends on: Step 1
   - [ ] 🟥 2.1 `api-client.ts`: `Task` gains `recurrence: string | null`, `seriesId: string | null`, `isRecurring: boolean`; `createTask`/`updateTask` bodies gain `recurrence?: string | null`.
