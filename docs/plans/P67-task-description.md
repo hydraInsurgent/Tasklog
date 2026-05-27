@@ -1,6 +1,6 @@
 # Feature Implementation Plan: Task description field
 
-**Overall Progress:** `0%`
+**Overall Progress:** `85%`
 
 **Tracking issue:** [#67](https://github.com/hydraInsurgent/Tasklog/issues/67)
 **Branch:** `feature/task-description-#67`
@@ -37,27 +37,27 @@ MCP: create_task / update_task gain a `description` param; Task objects include 
 
 ## Tasks
 
-- [ ] 🟥 **Step 1: Backend - column, migration, create/update** `[sequential]` → depends on: nothing
-  - [ ] 🟥 1.1 `TaskModel` gains `public string? Description { get; set; }`. (No DbContext config - nullable string maps and defaults to null.)
-  - [ ] 🟥 1.2 Create migration `AddDescription` via a GLOBAL `dotnet-ef` install (NOT a local tool manifest - a committed `dotnet-tools.json` broke release CI in #65's tail). Verify it adds a nullable TEXT column with no default.
-  - [ ] 🟥 1.3 `CreateTaskRequest` gains `string? Description = null`; Create normalises (trim; null/whitespace -> null) and 400s if > 2000 chars; sets it.
-  - [ ] 🟥 1.4 `Update` handles a `description` key: null/empty/whitespace -> clear; string -> trimmed set (400 if > 2000); omitted -> keep. A small shared `NormalizeDescription(string?)` helper avoids duplicating the trim/cap between Create and Update.
-  - [ ] 🟥 1.5 Tests: create with description / without (null) / >2000 -> 400; update set / clear (null + empty) / omit-keeps / >2000 -> 400.
+- [x] 🟩 **Step 1: Backend - column, migration, create/update** `[sequential]` → depends on: nothing
+  - [x] 🟩 1.1 `TaskModel` gained nullable `Description`.
+  - [x] 🟩 1.2 `AddDescription` migration via global dotnet-ef (no local manifest); verified nullable TEXT, no default.
+  - [x] 🟩 1.3 `CreateTaskRequest` gained `Description = null`; Create normalises + 400 on >2000.
+  - [x] 🟩 1.4 Update handles the `description` key (null/blank=clear, string=set trimmed, 400 on >2000, omit=keep) via the shared `NormalizeDescription` helper.
+  - [x] 🟩 1.5 9 tests (create with/blank/none/too-long-400; update set/clear[null+blank]/omit-keeps/too-long-400). 129 backend tests pass.
 
-- [ ] 🟥 **Step 2: MCP - param + type** `[sequential]` → depends on: Step 1
-  - [ ] 🟥 2.1 `Task` interface gains `description: string | null`. `createTask`/`updateTask` bodies gain `description?: string | null`.
-  - [ ] 🟥 2.2 `create_task` + `update_task` gain a `description` Zod param (string, optional; nullable on update for clearing) with describe text. Returns shape unchanged.
-  - [ ] 🟥 2.3 Tests: description present in create/update body; update null clears.
+- [x] 🟩 **Step 2: MCP - param + type** `[sequential]` → depends on: Step 1
+  - [x] 🟩 2.1 `Task` gained `description`; createTask/updateTask bodies gained `description?`.
+  - [x] 🟩 2.2 `create_task` (string max 2000) + `update_task` (nullable, for clearing) gained `description`; update description text + list_tasks Returns shape mention it.
+  - [x] 🟩 2.3 3 tests (create/update set, update null clears); fixed the dueStatus Task literal. 85 MCP tests pass.
 
-- [ ] 🟥 **Step 3: Web UI - forms + detail render** `[sequential]` → depends on: Step 1 `[UI]`
-  - [ ] 🟥 3.1 Frontend `Task` type gains `description: string | null`; `createTask`/`updateTask` accept it.
-  - [ ] 🟥 3.2 `AddTaskForm`: optional multiline `<textarea>` (resets after submit). `EditTaskModal`: multiline `<textarea>` prefilled, diffed + sent on change (clear = null).
-  - [ ] 🟥 3.3 Task detail page: render the description (`whitespace-pre-wrap`) as a block under the title, only when present. Optional: a subtle "has notes" indicator in the list/card.
-  - [ ] 🟥 3.4 Fixtures: add `description` to Task literals; keep existing tests green; clean tsc + build.
+- [x] 🟩 **Step 3: Web UI - forms + detail render** `[sequential]` → depends on: Step 1 `[UI]`
+  - [x] 🟩 3.1 Frontend `Task` type gained `description`; createTask/updateTask accept it.
+  - [x] 🟩 3.2 `AddTaskForm`: full-width multiline `<textarea>` (maxLength 2000, resets after submit). `EditTaskModal`: prefilled textarea, diffed + sent on change (blank -> null clears).
+  - [x] 🟩 3.3 Detail page renders the description (`whitespace-pre-wrap`) under the title, only when present. (Skipped the optional list indicator - keeps the list uncluttered.)
+  - [x] 🟩 3.4 Added `description` to the TaskCard fixture; fixed the AddTaskForm onAdd-arg assertion. 56 frontend tests green; clean tsc + next build.
 
-- [ ] 🟥 **Step 4: Docs + CHANGELOG** `[sequential]` → depends on: Steps 1-3
-  - [ ] 🟥 4.1 architecture.md: add `Description` to the Tasks data model + the POST/PATCH rows. product-design.md: tasks now have an optional description.
-  - [ ] 🟥 4.2 CHANGELOG.md: v2.11.0 section. coverage.md: new counts + checklists.
+- [x] 🟩 **Step 4: Docs + CHANGELOG** `[sequential]` → depends on: Steps 1-3
+  - [x] 🟩 4.1 architecture.md: `Description` in the Tasks data model + POST/PATCH rows. product-design.md: optional description on tasks.
+  - [x] 🟩 4.2 CHANGELOG.md: v2.11.0 section. coverage.md: counts (129 backend / 85 MCP) + description checklists.
 
 - [ ] 🟥 **Step 5: Deploy + smoke test** `[sequential]` → depends on: Step 4
   - [ ] 🟥 5.1 Check phone reachable (dozes); capture live task count first. Stash frontend WIP, `./scripts/deploy-phone.sh`, restore (pop) after. CONFIRM the migration applied with zero data loss (count unchanged, existing rows report null description).

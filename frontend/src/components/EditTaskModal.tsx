@@ -39,6 +39,7 @@ export default function EditTaskModal({ task, projects, allLabels, onSaved, onCl
   );
   const [labelIds, setLabelIds] = useState<number[]>(task.labels.map((l) => l.id));
   const [priority, setPriority] = useState(task.priority);
+  const [description, setDescription] = useState(task.description ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -89,23 +90,27 @@ export default function EditTaskModal({ task, projects, allLabels, onSaved, onCl
     // and fire a pointless clear PATCH; with it, only a real add/change/clear counts.
     const deadlineChanged = (newDeadline ?? "") !== toDateInput(task.deadline);
     const priorityChanged = priority !== task.priority;
+    // Normalise blank -> null on both sides so "still no description" isn't a change.
+    const newDescription = description.trim() || null;
+    const descriptionChanged = newDescription !== (task.description ?? null);
     const projectChanged = projectId !== origProjectId;
     const labelsChanged =
       origLabelIds.length !== newLabelIds.length ||
       origLabelIds.some((id, i) => id !== newLabelIds[i]);
 
-    if (!titleChanged && !deadlineChanged && !priorityChanged && !projectChanged && !labelsChanged) {
+    if (!titleChanged && !deadlineChanged && !priorityChanged && !descriptionChanged && !projectChanged && !labelsChanged) {
       onClose(); // nothing to do
       return;
     }
 
     setSaving(true);
     try {
-      if (titleChanged || deadlineChanged || priorityChanged) {
-        const body: { title?: string; deadline?: string | null; priority?: number } = {};
+      if (titleChanged || deadlineChanged || priorityChanged || descriptionChanged) {
+        const body: { title?: string; deadline?: string | null; priority?: number; description?: string | null } = {};
         if (titleChanged) body.title = trimmed;
         if (deadlineChanged) body.deadline = newDeadline;
         if (priorityChanged) body.priority = priority;
+        if (descriptionChanged) body.description = newDescription;
         await updateTask(task.id, body);
       }
       if (projectChanged) {
@@ -249,6 +254,23 @@ export default function EditTaskModal({ task, projects, allLabels, onSaved, onCl
                   </option>
                 ))}
               </select>
+            </div>
+
+            {/* Description */}
+            <div>
+              <label htmlFor="edit-description" className="block text-sm font-medium text-zinc-700 mb-1">
+                Description
+              </label>
+              <textarea
+                id="edit-description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                disabled={saving}
+                rows={3}
+                maxLength={2000}
+                placeholder="Notes, context, a link..."
+                className="w-full px-3 py-2 border border-zinc-200 rounded-md text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-shadow duration-150 resize-y"
+              />
             </div>
 
             {/* Labels - toggle chips for the existing labels */}

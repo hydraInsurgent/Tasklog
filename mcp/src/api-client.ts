@@ -31,6 +31,8 @@ export interface Label {
 export interface Task {
   id: number;
   title: string;
+  // Optional free-text notes/context. Null = no description.
+  description: string | null;
   deadline: string | null;
   // Computed server-side from the deadline relative to today. Read-only - never sent.
   dueStatus: 'overdue' | 'today' | 'this_week' | 'later' | 'none';
@@ -164,6 +166,7 @@ export const createTask = (body: {
   deadline?: string;
   projectId?: number;
   priority?: number;
+  description?: string;
 }): Promise<Task> =>
   request('/api/tasks', { method: 'POST', body: JSON.stringify(body) });
 
@@ -176,7 +179,7 @@ export const deleteTask = (id: number): Promise<void> =>
 // sets it. Pass {} and nothing changes.
 export const updateTask = (
   id: number,
-  body: { title?: string; deadline?: string | null; priority?: number },
+  body: { title?: string; deadline?: string | null; priority?: number; description?: string | null },
 ): Promise<Task> =>
   request(`/api/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
 

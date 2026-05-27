@@ -22,6 +22,7 @@ describe('Task.dueStatus shape (server-computed, pass-through)', () => {
     const sample: Task = {
       id: 1,
       title: 'x',
+      description: null,
       deadline: null,
       dueStatus: 'none',
       priority: 4,
@@ -149,6 +150,22 @@ describe('name resolution request bodies', () => {
       JSON.stringify({ labelNames: ['urgent', 'home'] }),
       '{"labelNames":["urgent","home"]}',
     );
+  });
+});
+
+// Description flows through create/update bodies; null on update clears (#67).
+describe('description wire contract', () => {
+  test('create body carries description', () => {
+    assert.equal(
+      JSON.stringify({ title: 'x', description: 'some notes' }),
+      '{"title":"x","description":"some notes"}',
+    );
+  });
+  test('update body sets description', () => {
+    assert.equal(JSON.stringify({ description: 'hi' }), '{"description":"hi"}');
+  });
+  test('update body null clears description', () => {
+    assert.equal(JSON.stringify({ description: null }), '{"description":null}');
   });
 });
 

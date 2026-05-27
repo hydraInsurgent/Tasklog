@@ -12,6 +12,7 @@ const baseTask: Task = {
   deadline: null,
   dueStatus: 'none',
   priority: 4,
+  description: null,
   projectId: null,
   createdAt: '2026-03-14T00:00:00Z',
   completedAt: null,

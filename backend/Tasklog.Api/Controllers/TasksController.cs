@@ -186,9 +186,15 @@ namespace Tasklog.Api.Controllers
             if (priority < 1 || priority > 4)
                 return BadRequest(new { message = "Priority must be between 1 (P1) and 4 (P4)." });
 
+            // Description is optional free text; normalise (trim, null when blank) and cap.
+            var (description, descError) = NormalizeDescription(request.Description);
+            if (descError is not null)
+                return BadRequest(new { message = descError });
+
             var task = new TaskModel
             {
                 Title = request.Title.Trim(),
+                Description = description,
                 Deadline = request.Deadline,
                 CreatedAt = DateTime.Now,
                 // Null means the task goes to Inbox (uncategorized).
@@ -230,6 +236,26 @@ namespace Tasklog.Api.Controllers
                 if (titleEl.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(titleEl.GetString()))
                     return BadRequest(new { message = "Title must be a non-empty string." });
                 task.Title = titleEl.GetString()!.Trim();
+            }
+
+            // description: present + null/blank clears it; present + string sets it
+            // (trimmed, <= 2000 chars); a non-string/non-null is a bad request. Absent keeps.
+            if (body.TryGetProperty("description", out var descEl))
+            {
+                if (descEl.ValueKind == JsonValueKind.Null)
+                {
+                    task.Description = null;
+                }
+                else if (descEl.ValueKind == JsonValueKind.String)
+                {
+                    var (description, descError) = NormalizeDescription(descEl.GetString());
+                    if (descError is not null) return BadRequest(new { message = descError });
+                    task.Description = description;
+                }
+                else
+                {
+                    return BadRequest(new { message = "Description must be a string or null." });
+                }
             }
 
             // deadline: present + null clears it; present + ISO date string sets it;
@@ -469,6 +495,18 @@ namespace Tasklog.Api.Controllers
             return Ok(tasks);
         }
 
+        // Normalise a free-text description: trim, treat blank as null (no description),
+        // and cap the length. Returns an error string (caller -> 400) when too long.
+        private const int MaxDescriptionLength = 2000;
+        private static (string? value, string? error) NormalizeDescription(string? raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw)) return (null, null);
+            var trimmed = raw.Trim();
+            if (trimmed.Length > MaxDescriptionLength)
+                return (null, $"Description must be {MaxDescriptionLength} characters or fewer.");
+            return (trimmed, null);
+        }
+
         // Resolve a project name to its id. Exact, case-insensitive match. Returns an
         // error string (not an id) when the name matches zero or more than one project,
         // so the caller can return a 400 - we never guess which project was meant.
@@ -507,8 +545,9 @@ namespace Tasklog.Api.Controllers
         }
     }
 
-    // Request body shape for task creation. Priority is optional (defaults to 4 = none).
-    public record CreateTaskRequest(string Title, DateTime? Deadline, int? ProjectId, int? Priority = null);
+    // Request body shape for task creation. Priority is optional (defaults to 4 = none);
+    // Description is optional free text (null/blank = none).
+    public record CreateTaskRequest(string Title, DateTime? Deadline, int? ProjectId, int? Priority = null, string? Description = null);
 
     // Request body shape for toggling task completion.
     public record CompleteTaskRequest(bool IsCompleted);

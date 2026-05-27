@@ -9,7 +9,7 @@ import LabelChip from "./LabelChip";
 interface Props {
   // Called by the parent when the form submits. Parent handles the API call
   // and any feedback display, so this component stays focused on form state.
-  onAdd: (title: string, deadline?: string, projectId?: number | null, labelIds?: number[], priority?: number) => Promise<void>;
+  onAdd: (title: string, deadline?: string, projectId?: number | null, labelIds?: number[], priority?: number, description?: string) => Promise<void>;
   // Projects list for the optional project dropdown. Omit to hide the dropdown.
   projects?: Project[];
   // Which project to pre-select (e.g. the current sidebar view). Null = Inbox.
@@ -23,6 +23,8 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
   const [deadline, setDeadline] = useState("");
   // Priority on the P1-P4 scale; default 4 (none).
   const [priority, setPriority] = useState(4);
+  // Optional free-text description.
+  const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   // Separate error state for label creation so it doesn't interfere with
@@ -148,11 +150,12 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
 
     setLoading(true);
     try {
-      await onAdd(title.trim(), deadline || undefined, projectId, labelIds, priority);
+      await onAdd(title.trim(), deadline || undefined, projectId, labelIds, priority, description.trim() || undefined);
       // Clear the form on success.
       setTitle("");
       setDeadline("");
       setPriority(4);
+      setDescription("");
       setSelectedLabels([]);
       setLabelInput("");
     } catch (err) {
@@ -369,6 +372,23 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
             {loading ? "Adding..." : "Add Task"}
           </button>
         </div>
+      </div>
+
+      {/* Description: optional multiline notes, full width below the inline fields. */}
+      <div className="mt-3">
+        <label htmlFor="task-description" className="block text-sm font-medium text-zinc-700 mb-1">
+          Description (optional)
+        </label>
+        <textarea
+          id="task-description"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          disabled={loading}
+          rows={2}
+          maxLength={2000}
+          placeholder="Notes, context, a link..."
+          className="w-full px-3 py-2 border border-zinc-200 rounded-md text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-shadow duration-150 resize-y"
+        />
       </div>
     </form>
   );

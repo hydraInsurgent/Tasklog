@@ -1268,4 +1268,114 @@ public class TasksControllerTests
         var tasks = result.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeAssignableTo<List<TaskModel>>().Subject;
         tasks.Should().OnlyContain(t => t.ProjectId == project.Id);
     }
+
+    // --- Description (#67) ---
+
+    [Fact]
+    public async Task Create_WithDescription_StoresTrimmed()
+    {
+        using var context = CreateContext();
+        var controller = new TasksController(context);
+
+        var result = await controller.Create(new CreateTaskRequest("t", null, null, Description: "  some notes  "));
+
+        var created = result.Should().BeOfType<CreatedAtActionResult>().Subject.Value.Should().BeOfType<TaskModel>().Subject;
+        created.Description.Should().Be("some notes");
+    }
+
+    [Fact]
+    public async Task Create_WithoutDescription_IsNull()
+    {
+        using var context = CreateContext();
+        var controller = new TasksController(context);
+
+        var result = await controller.Create(new CreateTaskRequest("t", null, null));
+
+        var created = result.Should().BeOfType<CreatedAtActionResult>().Subject.Value.Should().BeOfType<TaskModel>().Subject;
+        created.Description.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Create_BlankDescription_IsNull()
+    {
+        using var context = CreateContext();
+        var controller = new TasksController(context);
+
+        var result = await controller.Create(new CreateTaskRequest("t", null, null, Description: "   "));
+
+        var created = result.Should().BeOfType<CreatedAtActionResult>().Subject.Value.Should().BeOfType<TaskModel>().Subject;
+        created.Description.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Create_DescriptionTooLong_Returns400()
+    {
+        using var context = CreateContext();
+        var controller = new TasksController(context);
+
+        var result = await controller.Create(new CreateTaskRequest("t", null, null, Description: new string('x', 2001)));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task Update_SetsDescription()
+    {
+        using var context = CreateContext();
+        var task = new TaskModel { Title = "t", CreatedAt = DateTime.Now };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.Update(task.Id, Json("{\"description\": \"  hello  \"}"));
+
+        var updated = result.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeOfType<TaskModel>().Subject;
+        updated.Description.Should().Be("hello");
+    }
+
+    [Theory]
+    [InlineData("{\"description\": null}")]
+    [InlineData("{\"description\": \"   \"}")]
+    public async Task Update_ClearsDescription(string json)
+    {
+        using var context = CreateContext();
+        var task = new TaskModel { Title = "t", CreatedAt = DateTime.Now, Description = "existing" };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.Update(task.Id, Json(json));
+
+        var updated = result.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeOfType<TaskModel>().Subject;
+        updated.Description.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Update_OmittedDescription_LeavesItUnchanged()
+    {
+        using var context = CreateContext();
+        var task = new TaskModel { Title = "t", CreatedAt = DateTime.Now, Description = "keep me" };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.Update(task.Id, Json("{\"title\": \"renamed\"}"));
+
+        var updated = result.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeOfType<TaskModel>().Subject;
+        updated.Description.Should().Be("keep me");
+    }
+
+    [Fact]
+    public async Task Update_DescriptionTooLong_Returns400()
+    {
+        using var context = CreateContext();
+        var task = new TaskModel { Title = "t", CreatedAt = DateTime.Now };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.Update(task.Id, Json($"{{\"description\": \"{new string('x', 2001)}\"}}"));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
 }

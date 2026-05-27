@@ -1,6 +1,6 @@
 # Test Coverage
 
-**Last updated:** 2026-05-27 (#66 - agent ergonomics: bulk_set_priority + name resolution)
+**Last updated:** 2026-05-27 (#67 - task description field: migration + create/update + UI)
 
 ---
 
@@ -19,7 +19,8 @@
 | TasksController.Bulk | 100% | 100% | +13 tests for POST /api/tasks/bulk (#63, incl. the 500-id cap) |
 | TasksController (priority) | 100% | 100% | +12 tests for priority on create/update/filter (#64, incl. float/negative rejection) |
 | TasksController (query) | 100% | 100% | +10 tests for createdAt range / sort / limit on GetAll (#65) |
-| TasksController (ergonomics) | 100% | 100% | +11 tests for bulk setPriority + project/label name resolution (#66) - 120 backend tests total |
+| TasksController (ergonomics) | 100% | 100% | +11 tests for bulk setPriority + project/label name resolution (#66) |
+| TasksController (description) | 100% | 100% | +9 tests for description on create/update (#67) - 129 backend tests total |
 | ProjectsController | 100% | 100% | All methods and branches covered |
 | TasklogDbContext | 100% | 100% | |
 | Program.cs | 0% | - | Framework wiring - not a test target |
@@ -42,7 +43,7 @@
 | oauth/well-known.ts | - | - | - | Returns fixed JSON metadata |
 | server.ts | - | - | - | Hono mount order + request logger; covered by middleware tests + end-to-end smoke |
 
-**82 tests, 0 failures** (was 78; +4 in api-client.test.ts for the bulk setPriority + projectName/labelNames request bodies, #66). Run with: `npm test --prefix mcp` (auto-rebuilds better-sqlite3 for host arch via pretest hook if needed). Note: a fresh `npm install` on the host installs better-sqlite3 without the native binary - run `npm rebuild better-sqlite3` once after install if the OAuth store/token tests fail with `ERR_DLOPEN_FAILED`.
+**85 tests, 0 failures** (was 82; +3 in api-client.test.ts for the description wire contract, #67). Run with: `npm test --prefix mcp` (auto-rebuilds better-sqlite3 for host arch via pretest hook if needed). Note: a fresh `npm install` on the host installs better-sqlite3 without the native binary - run `npm rebuild better-sqlite3` once after install if the OAuth store/token tests fail with `ERR_DLOPEN_FAILED`.
 
 ### Next.js Frontend - last run 2026-05-26
 
@@ -141,6 +142,14 @@
 - [x] 🟩 SetLabels by name - resolves + applies
 - [x] 🟩 SetLabels by name - unknown name -> 400
 - [x] 🟩 bulk assignProject by name - resolves
+
+### TasksController - description (#67)
+- [x] 🟩 Create - with description (trimmed) / without (null) / blank (null)
+- [x] 🟩 Create - description > 2000 chars -> 400
+- [x] 🟩 Update - sets description (trimmed)
+- [x] 🟩 Update - clears (null + blank)
+- [x] 🟩 Update - omitted leaves it unchanged
+- [x] 🟩 Update - description > 2000 chars -> 400
 
 ### TasksController.Bulk (POST /api/tasks/bulk)
 - [x] 🟩 complete true - sets IsCompleted + CompletedAt on all
@@ -319,6 +328,7 @@ its own subprocess, so in-memory DBs are isolated across files.
 - [x] 🟩 priority - buildTaskQuery serializes priorities as repeated keys + omits empty (#64)
 - [x] 🟩 query - buildTaskQuery serializes createdAfter/createdBefore, sort+order, limit; omits when absent (#65)
 - [x] 🟩 ergonomics - bulk setPriority body; assignProject-by-name body; setTaskProject projectName + setTaskLabels labelNames bodies (#66)
+- [x] 🟩 description - create/update body sets it; update null clears (#67)
 
 ### Not covered (and why)
 - `tools/tasks.ts`, `tools/projects.ts`, `tools/labels.ts` - thin api-client wrappers; behavior is exercised through `runTool` tests + the end-to-end smoke run with claude.ai.

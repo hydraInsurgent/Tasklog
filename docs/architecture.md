@@ -155,6 +155,7 @@ Projects
 Tasks
   Id          INTEGER  primary key, autoincrement
   Title       TEXT     not null
+  Description TEXT     nullable  (optional free-text notes, <= 2000 chars; null = none) (v2.11.0)
   Deadline    TEXT     nullable  (ISO 8601 date string)
   CreatedAt   TEXT     not null  (ISO 8601 datetime string)
   IsCompleted INTEGER  not null  default 0  (boolean: 0 = pending, 1 = complete)
@@ -183,8 +184,8 @@ LabelTaskModel  (join table - implicit many-to-many)
 |--------|------|-------------|
 | GET | `/api/tasks` | Filtered/sorted task list. Filter params: `projectIds` (repeated key), `inbox`, `labelIds` (repeated key), `dueBefore`, `dueAfter`, `createdAfter`, `createdBefore`, `completed`, `text`, `priorities` (repeated key, P1-P4). Sort: `sort` (`created`/`deadline`/`priority`, default `created`) + `order` (`asc`/`desc`, default `desc`; deadline sorts nulls-last, priority asc = P1 first). `limit` caps to the first N after sorting (`<1` → 400). Arrays use repeated keys, not comma-separated. AND across dimensions, OR within id arrays. No params = all tasks, newest-first. `inbox=true` + `projectIds` → 400. |
 | GET | `/api/tasks/{id}` | Single task by ID. 404 if not found |
-| POST | `/api/tasks` | Create task. Body: `{ title, deadline?, projectId?, priority? }`. priority is 1-4 (default 4 = none); 400 if out of range |
-| PATCH | `/api/tasks/{id}` | Partial update of title, deadline, and/or priority. JSON body, present-key detection: omit=keep, `deadline: null`=clear, value=set. priority must be 1-4 (no clear - P4 is none). 400 on empty title / bad date / bad priority. Returns the updated task |
+| POST | `/api/tasks` | Create task. Body: `{ title, deadline?, projectId?, priority?, description? }`. priority is 1-4 (default 4 = none); description <= 2000 chars (blank → null); 400 if out of range |
+| PATCH | `/api/tasks/{id}` | Partial update of title, deadline, priority, and/or description. JSON body, present-key detection: omit=keep, `deadline: null`/`description: null`/blank=clear, value=set. priority must be 1-4 (no clear - P4 is none); description <= 2000. 400 on empty title / bad date / bad priority / too-long description. Returns the updated task |
 | DELETE | `/api/tasks/{id}` | Delete task. 204 on success, 404 if not found |
 | PATCH | `/api/tasks/{id}/complete` | Mark task complete or incomplete. Body: `{ isCompleted: bool }`. Returns updated task |
 | PATCH | `/api/tasks/{id}/project` | Reassign task to a project or Inbox. Body: `{ projectId: int?, projectName?: string }`. projectName is resolved by name (case-insensitive, exact) and wins over projectId; 0/multiple matches → 400 |

@@ -34,11 +34,11 @@ export function registerTaskTools(server: McpServer): void {
         'given values). Use when the user asks "what tasks do I have", ' +
         '"what is due this week", "what is in the Work project", "tasks ' +
         'tagged urgent", "what is P1", etc. ' +
-        'Returns: array of tasks, each with id, title, deadline (ISO date or ' +
-        'null), dueStatus ("overdue" | "today" | "this_week" | "later" | ' +
-        '"none", computed server-side from the deadline), priority (1-4, ' +
-        '1=P1 urgent .. 4=P4 none), isCompleted, completedAt, projectId, ' +
-        'project, labels[].',
+        'Returns: array of tasks, each with id, title, description (or null), ' +
+        'deadline (ISO date or null), dueStatus ("overdue" | "today" | ' +
+        '"this_week" | "later" | "none", computed server-side from the ' +
+        'deadline), priority (1-4, 1=P1 urgent .. 4=P4 none), isCompleted, ' +
+        'completedAt, projectId, project, labels[].',
       inputSchema: {
         projectIds: z
           .array(z.number().int().positive())
@@ -186,12 +186,17 @@ export function registerTaskTools(server: McpServer): void {
             'Optional priority: 1=P1 (urgent), 2=P2 (high), 3=P3 (medium), ' +
               '4=P4 (none). Omit to default to P4 (no priority).',
           ),
+        description: z
+          .string()
+          .max(2000)
+          .optional()
+          .describe('Optional free-text notes/context for the task (up to 2000 chars).'),
       },
     },
-    async ({ title, deadline, projectId, priority }) =>
+    async ({ title, deadline, projectId, priority, description }) =>
       runTool(
         'create_task',
-        () => api.createTask({ title, deadline, projectId, priority }),
+        () => api.createTask({ title, deadline, projectId, priority, description }),
         (t) =>
           `Created task #${t.id}: "${t.title}"` +
           (t.deadline ? ` (due ${t.deadline})` : '') +
@@ -204,9 +209,10 @@ export function registerTaskTools(server: McpServer): void {
     {
       title: 'Update Task',
       description:
-        'Change a task\'s title, deadline, and/or priority. Use when the user says ' +
-        '"rename task X", "change the deadline of X to Friday", "move X to ' +
-        'next week", "clear X\'s deadline", "make X a P1", etc. Only the fields ' +
+        'Change a task\'s title, deadline, priority, and/or description. Use when ' +
+        'the user says "rename task X", "change the deadline of X to Friday", "move ' +
+        'X to next week", "clear X\'s deadline", "make X a P1", "add a note to X", ' +
+        'etc. Only the fields ' +
         'you pass are changed; omitted fields are left as-is. Pass deadline as ' +
         'null to remove an existing deadline. To change a task\'s project or ' +
         'labels, use assign_task_to_project or set_task_labels instead. Returns: ' +
@@ -236,15 +242,30 @@ export function registerTaskTools(server: McpServer): void {
             'New priority: 1=P1 (urgent), 2=P2 (high), 3=P3 (medium), 4=P4 ' +
               '(none). Omit to leave it unchanged. There is no "clear" - use 4 for none.',
           ),
+        description: z
+          .string()
+          .max(2000)
+          .nullable()
+          .optional()
+          .describe(
+            'New free-text description (up to 2000 chars). Pass null (or an empty ' +
+              'string) to clear it. Omit to leave it unchanged.',
+          ),
       },
     },
-    async ({ id, title, deadline, priority }) => {
+    async ({ id, title, deadline, priority, description }) => {
       // Build the PATCH body preserving the keep/clear/set distinction:
-      // undefined = omit (keep), null = clear (deadline only), value = set.
-      const body: { title?: string; deadline?: string | null; priority?: number } = {};
+      // undefined = omit (keep), null = clear (deadline/description), value = set.
+      const body: {
+        title?: string;
+        deadline?: string | null;
+        priority?: number;
+        description?: string | null;
+      } = {};
       if (title !== undefined) body.title = title;
       if (deadline !== undefined) body.deadline = deadline;
       if (priority !== undefined) body.priority = priority;
+      if (description !== undefined) body.description = description;
       return runTool('update_task', () => api.updateTask(id, body));
     },
   );
