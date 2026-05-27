@@ -99,9 +99,57 @@ namespace Tasklog.Api.Controllers
                 query = query.Where(t => filter.Priorities.Contains(t.Priority));
             }
 
-            var tasks = await query
-                .OrderByDescending(t => t.CreatedAt)
-                .ToListAsync();
+            // createdAt range. Unlike Deadline (date-only), CreatedAt carries a time,
+            // so "added today" = createdAfter=<today> (>= midnight today). Inclusive
+            // bounds, mirroring DueBefore/DueAfter. CreatedAt is never null.
+            if (filter.CreatedAfter.HasValue)
+            {
+                query = query.Where(t => t.CreatedAt >= filter.CreatedAfter.Value);
+            }
+
+            if (filter.CreatedBefore.HasValue)
+            {
+                query = query.Where(t => t.CreatedAt <= filter.CreatedBefore.Value);
+            }
+
+            // limit is a post-sort count cap. Reject nonsense up front.
+            if (filter.Limit is < 1)
+            {
+                return BadRequest(new { message = "limit must be 1 or greater." });
+            }
+
+            // Sort: created | deadline | priority, asc | desc. Default created/desc
+            // (the historical newest-first behaviour). Deadline sorts nulls-last in
+            // both directions (the `== null` key orders non-null before null), and
+            // every sort breaks ties on CreatedAt desc for stable ordering.
+            var descending = !string.Equals(filter.Order, "asc", StringComparison.OrdinalIgnoreCase);
+            IOrderedQueryable<TaskModel> ordered = (filter.Sort?.ToLowerInvariant()) switch
+            {
+                "deadline" => descending
+                    ? query.OrderBy(t => t.Deadline == null).ThenByDescending(t => t.Deadline)
+                    : query.OrderBy(t => t.Deadline == null).ThenBy(t => t.Deadline),
+                "priority" => descending
+                    ? query.OrderByDescending(t => t.Priority)
+                    : query.OrderBy(t => t.Priority),
+                // "created" and any unrecognised value fall back to created.
+                _ => descending
+                    ? query.OrderByDescending(t => t.CreatedAt)
+                    : query.OrderBy(t => t.CreatedAt),
+            };
+
+            // Stable tiebreak so equal sort keys (e.g. same deadline/priority) have a
+            // deterministic order. Skip it for the created sort - CreatedAt is already
+            // the key there (and re-applying it would be redundant).
+            IQueryable<TaskModel> sorted = filter.Sort?.ToLowerInvariant() is "deadline" or "priority"
+                ? ordered.ThenByDescending(t => t.CreatedAt)
+                : ordered;
+
+            if (filter.Limit.HasValue)
+            {
+                sorted = sorted.Take(filter.Limit.Value);
+            }
+
+            var tasks = await sorted.ToListAsync();
 
             return Ok(tasks);
         }
@@ -410,6 +458,9 @@ namespace Tasklog.Api.Controllers
     //   completed / inbox    - "true" or "false"
     //   text                  - free substring for case-insensitive title match
     //   priorities            - repeated keys (P1-P4 values), OR within
+    //   createdAfter/Before   - ISO datetime; inclusive range on CreatedAt
+    //   sort / order          - created|deadline|priority + asc|desc (default created/desc)
+    //   limit                 - cap the result to the first N after sorting
     public record TaskFilterQuery(
         int[]? ProjectIds,
         bool? Inbox,
@@ -418,5 +469,10 @@ namespace Tasklog.Api.Controllers
         DateTime? DueAfter,
         bool? Completed,
         string? Text,
-        int[]? Priorities = null);
+        int[]? Priorities = null,
+        DateTime? CreatedAfter = null,
+        DateTime? CreatedBefore = null,
+        string? Sort = null,
+        string? Order = null,
+        int? Limit = null);
 }

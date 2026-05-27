@@ -100,6 +100,34 @@ export function registerTaskTools(server: McpServer): void {
             'Filter by priority. Tasks with ANY of the listed priorities match ' +
               '(1=P1 urgent, 2=P2 high, 3=P3 medium, 4=P4 none). E.g. [1] for "what is P1".',
           ),
+        createdAfter: z
+          .string()
+          .optional()
+          .describe(
+            'ISO 8601 date/datetime. Returns tasks created on or after this. ' +
+              'For "what did I add today", pass today\'s date (matches from midnight on).',
+          ),
+        createdBefore: z
+          .string()
+          .optional()
+          .describe('ISO 8601 date/datetime. Returns tasks created on or before this instant.'),
+        sort: z
+          .enum(['created', 'deadline', 'priority'])
+          .optional()
+          .describe(
+            'Sort field (default "created"). "deadline" puts tasks with no deadline last; ' +
+              '"priority" with order=asc lists P1 first.',
+          ),
+        order: z
+          .enum(['asc', 'desc'])
+          .optional()
+          .describe('Sort direction (default "desc").'),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .optional()
+          .describe('Return only the first N tasks after sorting. Omit for all. Useful for "top 5 by priority".'),
       },
     },
     async (filter) => runTool('list_tasks', () => api.listTasks(filter)),

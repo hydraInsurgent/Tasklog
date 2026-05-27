@@ -55,6 +55,26 @@ describe('priority wire contract', () => {
   });
 });
 
+// createdAt range + sort/order/limit are scalar params serialized via params.set (#65).
+describe('buildTaskQuery - createdAt range, sort, limit', () => {
+  test('serializes createdAfter and createdBefore', () => {
+    assert.equal(
+      buildTaskQuery({ createdAfter: '2026-05-27', createdBefore: '2026-05-28' }),
+      '?createdAfter=2026-05-27&createdBefore=2026-05-28',
+    );
+  });
+  test('serializes sort + order', () => {
+    assert.equal(buildTaskQuery({ sort: 'deadline', order: 'asc' }), '?sort=deadline&order=asc');
+  });
+  test('serializes limit, including 0 (backend rejects <1, but the client passes it through)', () => {
+    assert.equal(buildTaskQuery({ limit: 5 }), '?limit=5');
+    assert.equal(buildTaskQuery({ limit: 0 }), '?limit=0');
+  });
+  test('omits sort/order/limit/createdAt when not provided', () => {
+    assert.equal(buildTaskQuery({}), '');
+  });
+});
+
 // The update_task PATCH body relies on JSON.stringify's keep/clear/set
 // behaviour: undefined keys are omitted (backend leaves the field unchanged),
 // null is kept (backend clears the field), a value is sent (backend sets it).

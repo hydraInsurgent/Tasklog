@@ -1,6 +1,6 @@
 # Test Coverage
 
-**Last updated:** 2026-05-27 (#64 - task priority P1-P4: migration + endpoints + MCP + UI)
+**Last updated:** 2026-05-27 (#65 - list_tasks query completeness: createdAt range, sort, limit)
 
 ---
 
@@ -17,7 +17,8 @@
 | TasksController | 100% | 100% | All methods and branches covered. +9 tests for Update/PATCH partial-update (#59) |
 | TaskModel.ComputeDueStatus | 100% | 100% | +11 tests for the dueStatus bucket logic (#61) |
 | TasksController.Bulk | 100% | 100% | +13 tests for POST /api/tasks/bulk (#63, incl. the 500-id cap) |
-| TasksController (priority) | 100% | 100% | +12 tests for priority on create/update/filter (#64, incl. float/negative rejection) - 99 backend tests total |
+| TasksController (priority) | 100% | 100% | +12 tests for priority on create/update/filter (#64, incl. float/negative rejection) |
+| TasksController (query) | 100% | 100% | +10 tests for createdAt range / sort / limit on GetAll (#65) - 109 backend tests total |
 | ProjectsController | 100% | 100% | All methods and branches covered |
 | TasklogDbContext | 100% | 100% | |
 | Program.cs | 0% | - | Framework wiring - not a test target |
@@ -40,7 +41,7 @@
 | oauth/well-known.ts | - | - | - | Returns fixed JSON metadata |
 | server.ts | - | - | - | Hono mount order + request logger; covered by middleware tests + end-to-end smoke |
 
-**74 tests, 0 failures** (was 70; +4 in api-client.test.ts for the priority wire contract, #64). Run with: `npm test --prefix mcp` (auto-rebuilds better-sqlite3 for host arch via pretest hook if needed). Note: a fresh `npm install` on the host installs better-sqlite3 without the native binary - run `npm rebuild better-sqlite3` once after install if the OAuth store/token tests fail with `ERR_DLOPEN_FAILED`.
+**78 tests, 0 failures** (was 74; +4 in api-client.test.ts for the createdAt-range/sort/limit query serialization, #65). Run with: `npm test --prefix mcp` (auto-rebuilds better-sqlite3 for host arch via pretest hook if needed). Note: a fresh `npm install` on the host installs better-sqlite3 without the native binary - run `npm rebuild better-sqlite3` once after install if the OAuth store/token tests fail with `ERR_DLOPEN_FAILED`.
 
 ### Next.js Frontend - last run 2026-05-26
 
@@ -115,6 +116,18 @@
 - [x] 🟩 Update - bad priority (0, 9, -1, 2.5 float, non-number) -> 400
 - [x] 🟩 GetAll - priorities filter, single value
 - [x] 🟩 GetAll - priorities filter, multiple values (OR within)
+
+### TasksController GetAll - query completeness (#65)
+- [x] 🟩 createdAfter - returns tasks created on/after the date
+- [x] 🟩 createdBefore - returns tasks created on/before the date
+- [x] 🟩 sort=deadline asc - earliest first, nulls last
+- [x] 🟩 sort=deadline desc - latest first, nulls still last
+- [x] 🟩 sort=priority asc - P1 first
+- [x] 🟩 sort=priority desc - P4 first
+- [x] 🟩 sort=created asc - oldest first
+- [x] 🟩 limit - caps to the most-recent N (respects default sort)
+- [x] 🟩 limit < 1 -> 400
+- [x] 🟩 default call - all rows, newest-first (unchanged behaviour)
 
 ### TasksController.Bulk (POST /api/tasks/bulk)
 - [x] 🟩 complete true - sets IsCompleted + CompletedAt on all
@@ -291,6 +304,7 @@ its own subprocess, so in-memory DBs are isolated across files.
 - [x] 🟩 bulk - setDeadline value sets / null clears (#63)
 - [x] 🟩 priority - create/update body carries priority (#64)
 - [x] 🟩 priority - buildTaskQuery serializes priorities as repeated keys + omits empty (#64)
+- [x] 🟩 query - buildTaskQuery serializes createdAfter/createdBefore, sort+order, limit; omits when absent (#65)
 
 ### Not covered (and why)
 - `tools/tasks.ts`, `tools/projects.ts`, `tools/labels.ts` - thin api-client wrappers; behavior is exercised through `runTool` tests + the end-to-end smoke run with claude.ai.

@@ -1,6 +1,6 @@
 # Feature Implementation Plan: list_tasks query completeness
 
-**Overall Progress:** `0%`
+**Overall Progress:** `75%`
 
 **Tracking issue:** [#65](https://github.com/hydraInsurgent/Tasklog/issues/65)
 **Branch:** `feature/list-tasks-query-completeness-#65`
@@ -40,21 +40,21 @@ list_tasks (MCP): same params surfaced on the tool; arrays/dates serialized as t
 
 ## Tasks
 
-- [ ] 🟥 **Step 1: Backend - filters, sort, limit on GetAll** `[sequential]` → depends on: nothing
-  - [ ] 🟥 1.1 `TaskFilterQuery` gains `DateTime? CreatedAfter = null`, `DateTime? CreatedBefore = null`, `string? Sort = null`, `string? Order = null`, `int? Limit = null`.
-  - [ ] 🟥 1.2 GetAll: add the two `CreatedAt` range `.Where` clauses (after the existing filters). Validate `Limit` - if present and `< 1`, return 400.
-  - [ ] 🟥 1.3 Replace the fixed `.OrderByDescending(t => t.CreatedAt)` with a sort switch: created/deadline/priority x asc/desc, deadline nulls-last, tiebreak `CreatedAt desc`. Default path stays `created desc`.
-  - [ ] 🟥 1.4 Apply `.Take(Limit.Value)` after ordering when `Limit` is set. Then `ToListAsync()`.
-  - [ ] 🟥 1.5 Tests: createdAfter / createdBefore (inclusive); sort=deadline asc+desc with a null-deadline task (nulls last both ways); sort=priority asc (P1 first) + desc; sort=created asc; limit caps to N (and respects sort); limit<1 -> 400; default call unchanged (newest-first, all rows).
+- [x] 🟩 **Step 1: Backend - filters, sort, limit on GetAll** `[sequential]` → depends on: nothing
+  - [x] 🟩 1.1 `TaskFilterQuery` gained `CreatedAfter`/`CreatedBefore`/`Sort`/`Order`/`Limit`, all `= null`.
+  - [x] 🟩 1.2 Added the two `CreatedAt` range `.Where` clauses; `Limit is < 1` returns 400.
+  - [x] 🟩 1.3 Replaced the fixed order with a created/deadline/priority x asc/desc switch; deadline nulls-last via `OrderBy(t => t.Deadline == null)`; tiebreak `ThenByDescending(CreatedAt)` for deadline/priority sorts.
+  - [x] 🟩 1.4 `.Take(Limit.Value)` after ordering when set.
+  - [x] 🟩 1.5 10 tests (createdAfter/before, deadline asc+desc nulls-last, priority asc/desc, created asc, limit caps to N, limit<1 400, default unchanged). 109 backend tests pass.
 
-- [ ] 🟥 **Step 2: MCP - surface on list_tasks** `[sequential]` → depends on: Step 1
-  - [ ] 🟥 2.1 `TaskFilter` interface gains `createdAfter?`/`createdBefore?` (string), `sort?`/`order?` (string), `limit?` (number). `buildTaskQuery` serializes them (dates + scalars via `params.set`).
-  - [ ] 🟥 2.2 `list_tasks` Zod schema: add the five params with `.describe()` text (incl. the "createdAfter for 'added today'" hint and the sort/order/limit meaning). Extend the "Returns:" line only if needed (shape unchanged).
-  - [ ] 🟥 2.3 Tests: `buildTaskQuery` serializes createdAfter/createdBefore/sort/order/limit; omitted params absent from the query string.
+- [x] 🟩 **Step 2: MCP - surface on list_tasks** `[sequential]` → depends on: Step 1
+  - [x] 🟩 2.1 `TaskFilter` gained `createdAfter`/`createdBefore`/`sort`/`order`/`limit`; `buildTaskQuery` serializes them via `params.set`.
+  - [x] 🟩 2.2 `list_tasks` schema: 5 params (`sort`/`order` as Zod enums, `limit` int min 1) with describe text incl. the "createdAfter for added-today" + "top 5 by priority" hints. Returns shape unchanged.
+  - [x] 🟩 2.3 4 buildTaskQuery tests (createdAfter/before, sort+order, limit incl 0 pass-through, omitted absent). Typecheck clean; 78 MCP tests pass.
 
-- [ ] 🟥 **Step 3: Docs + CHANGELOG** `[sequential]` → depends on: Steps 1-2
-  - [ ] 🟥 3.1 architecture.md: extend the `GET /api/tasks` row with the new params.
-  - [ ] 🟥 3.2 CHANGELOG.md: v2.10.6 section. coverage.md: new backend + MCP test counts/checklist.
+- [x] 🟩 **Step 3: Docs + CHANGELOG** `[sequential]` → depends on: Steps 1-2
+  - [x] 🟩 3.1 architecture.md: rewrote the `GET /api/tasks` row with createdAfter/before, sort/order, limit.
+  - [x] 🟩 3.2 CHANGELOG.md: v2.10.6 section. coverage.md: counts (109 backend / 78 MCP) + query checklists.
 
 - [ ] 🟥 **Step 4: Deploy + smoke test** `[sequential]` → depends on: Step 3
   - [ ] 🟥 4.1 `./scripts/deploy-phone.sh`.
