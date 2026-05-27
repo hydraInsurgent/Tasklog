@@ -1,6 +1,6 @@
 # Feature Implementation Plan: Natural-language quick-add
 
-**Overall Progress:** `0%`
+**Overall Progress:** `30%`
 
 **Tracking issue:** [#72](https://github.com/hydraInsurgent/Tasklog/issues/72)
 **Branch:** `feature/natural-language-recurrence-#72`
@@ -47,10 +47,10 @@ Dropped (no Tasklog field): `+assignee`, `!reminder`, `/section`.
 
 ## Tasks
 
-- [ ] 🟥 **Step 1: Pure parser - `quickAdd.ts` + recurrence-phrase helper + tests** `[sequential]` → depends on: nothing
-  - [ ] 🟥 1.1 `frontend/src/lib/quickAdd.ts`: `parseQuickAdd(text, { projects, labels }, refDate?)` → `{ cleanedTitle, deadline?, recurrence?, projectName?, labelNames?, priority?, tokens[] }`. Token regexes for `#`/`@`/`pN` (record spans); chrono.parse for the date (span + `isCertain('hour')` → date-only vs timed); strip recognized spans → cleanedTitle.
-  - [ ] 🟥 1.2 `parseRecurrencePhrase(text, refDate?)` (in quickAdd.ts or format.ts) covering the bounded v2.14.x grammar: every day / every N days / every weekday / every `<weekday(s)>` / every other `<weekday>` / every N weeks / every month / every N months / on the `<N>th` / the `<N>th|last <weekday>` / last day / `until <date>` (chrono → UNTIL) / `<N> times` (→ COUNT). Emits canonical RRULE.
-  - [ ] 🟥 1.3 Tests: each token type, combinations, date-only vs timed (injected refDate for determinism), every recurrence phrase → expected RRULE, cleanedTitle stripping, unknown `#`/`@` left in title.
+- [x] 🟩 **Step 1: Pure parser - `quickAdd.ts` + recurrence-phrase helper + tests** `[sequential]` → depends on: nothing
+  - [x] 🟩 1.1 `quickAdd.ts` `parseQuickAdd(text, projects, refDate?)`: recurrence-first (so "every friday" isn't taken as a one-off date), then chrono date (span + `isCertain('hour')` → date-only vs timed), then `#`/`@`/`pN` token regexes; masks claimed spans; `cleanedTitle` = stripped + collapsed.
+  - [x] 🟩 1.2 `matchRecurrence` (hand-rolled, ordered matchers) onto the v2.14.x grammar: daily / every-N-days / weekday / `<weekday-list>` / every-other / every-N-weeks / weekly / every-N-months / nth-weekday / last-day / day-of-month / monthly, + `until <date>`→UNTIL / `[for] N times`→COUNT. Emits canonical RRULE.
+  - [x] 🟩 1.3 26 tests (tokens, known/unknown project, dates date-only vs timed + absolute + offset, every recurrence form, end conditions, combined line, spans). **107 frontend tests pass** (was 81).
 
 - [ ] 🟥 **Step 2: AddTaskForm - parse-on-submit + field pre-fill + autosuggest** `[sequential]` → depends on: Step 1 `[UI]`
   - [ ] 🟥 2.1 On submit, run `parseQuickAdd`; resolve `projectName` against loaded projects (unknown → ignore the match, keep in title); resolve/auto-create `labelNames` (reuse the existing label-create logic); set deadline/recurrence/priority; call `onAdd` with the cleaned title + parsed fields. Pre-fill the structured controls from the parse so they show what was captured (and can override).
