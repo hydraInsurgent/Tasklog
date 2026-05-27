@@ -1,10 +1,10 @@
 /**
  * MCP tools for task operations.
  *
- * Eleven tools wrap the task-related Tasklog API endpoints: eight single-task
- * tools plus three bulk tools (bulk_set_completion, bulk_assign_to_project,
- * bulk_set_deadline) that apply one operation to many tasks in a single
- * transactional call. The completion toggle is a single tool
+ * Twelve tools wrap the task-related Tasklog API endpoints: eight single-task
+ * tools plus four bulk tools (bulk_set_completion, bulk_assign_to_project,
+ * bulk_set_deadline, bulk_set_priority) that apply one operation to many tasks
+ * in a single transactional call. The completion toggle is a single tool
  * (set_task_completion) that takes a boolean - earlier versions split it into
  * separate complete_task and uncomplete_task tools, but the LLM picks the right
  * value from natural language reliably and one tool reduces the surface area.
@@ -299,8 +299,10 @@ export function registerTaskTools(server: McpServer): void {
       description:
         'Move a task to a different project, or remove it from any project ' +
         '(move to Inbox). Use when the user says "put X under project Y" or ' +
-        '"move X to Inbox". Returns: the updated task (same shape as ' +
-        'list_tasks items, including dueStatus).',
+        '"move X to Inbox". Pass projectName to target by name (saves a ' +
+        'list_projects lookup) or projectId; an ambiguous/unknown name returns ' +
+        'an error. Returns: the updated task (same shape as list_tasks items, ' +
+        'including dueStatus).',
       inputSchema: {
         taskId: z.number().int().positive().describe('The task id to move.'),
         projectId: z
@@ -308,15 +310,23 @@ export function registerTaskTools(server: McpServer): void {
           .int()
           .positive()
           .nullable()
+          .optional()
           .describe(
             'The destination project id, or null to put the task in Inbox ' +
-              '(no project).',
+              '(no project). Omit if using projectName.',
+          ),
+        projectName: z
+          .string()
+          .optional()
+          .describe(
+            'Destination project by name (case-insensitive, exact). Wins over ' +
+              'projectId. Errors if the name matches zero or multiple projects.',
           ),
       },
     },
-    async ({ taskId, projectId }) =>
+    async ({ taskId, projectId, projectName }) =>
       runTool('assign_task_to_project', () =>
-        api.setTaskProject(taskId, projectId),
+        api.setTaskProject(taskId, { projectId, projectName }),
       ),
   );
 
@@ -326,9 +336,11 @@ export function registerTaskTools(server: McpServer): void {
       title: 'Set Task Labels',
       description:
         'Replace the full set of labels on a task. Pass the FINAL desired ' +
-        'list of label ids - this is not additive. Pass an empty array to ' +
-        'remove all labels from the task. Returns: the updated task with its ' +
-        'new labels[] (same shape as list_tasks items, including dueStatus).',
+        'list (this is not additive) as labelIds OR labelNames; an empty array ' +
+        'removes all labels. labelNames is resolved by name (saves a list_labels ' +
+        'lookup) and wins over labelIds; an ambiguous/unknown name returns an ' +
+        'error. Returns: the updated task with its new labels[] (same shape as ' +
+        'list_tasks items, including dueStatus).',
       inputSchema: {
         taskId: z
           .number()
@@ -337,14 +349,22 @@ export function registerTaskTools(server: McpServer): void {
           .describe('The task id whose labels are being set.'),
         labelIds: z
           .array(z.number().int().positive())
+          .optional()
           .describe(
             'The complete final list of label ids. Existing labels not in ' +
-              'this list are removed.',
+              'this list are removed. Omit if using labelNames.',
+          ),
+        labelNames: z
+          .array(z.string())
+          .optional()
+          .describe(
+            'The complete final list of label names (case-insensitive, exact). ' +
+              'Wins over labelIds. Errors if any name matches zero or multiple labels.',
           ),
       },
     },
-    async ({ taskId, labelIds }) =>
-      runTool('set_task_labels', () => api.setTaskLabels(taskId, labelIds)),
+    async ({ taskId, labelIds, labelNames }) =>
+      runTool('set_task_labels', () => api.setTaskLabels(taskId, { labelIds, labelNames })),
   );
 
   // --- Bulk tools (act on many tasks in one transactional call) ---
@@ -385,8 +405,9 @@ export function registerTaskTools(server: McpServer): void {
       description:
         'Move many tasks to one project (or to Inbox) at once. Use when the user ' +
         'says "move these to Work", "put all of these in project X", "send these ' +
-        'to Inbox". Returns: array of the updated tasks (same shape as list_tasks ' +
-        'items, including dueStatus).',
+        'to Inbox". Pass projectName to target by name (saves a list_projects ' +
+        'lookup) or projectId; an ambiguous/unknown name returns an error. Returns: ' +
+        'array of the updated tasks (same shape as list_tasks items, including dueStatus).',
       inputSchema: {
         taskIds,
         projectId: z
@@ -394,12 +415,41 @@ export function registerTaskTools(server: McpServer): void {
           .int()
           .positive()
           .nullable()
-          .describe('Destination project id, or null to move all to Inbox.'),
+          .optional()
+          .describe('Destination project id, or null to move all to Inbox. Omit if using projectName.'),
+        projectName: z
+          .string()
+          .optional()
+          .describe('Destination project by name (case-insensitive, exact). Wins over projectId.'),
       },
     },
-    async ({ taskIds, projectId }) =>
+    async ({ taskIds, projectId, projectName }) =>
       runTool('bulk_assign_to_project', () =>
-        api.bulkTasks('assignProject', taskIds, { projectId }),
+        api.bulkTasks('assignProject', taskIds, { projectId, projectName }),
+      ),
+  );
+
+  server.registerTool(
+    'bulk_set_priority',
+    {
+      title: 'Bulk Set Priority',
+      description:
+        'Set the priority on many tasks at once. Use when the user says "make ' +
+        'these all P1", "bump these to high priority". Returns: array of the ' +
+        'updated tasks (same shape as list_tasks items, including dueStatus).',
+      inputSchema: {
+        taskIds,
+        priority: z
+          .number()
+          .int()
+          .min(1)
+          .max(4)
+          .describe('Priority for all selected tasks: 1=P1 urgent .. 4=P4 none.'),
+      },
+    },
+    async ({ taskIds, priority }) =>
+      runTool('bulk_set_priority', () =>
+        api.bulkTasks('setPriority', taskIds, { priority }),
       ),
   );
 

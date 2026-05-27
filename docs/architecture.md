@@ -65,10 +65,10 @@ Tasklog/
 │   │   ├── server.ts              Hono HTTP entry, middleware wiring
 │   │   ├── config.ts              Env var loading + production validation
 │   │   ├── api-client.ts          Typed client for the Tasklog .NET API
-│   │   ├── tools/                 19 MCP tools wrapping every API endpoint
-│   │   │   ├── tasks.ts           11 task tools (list[+filters]/get/create/update/
+│   │   ├── tools/                 20 MCP tools wrapping every API endpoint
+│   │   │   ├── tasks.ts           12 task tools (list[+filters]/get/create/update/
 │   │   │   │                      delete/set-completion/assign-project/set-labels +
-│   │   │   │                      bulk-set-completion/bulk-assign-to-project/bulk-set-deadline)
+│   │   │   │                      bulk-set-completion/bulk-assign-to-project/bulk-set-deadline/bulk-set-priority)
 │   │   │   ├── projects.ts        4 project tools
 │   │   │   ├── labels.ts          4 label tools
 │   │   │   ├── registry.ts        Aggregates and registers all tools
@@ -187,8 +187,8 @@ LabelTaskModel  (join table - implicit many-to-many)
 | PATCH | `/api/tasks/{id}` | Partial update of title, deadline, and/or priority. JSON body, present-key detection: omit=keep, `deadline: null`=clear, value=set. priority must be 1-4 (no clear - P4 is none). 400 on empty title / bad date / bad priority. Returns the updated task |
 | DELETE | `/api/tasks/{id}` | Delete task. 204 on success, 404 if not found |
 | PATCH | `/api/tasks/{id}/complete` | Mark task complete or incomplete. Body: `{ isCompleted: bool }`. Returns updated task |
-| PATCH | `/api/tasks/{id}/project` | Reassign task to a project or Inbox. Body: `{ projectId: int? }` |
-| POST | `/api/tasks/bulk` | Apply one operation to many tasks in one transaction. Body: `{ operation: "complete" \| "assignProject" \| "setDeadline", taskIds: int[], data?: { isCompleted?, projectId?, deadline? } }`. No bulk delete. Unknown ids skipped; returns the affected tasks. 400 on empty ids / unknown op / invalid data (incl. assignProject to a missing project) |
+| PATCH | `/api/tasks/{id}/project` | Reassign task to a project or Inbox. Body: `{ projectId: int?, projectName?: string }`. projectName is resolved by name (case-insensitive, exact) and wins over projectId; 0/multiple matches → 400 |
+| POST | `/api/tasks/bulk` | Apply one operation to many tasks in one transaction. Body: `{ operation: "complete" \| "assignProject" \| "setDeadline" \| "setPriority", taskIds: int[], data?: { isCompleted?, projectId?, projectName?, deadline?, priority? } }`. assignProject accepts a project name (resolved, wins over id). No bulk delete. Unknown ids skipped; returns the affected tasks. 400 on empty ids / unknown op / invalid data (missing/ambiguous project name, priority out of 1-4) |
 | GET | `/api/projects` | All projects, ordered by name |
 | POST | `/api/projects` | Create project. Body: `{ name: string }`. Returns created project |
 | PATCH | `/api/projects/{id}` | Rename project. Body: `{ name: string }`. Returns updated project |
@@ -197,7 +197,7 @@ LabelTaskModel  (join table - implicit many-to-many)
 | POST | `/api/labels` | Create label. Body: `{ name, colorIndex }`. Returns created label |
 | PATCH | `/api/labels/{id}` | Update label name and/or color. Body: `{ name, colorIndex }`. Returns updated label |
 | DELETE | `/api/labels/{id}` | Delete label. Unlinks from all tasks (does not delete tasks). 204 on success |
-| PATCH | `/api/tasks/{id}/labels` | Replace task's label set. Body: `{ labelIds: int[] }`. Returns updated task |
+| PATCH | `/api/tasks/{id}/labels` | Replace task's label set. Body: `{ labelIds?: int[], labelNames?: string[] }`. labelNames is resolved by name and wins over labelIds; 0/multiple matches → 400. Empty/absent both clear. Returns updated task |
 
 ### CORS
 
@@ -377,7 +377,7 @@ POST /token                                     auth_code and refresh_token gran
 
 ### Tool layer
 
-19 MCP tools across three families (tasks: 11, projects: 4, labels: 4). The task family includes three bulk tools (`bulk_set_completion`, `bulk_assign_to_project`, `bulk_set_deadline`) backed by the single `POST /api/tasks/bulk` endpoint. Each tool is a thin wrapper around the corresponding Tasklog `/api` endpoint via `api-client.ts`. Input schemas use Zod and are inlined per tool. The `runTool()` helper in `result.ts` converts thrown `ApiError`s into MCP `isError: true` tool results (not JSON-RPC protocol errors), so the LLM can see and react to failures.
+20 MCP tools across three families (tasks: 12, projects: 4, labels: 4). The task family includes four bulk tools (`bulk_set_completion`, `bulk_assign_to_project`, `bulk_set_deadline`, `bulk_set_priority`) backed by the single `POST /api/tasks/bulk` endpoint. `assign_task_to_project` / `bulk_assign_to_project` / `set_task_labels` accept a name as an alternative to an id (resolved server-side). Each tool is a thin wrapper around the corresponding Tasklog `/api` endpoint via `api-client.ts`. Input schemas use Zod and are inlined per tool. The `runTool()` helper in `result.ts` converts thrown `ApiError`s into MCP `isError: true` tool results (not JSON-RPC protocol errors), so the LLM can see and react to failures.
 
 The `list_tasks` tool accepts an optional filter object (project, inbox, labels, deadline range, completion, title substring) that `api-client.ts` serializes into a query string on `GET /api/tasks`. Completion is a single `set_task_completion(id, isCompleted)` tool - the earlier `complete_task` / `uncomplete_task` split was consolidated in v2.10.1.
 

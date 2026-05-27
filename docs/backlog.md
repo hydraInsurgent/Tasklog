@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| _none_ | | | |
+| [P66-agent-ergonomics.md](plans/P66-agent-ergonomics.md) | #66 | feature/agent-ergonomics-#66 | In Progress |
 
 ---
 

@@ -1115,4 +1115,157 @@ public class TasksControllerTests
         // Unchanged historical behaviour: every row, newest CreatedAt first.
         Tasks(result).Select(t => t.Title).Should().Equal("newer", "older");
     }
+
+    // --- Agent ergonomics: bulk setPriority + name resolution (#66) ---
+
+    [Fact]
+    public async Task Bulk_SetPriority_SetsOnAll()
+    {
+        var (controller, context, ids) = await SeedThreeTasks();
+        using var _ = context;
+
+        var result = await controller.Bulk(new BulkTaskRequest("setPriority", ids, new BulkTaskData(null, null, null, Priority: 1)));
+
+        var tasks = result.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeAssignableTo<List<TaskModel>>().Subject;
+        tasks.Should().OnlyContain(t => t.Priority == 1);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(5)]
+    public async Task Bulk_SetPriority_OutOfRange_Returns400(int priority)
+    {
+        var (controller, context, ids) = await SeedThreeTasks();
+        using var _ = context;
+
+        var result = await controller.Bulk(new BulkTaskRequest("setPriority", ids, new BulkTaskData(null, null, null, Priority: priority)));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task Bulk_SetPriority_MissingPriority_Returns400()
+    {
+        var (controller, context, ids) = await SeedThreeTasks();
+        using var _ = context;
+
+        var result = await controller.Bulk(new BulkTaskRequest("setPriority", ids, new BulkTaskData(null, null, null)));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task AssignProject_ByName_ResolvesToTheProject()
+    {
+        using var context = CreateContext();
+        var project = new Project { Name = "Work", CreatedAt = DateTime.UtcNow };
+        context.Projects.Add(project);
+        var task = new TaskModel { Title = "t", CreatedAt = DateTime.Now };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        // Case-insensitive match.
+        var result = await controller.AssignProject(task.Id, new AssignProjectRequest(null, ProjectName: "work"));
+
+        var updated = result.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeOfType<TaskModel>().Subject;
+        updated.ProjectId.Should().Be(project.Id);
+    }
+
+    [Fact]
+    public async Task AssignProject_ByName_Ambiguous_Returns400()
+    {
+        using var context = CreateContext();
+        context.Projects.AddRange(
+            new Project { Name = "Work", CreatedAt = DateTime.UtcNow },
+            new Project { Name = "work", CreatedAt = DateTime.UtcNow }
+        );
+        var task = new TaskModel { Title = "t", CreatedAt = DateTime.Now };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.AssignProject(task.Id, new AssignProjectRequest(null, ProjectName: "Work"));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task AssignProject_ByName_Missing_Returns400()
+    {
+        using var context = CreateContext();
+        var task = new TaskModel { Title = "t", CreatedAt = DateTime.Now };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.AssignProject(task.Id, new AssignProjectRequest(null, ProjectName: "Nope"));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task AssignProject_NameWinsOverId()
+    {
+        using var context = CreateContext();
+        var work = new Project { Name = "Work", CreatedAt = DateTime.UtcNow };
+        var home = new Project { Name = "Home", CreatedAt = DateTime.UtcNow };
+        context.Projects.AddRange(work, home);
+        var task = new TaskModel { Title = "t", CreatedAt = DateTime.Now };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        // Pass a (wrong) id AND a name - the name should win.
+        var result = await controller.AssignProject(task.Id, new AssignProjectRequest(home.Id, ProjectName: "Work"));
+
+        var updated = result.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeOfType<TaskModel>().Subject;
+        updated.ProjectId.Should().Be(work.Id);
+    }
+
+    [Fact]
+    public async Task SetLabels_ByName_ResolvesAndApplies()
+    {
+        using var context = CreateContext();
+        var urgent = new Label { Name = "urgent", ColorIndex = 0, CreatedAt = DateTime.UtcNow };
+        context.Labels.Add(urgent);
+        var task = new TaskModel { Title = "t", CreatedAt = DateTime.Now };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.SetLabels(task.Id, new SetTaskLabelsRequest(LabelNames: new[] { "URGENT" }));
+
+        var updated = result.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeOfType<TaskModel>().Subject;
+        updated.Labels.Select(l => l.Id).Should().Equal(urgent.Id);
+    }
+
+    [Fact]
+    public async Task SetLabels_ByName_UnknownName_Returns400()
+    {
+        using var context = CreateContext();
+        var task = new TaskModel { Title = "t", CreatedAt = DateTime.Now };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.SetLabels(task.Id, new SetTaskLabelsRequest(LabelNames: new[] { "ghost" }));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task Bulk_AssignProject_ByName_Resolves()
+    {
+        var (controller, context, ids) = await SeedThreeTasks();
+        using var _ = context;
+        var project = new Project { Name = "Work", CreatedAt = DateTime.UtcNow };
+        context.Projects.Add(project);
+        await context.SaveChangesAsync();
+
+        var result = await controller.Bulk(new BulkTaskRequest("assignProject", ids, new BulkTaskData(null, null, null, ProjectName: "Work")));
+
+        var tasks = result.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeAssignableTo<List<TaskModel>>().Subject;
+        tasks.Should().OnlyContain(t => t.ProjectId == project.Id);
+    }
 }

@@ -186,25 +186,39 @@ export const setTaskComplete = (id: number, isCompleted: boolean): Promise<Task>
     body: JSON.stringify({ isCompleted }),
   });
 
-export const setTaskProject = (id: number, projectId: number | null): Promise<Task> =>
+// projectName (when given) is resolved by name server-side and wins over projectId.
+export const setTaskProject = (
+  id: number,
+  body: { projectId?: number | null; projectName?: string },
+): Promise<Task> =>
   request(`/api/tasks/${id}/project`, {
     method: 'PATCH',
-    body: JSON.stringify({ projectId }),
+    body: JSON.stringify(body),
   });
 
-export const setTaskLabels = (id: number, labelIds: number[]): Promise<Task> =>
+// labelNames (when given) is resolved by name server-side and wins over labelIds.
+export const setTaskLabels = (
+  id: number,
+  body: { labelIds?: number[]; labelNames?: string[] },
+): Promise<Task> =>
   request(`/api/tasks/${id}/labels`, {
     method: 'PATCH',
-    body: JSON.stringify({ labelIds }),
+    body: JSON.stringify(body),
   });
 
 // Bulk operations: one transactional POST applies one operation to many tasks.
-// data carries the per-operation payload (isCompleted / projectId / deadline).
-// Returns the affected tasks.
+// data carries the per-operation payload (isCompleted / projectId / projectName /
+// deadline / priority). Returns the affected tasks.
 export const bulkTasks = (
-  operation: 'complete' | 'assignProject' | 'setDeadline',
+  operation: 'complete' | 'assignProject' | 'setDeadline' | 'setPriority',
   taskIds: number[],
-  data?: { isCompleted?: boolean; projectId?: number | null; deadline?: string | null },
+  data?: {
+    isCompleted?: boolean;
+    projectId?: number | null;
+    projectName?: string;
+    deadline?: string | null;
+    priority?: number;
+  },
 ): Promise<Task[]> =>
   request('/api/tasks/bulk', {
     method: 'POST',

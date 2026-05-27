@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Check, Undo2, FolderInput, CalendarClock, X, Loader2 } from "lucide-react";
+import { Check, Undo2, FolderInput, CalendarClock, Flag, X, Loader2 } from "lucide-react";
 import { Project } from "@/lib/api";
+import { PRIORITY_OPTIONS } from "@/lib/format";
 import DeadlinePopover from "./DeadlinePopover";
 
 interface Props {
@@ -18,6 +19,8 @@ interface Props {
   onMoveToProject: (projectId: number | null) => void;
   // null clears the deadline on the selection.
   onSetDeadline: (deadline: string | null) => void;
+  // Set the priority (1-4) on the selection.
+  onSetPriority: (priority: number) => void;
   // Exit selection mode / clear the selection.
   onCancel: () => void;
 }
@@ -33,10 +36,11 @@ export default function BulkActionsBar({
   onUncomplete,
   onMoveToProject,
   onSetDeadline,
+  onSetPriority,
   onCancel,
 }: Props) {
-  // Which sub-popover is open ("project" | "deadline" | null).
-  const [openMenu, setOpenMenu] = useState<"project" | "deadline" | null>(null);
+  // Which sub-popover is open ("project" | "deadline" | "priority" | null).
+  const [openMenu, setOpenMenu] = useState<"project" | "deadline" | "priority" | null>(null);
   const barRef = useRef<HTMLDivElement>(null);
 
   // Close any open sub-popover on outside click or Escape.
@@ -157,6 +161,45 @@ export default function BulkActionsBar({
                 }}
                 onClose={() => setOpenMenu(null)}
               />
+            </div>
+          )}
+        </div>
+
+        {/* Set priority - small P1-P4 dropdown reusing the shared priority options. */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setOpenMenu(openMenu === "priority" ? null : "priority")}
+            disabled={busy}
+            aria-haspopup="true"
+            aria-expanded={openMenu === "priority"}
+            className={`${actionBtn} text-zinc-600 hover:bg-zinc-100 focus:ring-zinc-500`}
+          >
+            <Flag size={16} aria-hidden="true" /> Set priority
+          </button>
+          {openMenu === "priority" && (
+            <div
+              role="menu"
+              className="absolute left-0 bottom-full mb-1 w-40 bg-white border border-zinc-200 rounded-md shadow-md py-1"
+            >
+              {PRIORITY_OPTIONS.map(({ value, meta }) => (
+                <button
+                  key={value}
+                  role="menuitem"
+                  onClick={() => {
+                    setOpenMenu(null);
+                    onSetPriority(value);
+                  }}
+                  className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50 focus:outline-none focus:bg-zinc-50 cursor-pointer"
+                >
+                  <span
+                    className="inline-block w-2 h-2 rounded-full shrink-0"
+                    style={{ backgroundColor: meta.dotColor ?? "#d4d4d8" }}
+                    aria-hidden="true"
+                  />
+                  {meta.label} - {meta.name}
+                </button>
+              ))}
             </div>
           )}
         </div>

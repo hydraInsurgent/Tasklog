@@ -138,7 +138,7 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
   // tasks back into local state and exit select mode.
   async function handleBulk(
     operation: BulkOperation,
-    data?: { isCompleted?: boolean; projectId?: number | null; deadline?: string | null },
+    data?: { isCompleted?: boolean; projectId?: number | null; deadline?: string | null; priority?: number },
   ) {
     const ids = [...selectedIds];
     if (ids.length === 0) return;
@@ -710,6 +710,7 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
           onUncomplete={() => handleBulk("complete", { isCompleted: false })}
           onMoveToProject={(projectId) => handleBulk("assignProject", { projectId })}
           onSetDeadline={(deadline) => handleBulk("setDeadline", { deadline })}
+          onSetPriority={(priority) => handleBulk("setPriority", { priority })}
           onCancel={exitSelectMode}
         />
       )}

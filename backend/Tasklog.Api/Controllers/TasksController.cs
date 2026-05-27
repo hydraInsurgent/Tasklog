@@ -309,7 +309,17 @@ namespace Tasklog.Api.Controllers
             if (task is null)
                 return NotFound(new { message = $"Task {id} not found." });
 
-            task.ProjectId = request.ProjectId;
+            // A projectName, when provided, wins over projectId and is resolved by name
+            // (ambiguous/missing -> 400). Otherwise use projectId (null = Inbox).
+            var projectId = request.ProjectId;
+            if (!string.IsNullOrWhiteSpace(request.ProjectName))
+            {
+                var (resolvedId, error) = await ResolveProjectByName(request.ProjectName);
+                if (error is not null) return BadRequest(new { message = error });
+                projectId = resolvedId;
+            }
+
+            task.ProjectId = projectId;
             await _context.SaveChangesAsync();
 
             return Ok(task);
@@ -330,16 +340,31 @@ namespace Tasklog.Api.Controllers
             if (task is null)
                 return NotFound(new { message = $"Task {id} not found." });
 
+            // labelNames, when provided, wins over labelIds and is resolved by name
+            // (any unknown/ambiguous name -> 400). Otherwise use labelIds (null = empty
+            // = clear all labels). The rest of the action works off this effective list.
+            int[] labelIds;
+            if (request.LabelNames is { Length: > 0 })
+            {
+                var (resolvedIds, error) = await ResolveLabelsByName(request.LabelNames);
+                if (error is not null) return BadRequest(new { message = error });
+                labelIds = resolvedIds!.ToArray();
+            }
+            else
+            {
+                labelIds = request.LabelIds ?? Array.Empty<int>();
+            }
+
             // Load the requested labels and reject the request if any IDs don't exist.
             // An empty array is valid - it clears all labels from the task.
             var newLabels = await _context.Labels
-                .Where(l => request.LabelIds.Contains(l.Id))
+                .Where(l => labelIds.Contains(l.Id))
                 .ToListAsync();
 
-            if (request.LabelIds.Length > 0)
+            if (labelIds.Length > 0)
             {
                 var foundIds = newLabels.Select(l => l.Id).ToHashSet();
-                var invalidIds = request.LabelIds.Where(id => !foundIds.Contains(id)).ToList();
+                var invalidIds = labelIds.Where(lid => !foundIds.Contains(lid)).ToList();
 
                 if (invalidIds.Any())
                     return BadRequest(new { message = $"Label IDs not found: {string.Join(", ", invalidIds)}." });
@@ -357,10 +382,11 @@ namespace Tasklog.Api.Controllers
 
         // POST /api/tasks/bulk
         // Applies one operation to a set of tasks in a single transaction. Supported
-        // operations: "complete" (data.isCompleted), "assignProject" (data.projectId,
-        // null = Inbox), "setDeadline" (data.deadline, null = clear, ISO string = set).
-        // No bulk delete - deletion stays single-task. Non-existent ids are skipped;
-        // returns the affected tasks (with labels). 400 on bad input.
+        // operations: "complete" (data.isCompleted), "assignProject" (data.projectId or
+        // data.projectName; null projectId = Inbox), "setDeadline" (data.deadline, null =
+        // clear, ISO string = set), "setPriority" (data.priority 1-4). No bulk delete -
+        // deletion stays single-task. Non-existent ids are skipped; returns the affected
+        // tasks (with labels). 400 on bad input.
         [HttpPost("bulk")]
         public async Task<IActionResult> Bulk([FromBody] BulkTaskRequest request)
         {
@@ -397,12 +423,28 @@ namespace Tasklog.Api.Controllers
 
                 case "assignProject":
                     var projectId = data?.ProjectId;
+                    // A projectName, when provided, wins over projectId and is resolved
+                    // by name (ambiguous/missing -> 400).
+                    if (!string.IsNullOrWhiteSpace(data?.ProjectName))
+                    {
+                        var (resolvedId, projErr) = await ResolveProjectByName(data.ProjectName);
+                        if (projErr is not null) return BadRequest(new { message = projErr });
+                        projectId = resolvedId;
+                    }
                     // Validate the destination project exists (null = Inbox is always valid).
                     // Stricter than the single-task endpoint on purpose; bulk is higher-stakes.
-                    if (projectId is int pid && !await _context.Projects.AnyAsync(p => p.Id == pid))
+                    else if (projectId is int pid && !await _context.Projects.AnyAsync(p => p.Id == pid))
                         return BadRequest(new { message = $"Project {pid} not found." });
                     foreach (var task in tasks)
                         task.ProjectId = projectId;
+                    break;
+
+                case "setPriority":
+                    // Mirror the single-task priority validation (P1-P4).
+                    if (data?.Priority is not int bulkPriority || bulkPriority < 1 || bulkPriority > 4)
+                        return BadRequest(new { message = "data.priority must be between 1 (P1) and 4 (P4)." });
+                    foreach (var task in tasks)
+                        task.Priority = bulkPriority;
                     break;
 
                 case "setDeadline":
@@ -419,12 +461,49 @@ namespace Tasklog.Api.Controllers
                     break;
 
                 default:
-                    return BadRequest(new { message = $"Unknown operation '{request.Operation}'. Expected: complete, assignProject, setDeadline." });
+                    return BadRequest(new { message = $"Unknown operation '{request.Operation}'. Expected: complete, assignProject, setDeadline, setPriority." });
             }
 
             await _context.SaveChangesAsync();
 
             return Ok(tasks);
+        }
+
+        // Resolve a project name to its id. Exact, case-insensitive match. Returns an
+        // error string (not an id) when the name matches zero or more than one project,
+        // so the caller can return a 400 - we never guess which project was meant.
+        private async Task<(int? id, string? error)> ResolveProjectByName(string name)
+        {
+            var matches = await _context.Projects
+                .Where(p => p.Name.ToLower() == name.ToLower())
+                .Select(p => p.Id)
+                .ToListAsync();
+            return matches.Count switch
+            {
+                0 => (null, $"No project named '{name}'."),
+                1 => (matches[0], null),
+                _ => (null, $"Multiple projects named '{name}' - use a project id instead."),
+            };
+        }
+
+        // Resolve a list of label names to ids (exact, case-insensitive). Any name that
+        // matches zero or more than one label is an error (caller -> 400).
+        private async Task<(List<int>? ids, string? error)> ResolveLabelsByName(string[] names)
+        {
+            var ids = new List<int>();
+            foreach (var name in names)
+            {
+                var matches = await _context.Labels
+                    .Where(l => l.Name.ToLower() == name.ToLower())
+                    .Select(l => l.Id)
+                    .ToListAsync();
+                if (matches.Count == 0)
+                    return (null, $"No label named '{name}'.");
+                if (matches.Count > 1)
+                    return (null, $"Multiple labels named '{name}' - use a label id instead.");
+                ids.Add(matches[0]);
+            }
+            return (ids, null);
         }
     }
 
@@ -435,17 +514,19 @@ namespace Tasklog.Api.Controllers
     public record CompleteTaskRequest(bool IsCompleted);
 
     // Request body shape for assigning or unassigning a project on a task.
-    public record AssignProjectRequest(int? ProjectId);
+    // ProjectName, when provided, is resolved by name and wins over ProjectId.
+    public record AssignProjectRequest(int? ProjectId, string? ProjectName = null);
 
-    // Request body shape for replacing a task's full label set.
-    public record SetTaskLabelsRequest(int[] LabelIds);
+    // Request body shape for replacing a task's full label set. LabelNames, when
+    // provided, is resolved by name and wins over LabelIds. Empty/absent both clear.
+    public record SetTaskLabelsRequest(int[]? LabelIds = null, string[]? LabelNames = null);
 
     // Request body shape for bulk operations. Operation is one of
     // "complete" / "assignProject" / "setDeadline". Data carries the per-operation
     // payload; Deadline is a string so it can be parsed and validated explicitly
     // (null = clear), mirroring the single-task PATCH.
     public record BulkTaskRequest(string Operation, List<int> TaskIds, BulkTaskData? Data);
-    public record BulkTaskData(bool? IsCompleted, int? ProjectId, string? Deadline);
+    public record BulkTaskData(bool? IsCompleted, int? ProjectId, string? Deadline, int? Priority = null, string? ProjectName = null);
 
     // Query-string shape for filtering the task list. All fields optional.
     // [FromQuery] binds:
