@@ -1,11 +1,11 @@
 # Feature Implementation Plan: Advanced recurrence grammar
 
-**Overall Progress:** `70%`
+**Overall Progress:** `88%`
 
 **Tracking issue:** [#71](https://github.com/hydraInsurgent/Tasklog/issues/71)
 **Branch:** `feature/advanced-recurrence-grammar-#71`
-**Target version:** v2.15.0 (minor - NO migration) - third of [proposal-recurring-and-habits.md](proposal-recurring-and-habits.md)
-**Research:** [rrule-rfc5545-2026-05-27.md](../research/rrule-rfc5545-2026-05-27.md) (v2.15.0 table)
+**Target version:** v2.14.1 (patch - NO migration, extends the existing recurrence feature) - third of [proposal-recurring-and-habits.md](proposal-recurring-and-habits.md)
+**Research:** [rrule-rfc5545-2026-05-27.md](../research/rrule-rfc5545-2026-05-27.md) (advanced-grammar additions)
 
 ## TLDR
 
@@ -20,7 +20,7 @@ Extend the v2.14.0 recurrence core to the harder RFC 5545 forms it currently rej
 
 All locked in `/explore` (RFC 5545 / Todoist conventions).
 
-- **Decision 1: No new DB column; end conditions live in the rule string.** `UNTIL` is a date compared to the next deadline; `COUNT` is evaluated at spawn time by counting rows with the same `SeriesId`. Completing occurrence #k sees exactly k rows, so it spawns iff `k < COUNT` → exactly `COUNT` occurrences. Keeps v2.15.0 migration-free. Trade-off: deleting a mid-series occurrence skews the `COUNT` tally (acceptable - deletion is rare and destructive; documented).
+- **Decision 1: No new DB column; end conditions live in the rule string.** `UNTIL` is a date compared to the next deadline; `COUNT` is evaluated at spawn time by counting rows with the same `SeriesId`. Completing occurrence #k sees exactly k rows, so it spawns iff `k < COUNT` → exactly `COUNT` occurrences. Keeps this release migration-free. Trade-off: deleting a mid-series occurrence skews the `COUNT` tally (acceptable - deletion is rare and destructive; documented).
 
 - **Decision 2: nth-weekday via `BYDAY` ordinal, not `BYSETPOS`.** `BYDAY=3TH` / `-1MO` is the simpler canonical form for every case Tasklog supports, so raw `BYSETPOS` is unnecessary and stays rejected. Only one ordinaled weekday allowed; ordinals `+1..+4` and `-1`; a non-existent `+5` clamps to the last occurrence.
 
@@ -28,7 +28,7 @@ All locked in `/explore` (RFC 5545 / Todoist conventions).
 
 - **Decision 4: The end-condition gate is the one new control-flow seam.** `RecurrenceRule.ShouldSpawn(next, existingSeriesCount)` returns whether to spawn; `TasksController.Complete` counts the series and calls it. When the series ends, the task is still completed and a "series complete" comment is logged - just no new occurrence.
 
-<!-- GUIDELINES CHECK: No new pattern - extends the pure static RecurrenceRule helper (v2.14.0). No migration (minor bump). product-design recurrence line gains the advanced forms. Research file already carries the v2.15.0 semantics. The end-condition gate in Complete is the only new seam; create/update accept the new grammar automatically once TryParse does. -->
+<!-- GUIDELINES CHECK: No new pattern - extends the pure static RecurrenceRule helper (v2.14.0). No migration (patch bump - extends an existing capability). product-design recurrence line gains the advanced forms. Research file already carries the advanced-grammar semantics. The end-condition gate in Complete is the only new seam; create/update accept the new grammar automatically once TryParse does. -->
 
 ## API contract (unchanged shape; grammar widened)
 
@@ -68,9 +68,9 @@ Completing a recurring task whose end condition is reached: marks it done + logs
   - [x] 🟩 3.2 `RecurrencePicker` rewritten on a single config object: monthly day-of-month | nth-weekday (ordinal+weekday dropdowns) | last-day; weekly+monthly interval inputs; shared Ends control (never | on date->UNTIL | after N->COUNT). `parseRule` reads all parts back; canonical part order matches the backend Serialize.
   - [x] 🟩 3.3 **81 frontend tests pass** (was 73, +8). Clean tsc + next build (verified against a clean tree).
 
-- [ ] 🟥 **Step 4: Docs + CHANGELOG** `[sequential]` → depends on: Steps 1-3
-  - [ ] 🟥 4.1 `architecture.md`: widen the recurrence grammar note + the spawn-on-complete end-condition behavior. `product-design.md`: recurrence line gains the advanced forms + end conditions. (engineering-guidelines: no new pattern - skip unless something emerges.)
-  - [ ] 🟥 4.2 `CHANGELOG.md`: v2.15.0 section. `coverage.md`: counts + new checklists.
+- [x] 🟩 **Step 4: Docs + CHANGELOG** `[sequential]` → depends on: Steps 1-3
+  - [x] 🟩 4.1 `architecture.md`: widened the recurrence grammar note + spawn-on-complete end-condition behavior. `product-design.md`: advanced forms + end conditions. (No new engineering-guidelines pattern.) Plus version re-label to v2.14.1 (patch) across plan/research/program-doc per the minor-vs-patch decision.
+  - [x] 🟩 4.2 `CHANGELOG.md`: v2.14.1 section. `coverage.md`: counts (216/92/81) + advanced-grammar checklists + corrected the now-stale #70 "rejects" line.
 
 - [ ] 🟥 **Step 5: Deploy + smoke test** `[sequential]` → depends on: Step 4
   - [ ] 🟥 5.1 Phone reachable; capture live task count. Stash-deploy-pop (user WIP untouched). Deploy. No migration, but confirm the count is unchanged (no accidental data change).
