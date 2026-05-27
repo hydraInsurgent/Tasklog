@@ -2,6 +2,19 @@
 
 ---
 
+## v2.13.0 - Task comments
+*May 2026*
+
+### Added
+
+- Tasks can now have timestamped comments - notes, progress, context. Add and delete them in a comments section on the task detail page. Stored in a new `Comments` table (DB migration; cascade-deleted with the task) (#69)
+- `GET /api/tasks/{id}` now returns the task's `comments[]` (newest first); new `POST`/`GET`/`DELETE` endpoints under `/api/tasks/{id}/comments`
+- MCP: `add_task_comment(taskId, body)` so Claude can "add a note to task N"; comments are read back via `get_task`. MCP tool count: 20 → 21
+
+Comments are capped at 2000 characters. This is the first slice of the planned recurring + habit-tracking program (it's the substrate the per-completion log will use).
+
+---
+
 ## v2.12.0 - Deadline time-of-day
 *May 2026*
 

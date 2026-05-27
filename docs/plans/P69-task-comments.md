@@ -1,6 +1,6 @@
 # Feature Implementation Plan: Task comments + completion-log foundation
 
-**Overall Progress:** `0%`
+**Overall Progress:** `85%`
 
 **Tracking issue:** [#69](https://github.com/hydraInsurgent/Tasklog/issues/69)
 **Branch:** `feature/task-comments-#69`
@@ -39,26 +39,26 @@ MCP: add_task_comment(taskId, body) -> the created comment; get_task includes co
 
 ## Tasks
 
-- [ ] 🟥 **Step 1: Backend - model, migration, CommentsController** `[sequential]` → depends on: nothing
-  - [ ] 🟥 1.1 `TaskComment` model (Id, required Body, CreatedAt, TaskId, `[JsonIgnore]` Task nav). `TaskModel` gains `ICollection<TaskComment> Comments`. DbContext: `DbSet<TaskComment>` + the Task->Comments relationship (cascade delete).
-  - [ ] 🟥 1.2 Migration `AddTaskComment` via GLOBAL dotnet-ef (no local manifest). Verify it creates the table + FK, no other changes.
-  - [ ] 🟥 1.3 `CommentsController` (`[Route("api/tasks/{taskId:int}/comments")]`): POST (404 if task missing; body trim, non-empty + <=2000 else 400; 201 with the created comment), GET (newest-first; 404 if task missing), DELETE `{id:int}` (204; 404 if not found under that task).
-  - [ ] 🟥 1.4 `GetById` adds `.Include(t => t.Comments)` so the single-task response carries them (GetAll unchanged).
-  - [ ] 🟥 1.5 Tests: add returns 201 + persists; add empty/whitespace -> 400; add > 2000 -> 400; add to unknown task -> 404; GET lists newest-first; DELETE removes (204) + unknown -> 404; GetById includes comments.
+- [x] 🟩 **Step 1: Backend - model, migration, CommentsController** `[sequential]` → depends on: nothing
+  - [x] 🟩 1.1 `TaskComment` model + `TaskModel.Comments` nav; DbContext DbSet + cascade FK.
+  - [x] 🟩 1.2 `AddTaskComment` migration via global dotnet-ef (no manifest); Comments table + FK.
+  - [x] 🟩 1.3 `CommentsController` at `api/tasks/{taskId}/comments`: POST (404/400/201), GET (newest-first, 404), DELETE (204/404).
+  - [x] 🟩 1.4 `GetById` filtered-include of Comments (newest-first); GetAll unchanged.
+  - [x] 🟩 1.5 10 tests (CommentsControllerTests: add/empty-400/too-long-400/unknown-404/list-newest-first/get-404/delete-204/delete-404 + GetById-includes-comments). 143 backend tests pass.
 
-- [ ] 🟥 **Step 2: MCP - add_task_comment + comments in get_task** `[sequential]` → depends on: Step 1
-  - [ ] 🟥 2.1 `Comment` interface (`{ id, body, createdAt }`); `Task` interface gains `comments?: Comment[]` (present on get_task). `api.addTaskComment(taskId, body)`.
-  - [ ] 🟥 2.2 `add_task_comment` tool (taskId + body, body min 1 / max 2000) with describe + "Returns:" the created comment. `get_task` Returns line notes it includes comments[]. Header/tool count update (labels family stays; task tools 12 -> 13).
-  - [ ] 🟥 2.3 Tests: add_task_comment body contract; Comment shape in the Task type.
+- [x] 🟩 **Step 2: MCP - add_task_comment + comments in get_task** `[sequential]` → depends on: Step 1
+  - [x] 🟩 2.1 `Comment` interface + `Task.comments?`; `api.addTaskComment(taskId, body)`.
+  - [x] 🟩 2.2 `add_task_comment` tool (body 1-2000) + Returns; get_task Returns notes comments[]; header (13 task tools / 21 total).
+  - [x] 🟩 2.3 2 tests (add_task_comment body; Comment[] type). Typecheck clean; 87 MCP tests pass.
 
-- [ ] 🟥 **Step 3: Web UI - comments on the detail page** `[sequential]` → depends on: Step 1 `[UI]`
-  - [ ] 🟥 3.1 Frontend `Comment` type + `Task.comments?`. `api.ts`: `addComment(taskId, body)` + `deleteComment(taskId, id)` (getTask already returns comments).
-  - [ ] 🟥 3.2 New `TaskComments` client component (initial comments + taskId props): list newest-first with delete buttons + an add textarea (optimistic-ish; refresh from response). Rendered on the task detail page below the detail rows.
-  - [ ] 🟥 3.3 Fixtures/tests: keep existing green; a focused TaskComments test if practical (add calls api, renders list). Clean tsc + build.
+- [x] 🟩 **Step 3: Web UI - comments on the detail page** `[sequential]` → depends on: Step 1 `[UI]`
+  - [x] 🟩 3.1 Frontend `Comment` type + `Task.comments?`; `addComment`/`deleteComment` in api.ts (addComment surfaces the backend message).
+  - [x] 🟩 3.2 New `TaskComments` client component (list newest-first + delete + add textarea, prepends the created comment), rendered at the bottom of the task detail card.
+  - [x] 🟩 3.3 61 frontend tests still green; clean tsc + next build. No new unit test - TaskComments is an interactive API-wiring component (integration territory, as BulkActionsBar/EditTaskModal), covered by the live smoke.
 
-- [ ] 🟥 **Step 4: Docs + CHANGELOG** `[sequential]` → depends on: Steps 1-3
-  - [ ] 🟥 4.1 architecture.md: `TaskComment` table + the comments endpoints + GetById-includes-comments; MCP tool count. product-design.md: tasks can have comments. engineering-guidelines: (nothing new) .
-  - [ ] 🟥 4.2 CHANGELOG.md: v2.13.0 section. coverage.md: new counts + checklists.
+- [x] 🟩 **Step 4: Docs + CHANGELOG** `[sequential]` → depends on: Steps 1-3
+  - [x] 🟩 4.1 architecture.md: Comments table + comments endpoints + GetById-includes; MCP tool count 20 -> 21 (prose + tree). product-design.md: tasks can have comments.
+  - [x] 🟩 4.2 CHANGELOG.md: v2.13.0 section. coverage.md: counts (143 backend / 87 MCP / 61 frontend) + CommentsController + comments-wire checklists.
 
 - [ ] 🟥 **Step 5: Deploy + smoke test** `[sequential]` → depends on: Step 4
   - [ ] 🟥 5.1 Check phone reachable (dozes); capture live task count. Stash frontend WIP, `./scripts/deploy-phone.sh`, restore (pop) after. CONFIRM the migration applied with zero data loss (count unchanged).

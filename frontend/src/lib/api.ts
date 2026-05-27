@@ -53,6 +53,15 @@ export interface Task {
   projectId: number | null;
   // Labels applied to this task. Always present (empty array if none).
   labels: Label[];
+  // Timestamped comments. Present on getTask (detail); absent on the list.
+  comments?: Comment[];
+}
+
+// A timestamped free-text note on a task.
+export interface Comment {
+  id: number;
+  body: string;
+  createdAt: string;
 }
 
 // GET /api/tasks - fetch all tasks ordered by creation date (newest first).
@@ -148,6 +157,28 @@ export async function bulkTasks(
     throw new Error(message || `Bulk operation failed (HTTP ${res.status}).`);
   }
   return res.json();
+}
+
+// POST /api/tasks/:id/comments - add a comment. Returns the created comment.
+export async function addComment(taskId: number, body: string): Promise<Comment> {
+  const res = await fetch(`${getApiUrl()}/api/tasks/${taskId}/comments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ body }),
+  });
+  if (!res.ok) {
+    const b = await res.json().then((x) => x?.message).catch(() => null);
+    throw new Error(b || "Failed to add comment.");
+  }
+  return res.json();
+}
+
+// DELETE /api/tasks/:id/comments/:commentId - remove a comment.
+export async function deleteComment(taskId: number, commentId: number): Promise<void> {
+  const res = await fetch(`${getApiUrl()}/api/tasks/${taskId}/comments/${commentId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error("Failed to delete comment.");
 }
 
 // GET /api/projects - fetch all projects.

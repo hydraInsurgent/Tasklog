@@ -11,6 +11,7 @@ import DeleteTaskButton from "@/components/DeleteTaskButton";
 import CompleteTaskButton from "@/components/CompleteTaskButton";
 import AssignProjectButton from "@/components/AssignProjectButton";
 import AssignLabelsButton from "@/components/AssignLabelsButton";
+import TaskComments from "@/components/TaskComments";
 
 // Format an ISO date string to a readable local date (e.g. "12 Mar 2026").
 function formatDate(iso: string): string {
@@ -157,6 +158,9 @@ export default async function TaskDetailPage({ params }: PageProps) {
           />
           <DeleteTaskButton taskId={task.id} taskTitle={task.title} />
         </div>
+
+        {/* Comments - interactive add/delete (Client Component). */}
+        <TaskComments taskId={task.id} initialComments={task.comments ?? []} />
       </div>
     </div>
   );

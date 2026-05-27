@@ -327,6 +327,23 @@ public class TasksControllerTests
         result.Should().BeOfType<NotFoundObjectResult>();
     }
 
+    [Fact]
+    public async Task GetById_IncludesComments()
+    {
+        using var context = CreateContext();
+        var task = new TaskModel { Title = "T", CreatedAt = DateTime.Now };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        context.Comments.Add(new TaskComment { TaskId = task.Id, Body = "a note", CreatedAt = DateTime.Now });
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.GetById(task.Id);
+
+        var returned = result.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeOfType<TaskModel>().Subject;
+        returned.Comments.Should().ContainSingle().Which.Body.Should().Be("a note");
+    }
+
     // --- Create ---
 
     [Fact]

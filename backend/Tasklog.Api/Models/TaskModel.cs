@@ -29,6 +29,10 @@ namespace Tasklog.Api.Models
         // Labels applied to this task. Many-to-many - a task can have multiple labels.
         public ICollection<Label> Labels { get; set; } = new List<Label>();
 
+        // Timestamped comments on this task. Only loaded for the single-task GetById
+        // (not the list) - see the controller. Cascade-deleted with the task.
+        public ICollection<TaskComment> Comments { get; set; } = new List<TaskComment>();
+
         // Read-only "due bucket" relative to now. [NotMapped] keeps EF Core from
         // treating it as a column (so it is always computed fresh, never stored);
         // System.Text.Json still serializes the getter, so every action that returns

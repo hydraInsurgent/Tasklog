@@ -43,6 +43,14 @@ export interface Task {
   completedAt: string | null;
   projectId: number | null;
   labels: Label[];
+  // Timestamped comments. Present on get_task (single task); absent on list_tasks.
+  comments?: Comment[];
+}
+
+export interface Comment {
+  id: number;
+  body: string;
+  createdAt: string;
 }
 
 // ApiError carries the HTTP status and body so callers can decide whether to
@@ -207,6 +215,13 @@ export const setTaskLabels = (
   request(`/api/tasks/${id}/labels`, {
     method: 'PATCH',
     body: JSON.stringify(body),
+  });
+
+// Add a timestamped comment to a task. Returns the created comment.
+export const addTaskComment = (taskId: number, body: string): Promise<Comment> =>
+  request(`/api/tasks/${taskId}/comments`, {
+    method: 'POST',
+    body: JSON.stringify({ body }),
   });
 
 // Bulk operations: one transactional POST applies one operation to many tasks.

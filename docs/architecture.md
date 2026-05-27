@@ -65,9 +65,9 @@ Tasklog/
 │   │   ├── server.ts              Hono HTTP entry, middleware wiring
 │   │   ├── config.ts              Env var loading + production validation
 │   │   ├── api-client.ts          Typed client for the Tasklog .NET API
-│   │   ├── tools/                 20 MCP tools wrapping every API endpoint
-│   │   │   ├── tasks.ts           12 task tools (list[+filters]/get/create/update/
-│   │   │   │                      delete/set-completion/assign-project/set-labels +
+│   │   ├── tools/                 21 MCP tools wrapping every API endpoint
+│   │   │   ├── tasks.ts           13 task tools (list[+filters]/get/create/update/
+│   │   │   │                      delete/set-completion/assign-project/set-labels/add-comment +
 │   │   │   │                      bulk-set-completion/bulk-assign-to-project/bulk-set-deadline/bulk-set-priority)
 │   │   │   ├── projects.ts        4 project tools
 │   │   │   ├── labels.ts          4 label tools
@@ -178,6 +178,12 @@ Labels
 LabelTaskModel  (join table - implicit many-to-many)
   LabelsId    INTEGER  not null  foreign key -> Labels.Id  (cascade delete)
   TasksId     INTEGER  not null  foreign key -> Tasks.Id   (cascade delete)
+
+Comments  (v2.13.0)
+  Id          INTEGER  primary key, autoincrement
+  Body        TEXT     not null  (free text, <= 2000 chars)
+  CreatedAt   TEXT     not null  (ISO 8601 datetime string)
+  TaskId      INTEGER  not null  foreign key -> Tasks.Id  (cascade delete)
 ```
 
 ### API endpoints
@@ -185,7 +191,10 @@ LabelTaskModel  (join table - implicit many-to-many)
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/tasks` | Filtered/sorted task list. Filter params: `projectIds` (repeated key), `inbox`, `labelIds` (repeated key), `dueBefore`, `dueAfter`, `createdAfter`, `createdBefore`, `completed`, `text`, `priorities` (repeated key, P1-P4). Sort: `sort` (`created`/`deadline`/`priority`, default `created`) + `order` (`asc`/`desc`, default `desc`; deadline sorts nulls-last, priority asc = P1 first). `limit` caps to the first N after sorting (`<1` → 400). Arrays use repeated keys, not comma-separated. AND across dimensions, OR within id arrays. No params = all tasks, newest-first. `inbox=true` + `projectIds` → 400. |
-| GET | `/api/tasks/{id}` | Single task by ID. 404 if not found |
+| GET | `/api/tasks/{id}` | Single task by ID, including its `comments[]` (newest first). 404 if not found |
+| GET | `/api/tasks/{taskId}/comments` | List a task's comments, newest first. 404 if task missing |
+| POST | `/api/tasks/{taskId}/comments` | Add a comment. Body: `{ body }` (non-empty, <= 2000). 201 with the created comment; 400 bad body; 404 task missing |
+| DELETE | `/api/tasks/{taskId}/comments/{id}` | Delete a comment under that task. 204; 404 if not found |
 | POST | `/api/tasks` | Create task. Body: `{ title, deadline?, projectId?, priority?, description? }`. priority is 1-4 (default 4 = none); description <= 2000 chars (blank → null); 400 if out of range |
 | PATCH | `/api/tasks/{id}` | Partial update of title, deadline, priority, and/or description. JSON body, present-key detection: omit=keep, `deadline: null`/`description: null`/blank=clear, value=set. priority must be 1-4 (no clear - P4 is none); description <= 2000. 400 on empty title / bad date / bad priority / too-long description. Returns the updated task |
 | DELETE | `/api/tasks/{id}` | Delete task. 204 on success, 404 if not found |
@@ -380,7 +389,7 @@ POST /token                                     auth_code and refresh_token gran
 
 ### Tool layer
 
-20 MCP tools across three families (tasks: 12, projects: 4, labels: 4). The task family includes four bulk tools (`bulk_set_completion`, `bulk_assign_to_project`, `bulk_set_deadline`, `bulk_set_priority`) backed by the single `POST /api/tasks/bulk` endpoint. `assign_task_to_project` / `bulk_assign_to_project` / `set_task_labels` accept a name as an alternative to an id (resolved server-side). Each tool is a thin wrapper around the corresponding Tasklog `/api` endpoint via `api-client.ts`. Input schemas use Zod and are inlined per tool. The `runTool()` helper in `result.ts` converts thrown `ApiError`s into MCP `isError: true` tool results (not JSON-RPC protocol errors), so the LLM can see and react to failures.
+21 MCP tools across three families (tasks: 13, projects: 4, labels: 4). The task family includes four bulk tools (`bulk_set_completion`, `bulk_assign_to_project`, `bulk_set_deadline`, `bulk_set_priority`) backed by the single `POST /api/tasks/bulk` endpoint, and `add_task_comment` (comments are read back via `get_task`). `assign_task_to_project` / `bulk_assign_to_project` / `set_task_labels` accept a name as an alternative to an id (resolved server-side). Each tool is a thin wrapper around the corresponding Tasklog `/api` endpoint via `api-client.ts`. Input schemas use Zod and are inlined per tool. The `runTool()` helper in `result.ts` converts thrown `ApiError`s into MCP `isError: true` tool results (not JSON-RPC protocol errors), so the LLM can see and react to failures.
 
 The `list_tasks` tool accepts an optional filter object (project, inbox, labels, deadline range, completion, title substring) that `api-client.ts` serializes into a query string on `GET /api/tasks`. Completion is a single `set_task_completion(id, isCompleted)` tool - the earlier `complete_task` / `uncomplete_task` split was consolidated in v2.10.1.
 
