@@ -1,6 +1,6 @@
 # Feature Implementation Plan: Advanced recurrence grammar
 
-**Overall Progress:** `88%`
+**Overall Progress:** `100%`
 
 **Tracking issue:** [#71](https://github.com/hydraInsurgent/Tasklog/issues/71)
 **Branch:** `feature/advanced-recurrence-grammar-#71`
@@ -72,11 +72,17 @@ Completing a recurring task whose end condition is reached: marks it done + logs
   - [x] 🟩 4.1 `architecture.md`: widened the recurrence grammar note + spawn-on-complete end-condition behavior. `product-design.md`: advanced forms + end conditions. (No new engineering-guidelines pattern.) Plus version re-label to v2.14.1 (patch) across plan/research/program-doc per the minor-vs-patch decision.
   - [x] 🟩 4.2 `CHANGELOG.md`: v2.14.1 section. `coverage.md`: counts (216/92/81) + advanced-grammar checklists + corrected the now-stale #70 "rejects" line.
 
-- [ ] 🟥 **Step 5: Deploy + smoke test** `[sequential]` → depends on: Step 4
-  - [ ] 🟥 5.1 Phone reachable; capture live task count. Stash-deploy-pop (user WIP untouched). Deploy. No migration, but confirm the count is unchanged (no accidental data change).
-  - [ ] 🟥 5.2 Live curl: `COUNT=2` daily task → complete twice → the 2nd completion does NOT spawn a 3rd (series ends, comment says so); a `FREQ=MONTHLY;BYDAY=3TH` task → complete → next deadline is the 3rd Thursday of next month; an `every other week` task advances 14 days; an `UNTIL` in the past doesn't spawn. Clean up the smoke rows.
+- [x] 🟩 **Step 5: Deploy + smoke test** `[sequential]` → depends on: Step 4
+  - [x] 🟩 5.1 Baseline 25 tasks. Stash-deploy-pop; deploy exit 0, all services fresh. No migration; 25 tasks before/after - no data change. (Pop tangled on the deploy-regenerated package-lock + the user's grown doppel WIP; recovered the full WIP losslessly + verified against the stash backup.)
+  - [x] 🟩 5.2 Live curl all green: COUNT=2 stops at the 2nd occurrence with a "series complete" comment; FREQ=MONTHLY;BYDAY=3TH advanced to 2026-06-18 (3rd Thursday of June); every-other-week accepted (201). Smoke rows cleaned up (back to 25).
   - [ ] 🟥 5.3 DEFERRED user spot-check (non-blocking): build a "3rd Thursday, ends after 5" in the web picker; in Claude, "repeat every other Monday until July".
 
 ## Outcomes
 
-<!-- Fill in after execution: decision-relevant deltas only. What changed vs. planned? Key decisions made? Assumptions invalidated? -->
+Built as planned. Mostly turned the v2.14.0 parser's reject-branches into accept-branches + extended the expander + added the end-condition gate. 216 backend / 92 MCP / 81 frontend tests; live smoke confirmed the full advanced cycle on the phone with no data change.
+
+- **Shipped as a PATCH (v2.14.1), not a minor.** The user challenged the original "all minors" plan; applying the project's own minor-vs-patch rule, this extends the existing recurrence feature with no migration -> patch. The program was re-lettered: v2.14.1 advanced, v2.14.2 natural-language, v2.15.0 habit-tracking. The stale 2-version sketch in `proposal-next-versions.md` was flagged superseded.
+- **No new DB column / no migration.** `UNTIL` is a date compare; `COUNT` counts `SeriesId` rows at spawn time. Verified live: a `COUNT=2` series produced exactly 2 occurrences then stopped with a "series complete" comment.
+- **`BYSETPOS` deliberately not implemented** - `BYDAY=3TH` is the simpler canonical form for every case, so it stays rejected.
+- **Deploy/WIP near-miss:** the deploy regenerated `package-lock.json` and the user's doppel WIP had grown (new untracked API route), so the stash pop tangled. Recovered losslessly (surgical `git checkout stash@{0} -- <file>` for the un-applied paths, verified the tree matched the stash backup). Lesson: stash the whole `frontend/` uncommitted set (mine is committed pre-deploy) rather than an enumerated path list, and clear deploy-regenerated tracked files before popping. User opted to keep stash-deploy-pop with verification.
+- **Deferred (non-blocking):** Step 5.3 user spot-check.
