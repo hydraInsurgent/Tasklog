@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, DM_Sans } from "next/font/google";
 import "./globals.css";
+import { DoppelWidget } from "@/components/DoppelWidget";
 
 // Heading font: Space Grotesk (tech-startup pairing from UI spec).
 // The `variable` prop injects a CSS custom property used in globals.css.
@@ -48,6 +49,9 @@ export default function RootLayout({
 
         {/* Page content */}
         <main className="max-w-6xl mx-auto px-4 py-8">{children}</main>
+
+        {/* Doppel - Manu's digital self. Fixed bottom-right, does not affect layout. */}
+        <DoppelWidget />
       </body>
     </html>
   );
