@@ -140,6 +140,15 @@ step "Building arm64 node_modules (Docker, QEMU emulation)"
 # Wipe the host-arch node_modules that next build wrote into standalone
 rm -rf "frontend/.next/standalone/node_modules"
 
+# Next's standalone copies package.json (which may reference vendored tarballs via
+# file:./vendor/...), but NOT the vendor/ dir itself - so the in-container npm install
+# would fail with ENOENT on those tarballs. Copy any vendored packages into the
+# standalone bundle so file: dependencies resolve inside Docker.
+if [ -d "frontend/vendor" ]; then
+    rm -rf "frontend/.next/standalone/vendor"
+    cp -r "frontend/vendor" "frontend/.next/standalone/vendor"
+fi
+
 docker run --rm \
     --platform=linux/arm64 \
     -v "${REPO_ROOT}/frontend/.next/standalone:/app" \

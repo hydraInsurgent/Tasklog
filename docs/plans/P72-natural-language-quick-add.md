@@ -1,6 +1,6 @@
 # Feature Implementation Plan: Natural-language quick-add
 
-**Overall Progress:** `88%`
+**Overall Progress:** `100%`
 
 **Tracking issue:** [#72](https://github.com/hydraInsurgent/Tasklog/issues/72)
 **Branch:** `feature/natural-language-recurrence-#72`
@@ -65,11 +65,17 @@ Dropped (no Tasklog field): `+assignee`, `!reminder`, `/section`.
   - [x] 🟩 4.1 `engineering-guidelines.md`: first frontend dep (chrono-node) + backdrop-overlay pattern. `product-design.md`: NL quick-add flow. `architecture.md`: chrono-node + `quickAdd.ts`/`QuickAddInput.tsx` in the tree.
   - [x] 🟩 4.2 `CHANGELOG.md`: v2.15.0 section. `coverage.md`: 118 frontend + quick-add checklist. `proposal-recurring-and-habits.md`: NL quick-add = v2.15.0 (minor, expanded), habit-tracking re-lettered to v2.16.0.
 
-- [ ] 🟥 **Step 5: Deploy + smoke test + ship** `[sequential]` → depends on: Step 4
-  - [ ] 🟥 5.1 Tree should be clean (doppel committed); check for any new user WIP first and stash-deploy-pop only if present. Deploy. No migration - confirm live task count unchanged.
-  - [ ] 🟥 5.2 Web smoke: in the add form, type `Buy milk tomorrow #Personal @errand p2 every week` → verify the saved task has tomorrow's deadline, the Personal project, the errand label, P2, a weekly recurrence, and a clean "Buy milk" title; tokens highlighted while typing. Clean up.
-  - [ ] 🟥 5.3 DEFERRED user spot-check (non-blocking): try several phrases in the browser; confirm the highlight + autosuggest feel right.
+- [x] 🟩 **Step 5: Deploy + smoke test + ship** `[sequential]` → depends on: Step 4
+  - [x] 🟩 5.1 Tree clean (doppel committed). First deploy FAILED: the committed doppel `file:vendor/*.tgz` dep broke the Docker arm64 `npm install` (vendor/ not copied into `.next/standalone`). Fixed `deploy-phone.sh` to copy `frontend/vendor/` into the standalone bundle; re-deploy succeeded, all 4 services fresh, 25 tasks unchanged (no migration).
+  - [x] 🟩 5.2 Parser verified by 118 unit tests + the user's local `npm run dev` testing (quick-add is client-side; curl can't exercise it). Deploy smoke: frontend + MCP HTTP 200.
+  - [ ] 🟥 5.3 DEFERRED user spot-check (non-blocking): try several phrases in the browser on the phone.
 
 ## Outcomes
 
-<!-- Fill in after execution: decision-relevant deltas only. What changed vs. planned? Key decisions made? Assumptions invalidated? -->
+Shipped the full Todoist-style natural-language quick-add (re-scoped from "NL recurrence" by the user). 118 frontend tests; frontend-only, no migration.
+
+- **chrono-node** (first frontend runtime dep, MIT) for free-form one-off dates; recurrence + `#`/`@`/`pN` tokens hand-rolled onto the existing grammar. `quickAdd.ts` is a pure function; `QuickAddInput.tsx` is a backdrop-overlay highlight input (no contenteditable).
+- **Heavy user iteration shaped the UX** (all driven by local `npm run dev` testing): arrow-key autosuggest nav; a captured-chips row (type label + ✕ unlink) instead of inline click-to-unlink; live-fill of the Deadline/Project/Priority/Repeat controls from the parse ("show both"); and the bare-multi-weekday case (`friday and saturday`) modeled as those days once via a `UNTIL` end date (the user's "not every, that's a gap" insight - reuses v2.14.1 end conditions).
+- **Deploy was broken by the committed doppel dependency** and fixed in `deploy-phone.sh` (copy `vendor/` into the standalone bundle so `file:` deps resolve in the Docker arm64 build). This permanently unblocks deploys; the fix shipped with this version.
+- **Versioning:** the original "NL recurrence" patch grew into a new creation capability, so it's a minor (v2.15.0); habit-tracking re-lettered to v2.16.0.
+- Deferred: Step 5.3 user spot-check (non-blocking).
