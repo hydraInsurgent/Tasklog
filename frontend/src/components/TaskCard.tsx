@@ -4,7 +4,7 @@ import { useRef, useEffect, useState } from "react";
 import Link from "next/link";
 import { MoreVertical, Trash2, Loader2, Pencil } from "lucide-react";
 import { Task, Project } from "@/lib/api";
-import { formatDate, deadlineColorClass, projectName, labelColor } from "@/lib/format";
+import { formatDeadline, deadlineColorClass, projectName, labelColor } from "@/lib/format";
 import DeadlinePopover from "./DeadlinePopover";
 import PriorityDot from "./PriorityDot";
 
@@ -138,7 +138,7 @@ export default function TaskCard({
                   task.deadline ? deadlineColorClass(task.deadline) : "text-zinc-300"
                 }`}
               >
-                {task.deadline ? formatDate(task.deadline) : "No deadline"}
+                {task.deadline ? formatDeadline(task.deadline) : "No deadline"}
               </button>
               {deadlineOpen && (
                 <DeadlinePopover

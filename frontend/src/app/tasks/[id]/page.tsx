@@ -4,6 +4,7 @@
 
 import Link from "next/link";
 import { getTask, getProjects, getLabels, type Project, type Label } from "@/lib/api";
+import { formatDeadline } from "@/lib/format";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import DeleteTaskButton from "@/components/DeleteTaskButton";
@@ -114,7 +115,7 @@ export default async function TaskDetailPage({ params }: PageProps) {
           <div className="px-6 py-4 flex justify-between items-center">
             <dt className="text-sm font-medium text-zinc-500">Deadline</dt>
             <dd className={`text-sm ${deadlineColorClass(task.deadline)}`}>
-              {task.deadline ? formatDate(task.deadline) : (
+              {task.deadline ? formatDeadline(task.deadline) : (
                 <span className="text-zinc-300">Not set</span>
               )}
             </dd>

@@ -164,8 +164,9 @@ export function registerTaskTools(server: McpServer): void {
           .string()
           .optional()
           .describe(
-            'Optional deadline as an ISO 8601 date string (e.g. ' +
-              '"2026-12-31"). Omit if no deadline.',
+            'Optional deadline as an ISO 8601 date (e.g. "2026-12-31", treated as ' +
+              'end of that day) or datetime for a specific moment (e.g. ' +
+              '"2026-12-31T15:00"). Omit if no deadline.',
           ),
         projectId: z
           .number()
@@ -229,8 +230,9 @@ export function registerTaskTools(server: McpServer): void {
           .nullable()
           .optional()
           .describe(
-            'New deadline as an ISO 8601 date string (e.g. "2026-12-31"). ' +
-              'Pass null to clear the deadline. Omit to leave it unchanged.',
+            'New deadline as an ISO 8601 date (e.g. "2026-12-31", end of that day) ' +
+              'or datetime for a specific moment (e.g. "2026-12-31T15:00"). Pass null ' +
+              'to clear the deadline. Omit to leave it unchanged.',
           ),
         priority: z
           .number()

@@ -87,6 +87,7 @@ A reminder or alert system would be a meaningful scope addition.
 - A "Show completed" toggle reveals all completed tasks. Completion can be undone.
 - CompletedAt timestamp is recorded when a task is marked done and cleared if un-completed.
 - Deadlines are visible to the user but the app does not enforce or act on them.
+- A deadline can optionally include a time of day (v2.12.0) - "due Friday at 3pm". A timed deadline shows as overdue the moment it passes; a date-only deadline stays due all that calendar day. Set the time via an optional field beside the date; leave it blank for date-only.
 - Every task carries a server-computed \`dueStatus\` (overdue / today / this_week / later / none), derived from the deadline relative to today (v2.10.3). It centralizes the due-bucket logic so Claude and any future client get a consistent answer without recomputing it.
 - A task can belong to a project (optional). Tasks with no project are in Inbox.
 - Bulk actions (v2.10.4): a "Select" mode on the task list lets you pick several tasks and, from a bulk-actions bar, complete/reopen them, move them to a project (or Inbox), or set/clear their deadline in one step. The same operations are available to Claude via bulk MCP tools, with bulk priority added in v2.10.7. There is no bulk delete - deletion stays one task at a time.

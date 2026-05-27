@@ -1,6 +1,6 @@
 # Test Coverage
 
-**Last updated:** 2026-05-27 (#67 - task description field: migration + create/update + UI)
+**Last updated:** 2026-05-27 (#68 - deadline time-of-day: dueStatus time rule + UI time input)
 
 ---
 
@@ -15,12 +15,12 @@
 | Class | Lines | Branches | Notes |
 |---|---|---|---|
 | TasksController | 100% | 100% | All methods and branches covered. +9 tests for Update/PATCH partial-update (#59) |
-| TaskModel.ComputeDueStatus | 100% | 100% | +11 tests for the dueStatus bucket logic (#61) |
+| TaskModel.ComputeDueStatus | 100% | 100% | +11 tests (#61) + 4 for the time-of-day overdue rule (#68) |
 | TasksController.Bulk | 100% | 100% | +13 tests for POST /api/tasks/bulk (#63, incl. the 500-id cap) |
 | TasksController (priority) | 100% | 100% | +12 tests for priority on create/update/filter (#64, incl. float/negative rejection) |
 | TasksController (query) | 100% | 100% | +10 tests for createdAt range / sort / limit on GetAll (#65) |
 | TasksController (ergonomics) | 100% | 100% | +11 tests for bulk setPriority + project/label name resolution (#66) |
-| TasksController (description) | 100% | 100% | +9 tests for description on create/update (#67) - 129 backend tests total |
+| TasksController (description) | 100% | 100% | +9 tests for description on create/update (#67) - 133 backend tests total (incl. #68 dueStatus time) |
 | ProjectsController | 100% | 100% | All methods and branches covered |
 | TasklogDbContext | 100% | 100% | |
 | Program.cs | 0% | - | Framework wiring - not a test target |
@@ -45,7 +45,7 @@
 
 **85 tests, 0 failures** (was 82; +3 in api-client.test.ts for the description wire contract, #67). Run with: `npm test --prefix mcp` (auto-rebuilds better-sqlite3 for host arch via pretest hook if needed). Note: a fresh `npm install` on the host installs better-sqlite3 without the native binary - run `npm rebuild better-sqlite3` once after install if the OAuth store/token tests fail with `ERR_DLOPEN_FAILED`.
 
-### Next.js Frontend - last run 2026-05-26
+### Next.js Frontend - last run 2026-05-27 (61 tests; +5 for deadline time-of-day, #68)
 
 | Component | Statements | Branches | Lines | Uncovered |
 |---|---|---|---|---|
@@ -107,7 +107,11 @@
 - [x] 🟩 on Sunday: tomorrow -> later (rest-of-week window empty)
 - [x] 🟩 on Saturday: Sunday -> this_week; Monday -> later
 - [x] 🟩 compares date-only, ignoring time of day -> today
-- [x] 🟩 DueStatus property wires ComputeDueStatus to DateTime.Today
+- [x] 🟩 DueStatus property wires ComputeDueStatus to DateTime.Now
+- [x] 🟩 timed deadline, past time today -> overdue (#68)
+- [x] 🟩 timed deadline, future time today -> today (#68)
+- [x] 🟩 date-only today stays today all day (#68)
+- [x] 🟩 timed deadline tomorrow -> this_week, not overdue (#68)
 
 ### TasksController (priority, #64)
 - [x] 🟩 Create - defaults priority to 4 when omitted
@@ -238,6 +242,10 @@
 - [x] 🟩 priorityMeta - labels P1..P4
 - [x] 🟩 priorityMeta - out-of-range falls back to P4
 - [x] 🟩 PRIORITY_OPTIONS - all four in order P1..P4
+
+### format.ts (deadline time-of-day, #68)
+- [x] 🟩 hasTimeComponent - false for midnight / bare date, true for a non-midnight time
+- [x] 🟩 formatDeadline - date only for midnight; appends the time when timed
 
 ### deadlinePresets (resolvePreset, injected `now`)
 - [x] 🟩 today - returns today's local date

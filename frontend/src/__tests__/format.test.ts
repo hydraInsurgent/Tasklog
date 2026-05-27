@@ -1,4 +1,4 @@
-import { deadlineColorClass, formatDate, projectName, priorityMeta, PRIORITY_OPTIONS } from '@/lib/format'
+import { deadlineColorClass, formatDate, formatDeadline, hasTimeComponent, projectName, priorityMeta, PRIORITY_OPTIONS } from '@/lib/format'
 
 describe('deadlineColorClass', () => {
   beforeEach(() => {
@@ -79,5 +79,29 @@ describe('priorityMeta', () => {
 
   it('PRIORITY_OPTIONS lists all four in order P1..P4', () => {
     expect(PRIORITY_OPTIONS.map((o) => o.value)).toEqual([1, 2, 3, 4])
+  })
+})
+
+describe('hasTimeComponent', () => {
+  it('is false for a midnight (date-only) deadline', () => {
+    expect(hasTimeComponent('2026-06-01T00:00:00')).toBe(false)
+  })
+  it('is false for a bare date string', () => {
+    expect(hasTimeComponent('2026-06-01')).toBe(false)
+  })
+  it('is true for a non-midnight time', () => {
+    expect(hasTimeComponent('2026-06-01T15:00:00')).toBe(true)
+  })
+})
+
+describe('formatDeadline', () => {
+  it('shows date only for a midnight deadline', () => {
+    expect(formatDeadline('2026-06-01T00:00:00')).toBe('1 Jun 2026')
+  })
+  it('appends the time for a timed deadline', () => {
+    // The exact time string is locale-formatted; assert it includes the date and a time.
+    const out = formatDeadline('2026-06-01T15:00:00')
+    expect(out).toContain('1 Jun 2026')
+    expect(out).toMatch(/3[:.]00/)
   })
 })

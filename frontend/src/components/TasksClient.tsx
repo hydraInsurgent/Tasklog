@@ -5,7 +5,7 @@ import { usePolling } from "@/hooks/usePolling";
 import Link from "next/link";
 import { Trash2, CheckCircle, XCircle, Loader2, MoreHorizontal, Plus, Pencil, ListChecks } from "lucide-react";
 import { getTasks, createTask, deleteTask, completeTask, getLabels, setTaskLabels, updateTask, bulkTasks, BulkOperation, Task, Project, Label } from "@/lib/api";
-import { formatDate, deadlineColorClass, projectName, labelColor } from "@/lib/format";
+import { formatDate, formatDeadline, deadlineColorClass, projectName, labelColor } from "@/lib/format";
 import AddTaskForm from "./AddTaskForm";
 import TaskCard from "./TaskCard";
 import EditTaskModal from "./EditTaskModal";
@@ -575,7 +575,7 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
                             aria-label={`Change deadline for ${task.title}`}
                             className={`rounded px-1 -mx-1 hover:bg-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer transition-colors duration-150 ${deadlineColorClass(task.deadline)}`}
                           >
-                            {task.deadline ? formatDate(task.deadline) : (
+                            {task.deadline ? formatDeadline(task.deadline) : (
                               <span className="text-zinc-300">Set date</span>
                             )}
                           </button>

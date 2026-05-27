@@ -21,6 +21,8 @@ interface Props {
 export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabels }: Props) {
   const [title, setTitle] = useState("");
   const [deadline, setDeadline] = useState("");
+  // Optional time-of-day ("HH:mm"). Blank = date-only deadline.
+  const [deadlineTime, setDeadlineTime] = useState("");
   // Priority on the P1-P4 scale; default 4 (none).
   const [priority, setPriority] = useState(4);
   // Optional free-text description.
@@ -150,10 +152,18 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
 
     setLoading(true);
     try {
-      await onAdd(title.trim(), deadline || undefined, projectId, labelIds, priority, description.trim() || undefined);
+      // Combine the date with an optional time. No date -> no deadline. Date + time
+      // -> a timed deadline; date alone -> date-only (backend stores midnight).
+      const deadlineValue = deadline
+        ? deadlineTime
+          ? `${deadline}T${deadlineTime}`
+          : deadline
+        : undefined;
+      await onAdd(title.trim(), deadlineValue, projectId, labelIds, priority, description.trim() || undefined);
       // Clear the form on success.
       setTitle("");
       setDeadline("");
+      setDeadlineTime("");
       setPriority(4);
       setDescription("");
       setSelectedLabels([]);
@@ -212,14 +222,25 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
           >
             Deadline (optional)
           </label>
-          <input
-            id="task-deadline"
-            type="date"
-            value={deadline}
-            onChange={(e) => setDeadline(e.target.value)}
-            className="w-full px-3 py-2 border border-zinc-200 rounded-md text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-shadow duration-150 cursor-pointer"
-            disabled={loading}
-          />
+          <div className="flex gap-2">
+            <input
+              id="task-deadline"
+              type="date"
+              value={deadline}
+              onChange={(e) => setDeadline(e.target.value)}
+              className="flex-1 min-w-0 px-3 py-2 border border-zinc-200 rounded-md text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-shadow duration-150 cursor-pointer"
+              disabled={loading}
+            />
+            {/* Optional time. Only meaningful with a date; blank = date-only. */}
+            <input
+              type="time"
+              value={deadlineTime}
+              onChange={(e) => setDeadlineTime(e.target.value)}
+              aria-label="Deadline time (optional)"
+              disabled={loading || !deadline}
+              className="w-28 px-2 py-2 border border-zinc-200 rounded-md text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-shadow duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            />
+          </div>
         </div>
 
         {/* Project dropdown - only shown when projects are available */}

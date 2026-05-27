@@ -56,9 +56,44 @@ public class TaskModelTests
     [Fact]
     public void DueStatus_Property_UsesComputeDueStatus()
     {
-        // The instance getter wires ComputeDueStatus to DateTime.Today. A null deadline is
+        // The instance getter wires ComputeDueStatus to DateTime.Now. A null deadline is
         // always "none" regardless of the date, which lets us assert without freezing the clock.
         var task = new TaskModel { Title = "x", Deadline = null };
         task.DueStatus.Should().Be("none");
+    }
+
+    // --- Time-of-day (#68): a non-midnight deadline goes overdue once its instant passes;
+    // a midnight/date-only deadline keeps the all-day-today behaviour. ---
+
+    [Fact]
+    public void ComputeDueStatus_TimedDeadline_PastTimeToday_IsOverdue()
+    {
+        var now = new DateTime(2026, 6, 3, 15, 0, 0); // 3pm
+        // Due at 9am today - the instant has passed.
+        TaskModel.ComputeDueStatus(new DateTime(2026, 6, 3, 9, 0, 0), now).Should().Be("overdue");
+    }
+
+    [Fact]
+    public void ComputeDueStatus_TimedDeadline_FutureTimeToday_IsToday()
+    {
+        var now = new DateTime(2026, 6, 3, 9, 0, 0); // 9am
+        // Due at 5pm today - not yet passed.
+        TaskModel.ComputeDueStatus(new DateTime(2026, 6, 3, 17, 0, 0), now).Should().Be("today");
+    }
+
+    [Fact]
+    public void ComputeDueStatus_DateOnlyToday_StaysTodayAllDay()
+    {
+        // Midnight (date-only) deadline today, even late in the evening, is still "today".
+        var now = new DateTime(2026, 6, 3, 23, 30, 0);
+        TaskModel.ComputeDueStatus(new DateTime(2026, 6, 3), now).Should().Be("today");
+    }
+
+    [Fact]
+    public void ComputeDueStatus_TimedDeadline_Tomorrow_IsThisWeekNotOverdue()
+    {
+        var now = new DateTime(2026, 6, 3, 15, 0, 0); // Wednesday 3pm
+        // Tomorrow 9am - a future instant on a future date.
+        TaskModel.ComputeDueStatus(new DateTime(2026, 6, 4, 9, 0, 0), now).Should().Be("this_week");
     }
 }
