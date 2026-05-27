@@ -63,6 +63,27 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
     setSelectedProjectId(defaultProjectId != null ? String(defaultProjectId) : "inbox");
   }, [defaultProjectId]);
 
+  // Live-reflect quick-add tokens into the structured controls as you type, so the
+  // Deadline / Project / Priority boxes show what the title captured (the in-field
+  // highlight + chips show it too - both, per request). Only a control whose token is
+  // present in the title is set, so manual edits to dimensions the title doesn't mention
+  // are preserved. Recurrence is shown via the chip, not pushed into the picker (which
+  // owns its own state after mount).
+  useEffect(() => {
+    if (!title.trim()) return;
+    const parsed = parseQuickAdd(title, projects ?? []);
+    if (parsed.deadline) {
+      const [d, t] = parsed.deadline.split("T");
+      setDeadline(d);
+      setDeadlineTime(t ? t.slice(0, 5) : "");
+    }
+    if (parsed.priority) setPriority(parsed.priority);
+    if (parsed.projectName && projects) {
+      const match = projects.find((p) => p.name.toLowerCase() === parsed.projectName!.toLowerCase());
+      if (match) setSelectedProjectId(String(match.id));
+    }
+  }, [title, projects]);
+
   // Recompute suggestions whenever the input text or selected labels change.
   useEffect(() => {
     if (!allLabels || labelInput.trim() === "") {
