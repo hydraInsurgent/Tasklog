@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| _none_ | | | |
+| [P68-deadline-time-of-day.md](plans/P68-deadline-time-of-day.md) | #68 | feature/deadline-time-of-day-#68 | In Progress |
 
 ---
 
