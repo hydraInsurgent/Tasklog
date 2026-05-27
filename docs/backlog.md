@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| _none_ | | | |
+| P65-list-tasks-query-completeness.md (pending) | #65 | feature/list-tasks-query-completeness-#65 | Planning |
 
 ---
 
