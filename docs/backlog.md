@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| [P72-natural-language-quick-add.md](plans/P72-natural-language-quick-add.md) | #72 | feature/natural-language-recurrence-#72 | In Progress |
+| _none_ | | | |
 
 ---
 
@@ -77,6 +77,7 @@ Recently completed work (keep last 10):
 
 | # | Title | Type | Closed |
 |---|-------|------|--------|
+| #72 | Natural-language quick-add (Todoist-style title parsing) (v2.15.0) | feature | 2026-05-27 |
 | #71 | Advanced recurrence grammar (nth-weekday, end conditions, intervals) (v2.14.1) | feature | 2026-05-27 |
 | #70 | Recurrence core (recurring tasks) (v2.14.0) | feature | 2026-05-27 |
 | #69 | Task comments + completion-log foundation (v2.13.0) | feature | 2026-05-27 |
@@ -86,7 +87,6 @@ Recently completed work (keep last 10):
 | #65 | list_tasks query completeness (createdAt filter, sort, limit) (v2.10.6) | feature | 2026-05-27 |
 | #64 | Task priority (Todoist P1-P4) (v2.10.5) | feature | 2026-05-27 |
 | #63 | Bulk task operations (complete, move-to-project, set-deadline) (v2.10.4) | feature | 2026-05-27 |
-| #61 | Computed dueStatus field + MCP tool-description shape hints (v2.10.3) | feature | 2026-05-27 |
 
 ---
 
