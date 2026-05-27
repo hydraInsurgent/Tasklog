@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| _none_ | | | |
+| [P70-recurrence-core.md](plans/P70-recurrence-core.md) | #70 | feature/recurrence-core-#70 | In Progress |
 
 ---
 
