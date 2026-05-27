@@ -118,6 +118,25 @@ describe('parseQuickAdd - combined', () => {
     expect(r.cleanedTitle).toBe('drinks')
   })
 
+  it('bare multi-weekday list -> those days once, ending on the last (the user case)', () => {
+    const r = parse('Email to mark on friday and saturday #Personal')
+    // Weekly on Fri+Sat, anchored this Friday, ending this Saturday (so it stops after Sat).
+    expect(r.recurrence).toBe('FREQ=WEEKLY;BYDAY=FR,SA;UNTIL=20260530')
+    expect(r.deadline).toBe('2026-05-29')
+    expect(r.projectName).toBe('Personal')
+    expect(r.cleanedTitle).toBe('Email to mark')
+  })
+
+  it('"every <weekdays>" stays an ongoing repeat (no end date)', () => {
+    expect(parse('drinks every friday and saturday').recurrence).toBe('FREQ=WEEKLY;BYDAY=FR,SA')
+  })
+
+  it('a single bare weekday is a one-off date, not a repeat', () => {
+    const r = parse('report friday')
+    expect(r.recurrence).toBeUndefined()
+    expect(r.deadline).toBe('2026-05-29')
+  })
+
   it('reports recognized token spans in order', () => {
     const r = parse('Buy milk #Work p2')
     expect(r.tokens.map((t) => t.type)).toEqual(['project', 'priority'])

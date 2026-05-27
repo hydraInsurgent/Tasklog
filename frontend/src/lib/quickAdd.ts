@@ -40,6 +40,10 @@ export interface QuickAddResult {
 const WEEKDAY_CODE: Record<string, string> = {
   su: "SU", mo: "MO", tu: "TU", we: "WE", th: "TH", fr: "FR", sa: "SA",
 };
+// Code -> a full name chrono understands (for anchoring a bare weekday list).
+const CODE_TO_NAME: Record<string, string> = {
+  SU: "sunday", MO: "monday", TU: "tuesday", WE: "wednesday", TH: "thursday", FR: "friday", SA: "saturday",
+};
 const DOW_ORDER = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
 // A regex fragment matching any weekday word (full or common abbreviation).
 const WD = "(?:sun(?:day)?|mon(?:day)?|tue(?:s|sday)?|wed(?:nesday)?|thu(?:r|rs|rsday)?|fri(?:day)?|sat(?:urday)?)";
@@ -177,6 +181,33 @@ function matchRecurrence(text: string, ref: Date): RecurrenceMatch | null {
   return { rule, start, end };
 }
 
+// A bare multi-weekday list with no "every" ("friday and saturday", "mon, wed, fri")
+// means "those specific upcoming days, once each" - NOT an ongoing repeat. We model it
+// the way Todoist does: a weekly rule on those weekdays with an end date (UNTIL) set to
+// the latest listed day, anchored (the first deadline) on the soonest. So it spawns
+// through each listed day and then stops. Returns null for fewer than two weekdays
+// (a single weekday stays a one-off date).
+function matchBareWeekdays(
+  text: string,
+  ref: Date,
+): { rule: string; deadline: string; start: number; end: number } | null {
+  const re = new RegExp(`\\b(?:on\\s+)?(${WD}(?:\\s*(?:,|and|,\\s*and)\\s*${WD})+)\\b`, "i");
+  const m = text.match(re);
+  if (!m || m.index === undefined) return null;
+  const codes = parseWeekdayList(m[1]);
+  if (codes.length < 2) return null;
+
+  // Each listed weekday's next upcoming date; anchor on the soonest, end on the latest.
+  const dates = codes
+    .map((c) => chrono.parseDate(CODE_TO_NAME[c], ref))
+    .filter((d): d is Date => d !== null)
+    .sort((a, b) => a.getTime() - b.getTime());
+  if (dates.length < 2) return null;
+
+  const rule = `FREQ=WEEKLY;BYDAY=${codes.join(",")};UNTIL=${toUntil(dates[dates.length - 1])}`;
+  return { rule, deadline: toDateString(dates[0]), start: m.index, end: m.index + m[0].length };
+}
+
 // Blank out a [start,end) span (preserving length/indices) so a later pass won't re-match it.
 function mask(text: string, start: number, end: number): string {
   return text.slice(0, start) + " ".repeat(end - start) + text.slice(end);
@@ -200,25 +231,37 @@ export function parseQuickAdd(
   // Work against a masked copy so each pass ignores already-claimed spans.
   let work = text;
 
-  // 1. Recurrence first, so "every friday" isn't grabbed as a one-off date.
-  const rec = matchRecurrence(work, refDate);
+  // 1. Recurrence first, so "every friday" isn't grabbed as a one-off date. An "every ..."
+  //    phrase repeats ongoing; a bare multi-weekday list ("friday and saturday") is those
+  //    specific days once each (a weekly rule with an end date), anchored on the soonest.
   let recurrence: string | undefined;
+  let deadline: string | undefined;
+  const rec = matchRecurrence(work, refDate);
   if (rec) {
     recurrence = rec.rule;
     tokens.push({ type: "recurrence", text: text.slice(rec.start, rec.end), start: rec.start, end: rec.end });
     work = mask(work, rec.start, rec.end);
+  } else {
+    const bare = matchBareWeekdays(work, refDate);
+    if (bare) {
+      recurrence = bare.rule;
+      deadline = bare.deadline; // anchored to the first listed day
+      tokens.push({ type: "recurrence", text: text.slice(bare.start, bare.end), start: bare.start, end: bare.end });
+      work = mask(work, bare.start, bare.end);
+    }
   }
 
-  // 2. One-off date via chrono (on the recurrence-masked text).
-  let deadline: string | undefined;
-  const parsed = chrono.parse(work, refDate);
-  if (parsed.length > 0) {
-    const r = parsed[0];
-    const d = r.start.date();
-    // Explicit time -> timed deadline; otherwise date-only (backend midnight convention).
-    deadline = r.start.isCertain("hour") ? toDateTimeString(d) : toDateString(d);
-    tokens.push({ type: "date", text: text.slice(r.index, r.index + r.text.length), start: r.index, end: r.index + r.text.length });
-    work = mask(work, r.index, r.index + r.text.length);
+  // 2. One-off date via chrono - only if a bare-weekday list didn't already anchor one.
+  if (deadline === undefined) {
+    const parsed = chrono.parse(work, refDate);
+    if (parsed.length > 0) {
+      const r = parsed[0];
+      const d = r.start.date();
+      // Explicit time -> timed deadline; otherwise date-only (backend midnight convention).
+      deadline = r.start.isCertain("hour") ? toDateTimeString(d) : toDateString(d);
+      tokens.push({ type: "date", text: text.slice(r.index, r.index + r.text.length), start: r.index, end: r.index + r.text.length });
+      work = mask(work, r.index, r.index + r.text.length);
+    }
   }
 
   // 3. Priority pN (last one wins).
