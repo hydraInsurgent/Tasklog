@@ -1,6 +1,6 @@
 # Feature Implementation Plan: Agent ergonomics (bulk_set_priority + name resolution)
 
-**Overall Progress:** `85%`
+**Overall Progress:** `100%` (engineering complete; Step 5.3 is a deferred post-ship user spot-check)
 
 **Tracking issue:** [#66](https://github.com/hydraInsurgent/Tasklog/issues/66)
 **Branch:** `feature/agent-ergonomics-#66`
@@ -60,11 +60,18 @@ MCP: bulk_set_priority(taskIds, priority); assign_task_to_project + bulk_assign_
   - [x] 🟩 4.1 architecture.md: bulk endpoint setPriority + projectName/labelNames on the project/labels rows; MCP tool count 19 -> 20 (prose + tree). product-design.md: bulk priority + name-friendly Claude line.
   - [x] 🟩 4.2 CHANGELOG.md: v2.10.7 section. coverage.md: counts (120 backend / 82 MCP) + ergonomics checklists.
 
-- [ ] 🟥 **Step 5: Deploy + smoke test** `[sequential]` → depends on: Step 4
-  - [ ] 🟥 5.1 Check phone reachable (dozes); if asleep, that is a user-action stop. Then stash the user's frontend WIP, `./scripts/deploy-phone.sh`, restore (pop) after.
-  - [ ] 🟥 5.2 Live curl: bulk setPriority on N tasks; assign by projectName (+ ambiguous/missing -> 400); set labels by labelNames; clean up.
-  - [ ] 🟥 5.3 DEFERRED user spot-check (non-blocking): web UI bulk "Set priority"; in Claude, "move these to Work", "make these P1", "tag these urgent".
+- [x] 🟩 **Step 5: Deploy + smoke test** `[sequential]` → depends on: Step 4
+  - [x] 🟩 5.1 Phone reachable (no doze this time); stashed frontend WIP, `./scripts/deploy-phone.sh` clean (exit 0), pop after ship.
+  - [x] 🟩 5.2 Live curl on throwaways (then deleted): bulk setPriority on 2 + out-of-range 400; assign by projectName (case-insensitive) + missing-name 400; bulk assign by name; set labels by labelNames + unknown-name 400. ALL PASSED.
+  - [x] 🟩 5.3 DEFERRED user spot-check (non-blocking): web UI bulk "Set priority"; in Claude, "move these to Work", "make these P1", "tag these urgent". Verified at API + unit + live-curl level.
 
 ## Outcomes
 
-<!-- Fill in after execution: decision-relevant deltas only. What changed vs. planned? Key decisions made? Assumptions invalidated? -->
+Built as planned; no design assumptions invalidated.
+
+- **Name resolution wired cleanly via two shared private helpers** (`ResolveProjectByName` / `ResolveLabelsByName`) reused across the single-task AND bulk paths. The name-wins-over-id precedence + 0/many → 400 rule held; live curl confirmed case-insensitive match, missing-name 400, and the bulk-by-name path.
+- **bulk_set_priority** completed the bulk family (now 4 ops / 4 bulk MCP tools, count 19 → 20), mirroring the single-task 1-4 validation.
+- **Record changes stayed backwards-compatible:** `SetTaskLabelsRequest.LabelIds` went nullable with a default and `AssignProjectRequest`/`BulkTaskData` gained optional name fields - all existing positional callers/tests compiled untouched (120 backend incl. the prior id-path tests green).
+- **One process slip caught + fixed:** `git add frontend/src/` accidentally staged the user's `layout.tsx` + `DoppelWidget.tsx`; spotted it in the staged-file check and unstaged before committing, so only my 3 frontend files (BulkActionsBar, TasksClient, lib/api.ts) went in. Lesson: stage explicit paths, not `frontend/src/`, while the user's WIP shares that tree.
+- **Tests:** +11 backend, +4 MCP. Totals 120 backend / 82 MCP / 56 frontend; clean tsc + next build.
+- **Pending:** only the hands-on spot-check (5.3), then ship as v2.10.7.
