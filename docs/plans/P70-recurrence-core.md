@@ -1,6 +1,6 @@
 # Feature Implementation Plan: Recurrence core (recurring tasks)
 
-**Overall Progress:** `70%`
+**Overall Progress:** `85%`
 
 **Tracking issue:** [#70](https://github.com/hydraInsurgent/Tasklog/issues/70)
 **Branch:** `feature/recurrence-core-#70`
@@ -92,9 +92,9 @@ MCP: create_task / update_task gain a `recurrence` string param (subset taught i
   - [x] 🟩 3.4 `TasksClient.handleComplete`: after a recurring completion, fetch and prepend only the new (unknown-id) occurrence so it shows immediately without disturbing the hide animation.
   - [x] 🟩 3.5 **73 frontend tests pass** (was 61, +12: describeRecurrence + RecurrencePicker). Clean tsc + next build (verified against a clean tree). Palette/focus/contrast per UI-SPEC; weekday chips wrap in the narrow add-form column.
 
-- [ ] 🟥 **Step 4: Docs + CHANGELOG** `[sequential]` → depends on: Steps 1-3
-  - [ ] 🟥 4.1 `architecture.md`: Recurrence + SeriesId columns in the data model; `RecurrenceRule` helper + the new `Services/` folder; recurrence on create/update + spawn-on-complete behavior. `engineering-guidelines.md`: note the pure-static-helper precedent extended (Services/ folder, still no DI service layer). `product-design.md`: tasks can recur.
-  - [ ] 🟥 4.2 `CHANGELOG.md`: v2.14.0 section. `coverage.md`: new counts + RecurrenceRule + recurrence-contract checklists.
+- [x] 🟩 **Step 4: Docs + CHANGELOG** `[sequential]` → depends on: Steps 1-3
+  - [x] 🟩 4.1 `architecture.md`: Recurrence + SeriesId columns + isRecurring; Services/ folder + RecurrenceRule; recurrence on create/update + spawn-on-complete endpoint note; MCP prose + repo tree (RecurrencePicker/RecurringBadge). `engineering-guidelines.md`: pure-static-helper-in-Services precedent (not a DI service). `product-design.md`: tasks can recur + tool count 20->21 fix + recurrence in the MCP line.
+  - [x] 🟩 4.2 `CHANGELOG.md`: v2.14.0 section. `coverage.md`: counts (190/91/73) + RecurrenceRule + TasksController-recurrence + MCP + frontend checklists.
 
 - [ ] 🟥 **Step 5: Deploy + smoke test** `[sequential]` → depends on: Step 4
   - [ ] 🟥 5.1 Phone reachable; capture live task count. Stash-deploy-pop (user WIP untouched). `./scripts/deploy-phone.sh`. CONFIRM the migration applied with zero data loss.

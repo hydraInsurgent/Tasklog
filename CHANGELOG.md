@@ -2,6 +2,21 @@
 
 ---
 
+## v2.14.0 - Recurring tasks
+*May 2026*
+
+### Added
+
+- Tasks can now repeat. Set a recurrence on the add/edit forms - daily, every N days, weekly on chosen weekdays, or monthly on a day-of-month - and a recurring badge shows the schedule on the list, cards, and the task detail page (#70)
+- Completing a recurring task keeps the finished one as a completed history row and immediately creates the next occurrence with its deadline advanced per the rule (title, project, labels, priority, description, and recurrence carried over, linked by a shared series id). A completion comment ("Completed X, next due Y") is logged on the one just finished
+- A recurring task needs a deadline to repeat from; recurrence advances from the scheduled date (not when you tick it off) and preserves the time of day
+- MCP: `create_task` and `update_task` accept an RRULE-shaped `recurrence` string (e.g. `FREQ=WEEKLY;BYDAY=MO,WE,FR`), so Claude can "make this repeat every weekday"; completing via `set_task_completion` spawns the next occurrence. Tasks now carry `recurrence` / `seriesId` / `isRecurring`
+- New `Recurrence` + `SeriesId` columns on the task (DB migration)
+
+Recurrence is stored RRULE-shaped (RFC 5545) so the grammar can grow. This core supports daily / every-N-days / weekly-on-weekdays / monthly-on-day; advanced patterns ("3rd Thursday", end conditions), natural-language entry, and habit streaks are planned follow-ups. Bulk-complete does not spawn next occurrences (complete recurring tasks individually).
+
+---
+
 ## v2.13.0 - Task comments
 *May 2026*
 

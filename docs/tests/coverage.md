@@ -1,6 +1,6 @@
 # Test Coverage
 
-**Last updated:** 2026-05-27 (#69 - task comments: TaskComment table + CommentsController + MCP + UI)
+**Last updated:** 2026-05-27 (#70 - recurrence core: RecurrenceRule helper + spawn-on-complete + MCP + UI)
 
 ---
 
@@ -21,7 +21,9 @@
 | TasksController (query) | 100% | 100% | +10 tests for createdAt range / sort / limit on GetAll (#65) |
 | TasksController (ergonomics) | 100% | 100% | +11 tests for bulk setPriority + project/label name resolution (#66) |
 | TasksController (description) | 100% | 100% | +9 tests for description on create/update (#67) |
-| CommentsController | 100% | 100% | +10 tests for task comments (add/list/delete + GetById-includes) (#69) - 143 backend tests total |
+| CommentsController | 100% | 100% | +10 tests for task comments (add/list/delete + GetById-includes) (#69) |
+| RecurrenceRule | 100% | 100% | +~35 tests: parse/serialize round-trip, NextDeadline (daily/everyN/weekly/monthly/clamp/time), validation rejects unsupported (#70) |
+| TasksController (recurrence) | 100% | 100% | +13 tests: create/update set+clear, recurrence-without-deadline 400, spawn-on-complete (fields/labels/SeriesId/comment), no double-spawn (#70) - 190 backend tests total |
 | ProjectsController | 100% | 100% | All methods and branches covered |
 | TasklogDbContext | 100% | 100% | |
 | Program.cs | 0% | - | Framework wiring - not a test target |
@@ -44,9 +46,9 @@
 | oauth/well-known.ts | - | - | - | Returns fixed JSON metadata |
 | server.ts | - | - | - | Hono mount order + request logger; covered by middleware tests + end-to-end smoke |
 
-**87 tests, 0 failures** (was 85; +2 in api-client.test.ts for the comments wire contract, #69). Run with: `npm test --prefix mcp` (auto-rebuilds better-sqlite3 for host arch via pretest hook if needed). Note: a fresh `npm install` on the host installs better-sqlite3 without the native binary - run `npm rebuild better-sqlite3` once after install if the OAuth store/token tests fail with `ERR_DLOPEN_FAILED`.
+**91 tests, 0 failures** (was 87; +4 in api-client.test.ts for the recurrence wire contract, #70). Run with: `npm test --prefix mcp` (auto-rebuilds better-sqlite3 for host arch via pretest hook if needed). Note: a fresh `npm install` on the host installs better-sqlite3 without the native binary - run `npm rebuild better-sqlite3` once after install if the OAuth store/token tests fail with `ERR_DLOPEN_FAILED`.
 
-### Next.js Frontend - last run 2026-05-27 (61 tests; +5 for deadline time-of-day, #68)
+### Next.js Frontend - last run 2026-05-27 (73 tests; +12 for recurrence: describeRecurrence + RecurrencePicker, #70)
 
 | Component | Statements | Branches | Lines | Uncovered |
 |---|---|---|---|---|
@@ -182,6 +184,28 @@
 - [x] 🟩 Delete - unknown comment -> 404
 - [x] 🟩 (TasksController) GetById includes comments
 
+### RecurrenceRule helper (#70)
+- [x] 🟩 Parse -> Serialize round-trips (daily / every-N / weekly / monthly)
+- [x] 🟩 Parse normalizes casing + weekday order; defaults INTERVAL to 1
+- [x] 🟩 NextDeadline - daily +1, every-N +N
+- [x] 🟩 NextDeadline - preserves time-of-day
+- [x] 🟩 NextDeadline - weekly single + multi (soonest matching weekday)
+- [x] 🟩 NextDeadline - monthly same-day, clamps short months, year rollover
+- [x] 🟩 Rejects YEARLY/HOURLY, COUNT/UNTIL, BYSETPOS, nth-weekday (3TH), negative/0/32 BYMONTHDAY, weekly/monthly INTERVAL>1, missing FREQ, weekly w/o BYDAY, monthly w/o BYMONTHDAY, unknown weekday, malformed, empty
+- [x] 🟩 Rejects FREQ=DAILY with BYDAY (points to WEEKLY)
+
+### TasksController - recurrence (#70)
+- [x] 🟩 Create - stores rule + stamps SeriesId; IsRecurring true
+- [x] 🟩 Create - recurrence without deadline -> 400
+- [x] 🟩 Create - invalid rule -> 400
+- [x] 🟩 Create - normalizes to canonical form
+- [x] 🟩 Complete - spawns next occurrence (same SeriesId, deadline +rule) + logs completion comment
+- [x] 🟩 Complete - carries title/description/project/priority/labels + preserves time-of-day
+- [x] 🟩 Complete - non-recurring does not spawn / no comment
+- [x] 🟩 Complete - re-completing does not double-spawn
+- [x] 🟩 Complete - weekly advances to the next configured weekday
+- [x] 🟩 Update - set assigns SeriesId; set-without-deadline 400; clear nulls rule+SeriesId; invalid rule 400
+
 ### ProjectsController
 - [x] 🟩 GetAll - returns projects ordered alphabetically
 - [x] 🟩 Create - returns 201 with created project on valid name
@@ -258,6 +282,12 @@
 ### format.ts (deadline time-of-day, #68)
 - [x] 🟩 hasTimeComponent - false for midnight / bare date, true for a non-midnight time
 - [x] 🟩 formatDeadline - date only for midnight; appends the time when timed
+
+### format.ts + RecurrencePicker (recurrence, #70)
+- [x] 🟩 describeRecurrence - null -> ""; daily; every-N; weekly (ordered weekdays); monthly (ordinal); unknown -> "Repeats"
+- [x] 🟩 RecurrencePicker - disabled + hint without a deadline
+- [x] 🟩 RecurrencePicker - emits FREQ=DAILY; seeds weekday/day-of-month from the deadline on weekly/monthly
+- [x] 🟩 RecurrencePicker - renders an initial rule; emits null on "Does not repeat"
 
 ### deadlinePresets (resolvePreset, injected `now`)
 - [x] 🟩 today - returns today's local date
@@ -350,6 +380,7 @@ its own subprocess, so in-memory DBs are isolated across files.
 - [x] 🟩 ergonomics - bulk setPriority body; assignProject-by-name body; setTaskProject projectName + setTaskLabels labelNames bodies (#66)
 - [x] 🟩 description - create/update body sets it; update null clears (#67)
 - [x] 🟩 comments - add_task_comment body; Task.comments optional Comment[] type (#69)
+- [x] 🟩 recurrence - create/update bodies carry recurrence; update null clears; Task carries recurrence/seriesId/isRecurring (#70)
 
 ### Not covered (and why)
 - `tools/tasks.ts`, `tools/projects.ts`, `tools/labels.ts` - thin api-client wrappers; behavior is exercised through `runTool` tests + the end-to-end smoke run with claude.ai.

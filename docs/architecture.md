@@ -53,6 +53,7 @@ Tasklog/
 │       ├── Data/                  EF Core DbContext
 │       ├── Migrations/            EF Core schema migrations
 │       ├── Models/                Data model classes
+│       ├── Services/              Pure domain helpers (RecurrenceRule - parse/validate/advance RRULE, v2.14.0)
 │       ├── Properties/            Launch settings (ports)
 │       ├── Program.cs             App startup and service registration
 │       ├── appsettings.json       Config (connection string, logging)
@@ -104,7 +105,9 @@ Tasklog/
 │       │   ├── EditTaskModal.tsx   Full task edit (title/deadline/project/labels), diff-and-fan-out save (Client Component, v2.10.2)
 │       │   ├── DeadlinePopover.tsx Quick deadline preset picker on the deadline pill (Client Component, v2.10.2)
 │       │   ├── BulkActionsBar.tsx  Sticky bulk-actions bar for multi-select mode (Client Component, v2.10.4)
-│       │   └── PriorityDot.tsx    Small colored priority dot (P1-P3) next to a task title (v2.10.5)
+│       │   ├── PriorityDot.tsx    Small colored priority dot (P1-P3) next to a task title (v2.10.5)
+│       │   ├── RecurrencePicker.tsx  Recurrence builder (none/daily/weekly/monthly) on the add/edit forms (Client Component, v2.14.0)
+│       │   └── RecurringBadge.tsx Repeat glyph + human label for recurring tasks (v2.14.0)
 │       │   (list is representative - other components: TaskCard, FilterPanel, LabelsClient, etc.)
 │       └── lib/
 │           ├── api.ts             Typed API call functions (used by both server and client)
@@ -162,7 +165,10 @@ Tasks
   CompletedAt TEXT     nullable  (ISO 8601 datetime string, set when marked complete, cleared on un-complete)
   ProjectId   INTEGER  nullable  foreign key -> Projects.Id (null = Inbox)
   Priority    INTEGER  not null  default 4  (Todoist P1-P4: 1=urgent .. 4=none; existing rows migrated to 4) (v2.10.5)
+  Recurrence  TEXT     nullable  (RRULE-shaped rule, e.g. "FREQ=DAILY"/"FREQ=WEEKLY;BYDAY=MO,WE"; null = does not repeat) (v2.14.0)
+  SeriesId    TEXT     nullable  (Guid linking all occurrences of a repeating task; null for one-offs) (v2.14.0)
 
+  (response-only) isRecurring  bool  Recurrence != null. NOT a column; [NotMapped] getter on TaskModel. (v2.14.0)
   (response-only) dueStatus  string  computed from Deadline vs now. A timed deadline goes
                   "overdue" once its instant passes; a midnight/date-only one stays "today"
                   all day then overdue next day. NOT a column. [NotMapped] getter on TaskModel,
@@ -195,10 +201,10 @@ Comments  (v2.13.0)
 | GET | `/api/tasks/{taskId}/comments` | List a task's comments, newest first. 404 if task missing |
 | POST | `/api/tasks/{taskId}/comments` | Add a comment. Body: `{ body }` (non-empty, <= 2000). 201 with the created comment; 400 bad body; 404 task missing |
 | DELETE | `/api/tasks/{taskId}/comments/{id}` | Delete a comment under that task. 204; 404 if not found |
-| POST | `/api/tasks` | Create task. Body: `{ title, deadline?, projectId?, priority?, description? }`. priority is 1-4 (default 4 = none); description <= 2000 chars (blank → null); 400 if out of range |
-| PATCH | `/api/tasks/{id}` | Partial update of title, deadline, priority, and/or description. JSON body, present-key detection: omit=keep, `deadline: null`/`description: null`/blank=clear, value=set. priority must be 1-4 (no clear - P4 is none); description <= 2000. 400 on empty title / bad date / bad priority / too-long description. Returns the updated task |
+| POST | `/api/tasks` | Create task. Body: `{ title, deadline?, projectId?, priority?, description?, recurrence? }`. priority is 1-4 (default 4 = none); description <= 2000 chars (blank → null); `recurrence` is an RRULE-shaped rule that requires a deadline and stamps a SeriesId (400 if no deadline / unsupported rule). 400 if out of range |
+| PATCH | `/api/tasks/{id}` | Partial update of title, deadline, priority, description, and/or recurrence. JSON body, present-key detection: omit=keep, `deadline: null`/`description: null`/blank/`recurrence: null`=clear, value=set. Setting recurrence requires the task to have a deadline (possibly set in the same PATCH) and assigns a SeriesId; clearing it nulls Recurrence + SeriesId. priority must be 1-4 (no clear - P4 is none); description <= 2000. 400 on empty title / bad date / bad priority / too-long description / unsupported recurrence. Returns the updated task |
 | DELETE | `/api/tasks/{id}` | Delete task. 204 on success, 404 if not found |
-| PATCH | `/api/tasks/{id}/complete` | Mark task complete or incomplete. Body: `{ isCompleted: bool }`. Returns updated task |
+| PATCH | `/api/tasks/{id}/complete` | Mark task complete or incomplete. Body: `{ isCompleted: bool }`. Returns the (completed) task. For a recurring task, completing it also spawns the next occurrence (deadline advanced per the rule; title/project/labels/priority/description/recurrence carried under the same SeriesId) and logs a completion comment on the finished one. Bulk-complete does not spawn |
 | PATCH | `/api/tasks/{id}/project` | Reassign task to a project or Inbox. Body: `{ projectId: int?, projectName?: string }`. projectName is resolved by name (case-insensitive, exact) and wins over projectId; 0/multiple matches → 400 |
 | POST | `/api/tasks/bulk` | Apply one operation to many tasks in one transaction. Body: `{ operation: "complete" \| "assignProject" \| "setDeadline" \| "setPriority", taskIds: int[], data?: { isCompleted?, projectId?, projectName?, deadline?, priority? } }`. assignProject accepts a project name (resolved, wins over id). No bulk delete. Unknown ids skipped; returns the affected tasks. 400 on empty ids / unknown op / invalid data (missing/ambiguous project name, priority out of 1-4) |
 | GET | `/api/projects` | All projects, ordered by name |
@@ -389,7 +395,7 @@ POST /token                                     auth_code and refresh_token gran
 
 ### Tool layer
 
-21 MCP tools across three families (tasks: 13, projects: 4, labels: 4). The task family includes four bulk tools (`bulk_set_completion`, `bulk_assign_to_project`, `bulk_set_deadline`, `bulk_set_priority`) backed by the single `POST /api/tasks/bulk` endpoint, and `add_task_comment` (comments are read back via `get_task`). `assign_task_to_project` / `bulk_assign_to_project` / `set_task_labels` accept a name as an alternative to an id (resolved server-side). Each tool is a thin wrapper around the corresponding Tasklog `/api` endpoint via `api-client.ts`. Input schemas use Zod and are inlined per tool. The `runTool()` helper in `result.ts` converts thrown `ApiError`s into MCP `isError: true` tool results (not JSON-RPC protocol errors), so the LLM can see and react to failures.
+21 MCP tools across three families (tasks: 13, projects: 4, labels: 4). The task family includes four bulk tools (`bulk_set_completion`, `bulk_assign_to_project`, `bulk_set_deadline`, `bulk_set_priority`) backed by the single `POST /api/tasks/bulk` endpoint, and `add_task_comment` (comments are read back via `get_task`). `assign_task_to_project` / `bulk_assign_to_project` / `set_task_labels` accept a name as an alternative to an id (resolved server-side). `create_task` and `update_task` accept an RRULE-shaped `recurrence` string (v2.14.0); completing a recurring task via `set_task_completion` spawns the next occurrence server-side, so no separate recurrence tool exists. Each tool is a thin wrapper around the corresponding Tasklog `/api` endpoint via `api-client.ts`. Input schemas use Zod and are inlined per tool. The `runTool()` helper in `result.ts` converts thrown `ApiError`s into MCP `isError: true` tool results (not JSON-RPC protocol errors), so the LLM can see and react to failures.
 
 The `list_tasks` tool accepts an optional filter object (project, inbox, labels, deadline range, completion, title substring) that `api-client.ts` serializes into a query string on `GET /api/tasks`. Completion is a single `set_task_completion(id, isCompleted)` tool - the earlier `complete_task` / `uncomplete_task` split was consolidated in v2.10.1.
 
