@@ -156,14 +156,16 @@ Tasks
   Id          INTEGER  primary key, autoincrement
   Title       TEXT     not null
   Description TEXT     nullable  (optional free-text notes, <= 2000 chars; null = none) (v2.11.0)
-  Deadline    TEXT     nullable  (ISO 8601 date string)
+  Deadline    TEXT     nullable  (ISO 8601 datetime. Midnight = date-only (due end of day); a non-midnight time = a specific moment. v2.12.0)
   CreatedAt   TEXT     not null  (ISO 8601 datetime string)
   IsCompleted INTEGER  not null  default 0  (boolean: 0 = pending, 1 = complete)
   CompletedAt TEXT     nullable  (ISO 8601 datetime string, set when marked complete, cleared on un-complete)
   ProjectId   INTEGER  nullable  foreign key -> Projects.Id (null = Inbox)
   Priority    INTEGER  not null  default 4  (Todoist P1-P4: 1=urgent .. 4=none; existing rows migrated to 4) (v2.10.5)
 
-  (response-only) dueStatus  string  computed, NOT a column. [NotMapped] getter on TaskModel,
+  (response-only) dueStatus  string  computed from Deadline vs now. A timed deadline goes
+                  "overdue" once its instant passes; a midnight/date-only one stays "today"
+                  all day then overdue next day. NOT a column. [NotMapped] getter on TaskModel,
                   derived from Deadline relative to DateTime.Today at serialization time.
                   One of: overdue / today / this_week (through upcoming Sunday) / later / none. (v2.10.3)
 

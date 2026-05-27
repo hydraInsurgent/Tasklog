@@ -30,9 +30,18 @@ function toDateInput(deadline: string | null): string {
   return deadline ? deadline.slice(0, 10) : "";
 }
 
+// The "HH:mm" time portion for a <input type="time">, or "" for a date-only
+// (midnight) deadline. Mirrors the backend's midnight = date-only convention.
+function toTimeInput(deadline: string | null): string {
+  if (!deadline || deadline.slice(11, 16) === "00:00" || deadline.length <= 10) return "";
+  return deadline.slice(11, 16);
+}
+
 export default function EditTaskModal({ task, projects, allLabels, onSaved, onClose }: Props) {
   const [title, setTitle] = useState(task.title);
   const [deadline, setDeadline] = useState(toDateInput(task.deadline));
+  // Optional time-of-day ("HH:mm"); blank = date-only. Disabled when no date.
+  const [deadlineTime, setDeadlineTime] = useState(toTimeInput(task.deadline));
   // "inbox" sentinel = null projectId (no project), mirroring AddTaskForm.
   const [projectId, setProjectId] = useState<string>(
     task.projectId != null ? String(task.projectId) : "inbox",
@@ -83,12 +92,12 @@ export default function EditTaskModal({ task, projects, allLabels, onSaved, onCl
     const newLabelIds = [...labelIds].sort();
 
     const titleChanged = trimmed !== task.title;
-    // Compare on the date-string form so "no deadline" vs a date is detected.
-    const newDeadline = deadline || null; // "" -> null (cleared)
-    // Normalise null -> "" on both sides so the comparison is string-vs-string.
-    // Without the `?? ""`, "still no deadline" (null vs "") would read as a change
-    // and fire a pointless clear PATCH; with it, only a real add/change/clear counts.
-    const deadlineChanged = (newDeadline ?? "") !== toDateInput(task.deadline);
+    // Build the canonical "YYYY-MM-DDTHH:mm:ss" (or null) form so a date OR time
+    // change is detected, and compare against the task's deadline trimmed to seconds.
+    // No date -> null (cleared). Date + blank time -> midnight (date-only).
+    const newDeadline = deadline ? `${deadline}T${deadlineTime || "00:00"}:00` : null;
+    const oldDeadline = task.deadline ? task.deadline.slice(0, 19) : null;
+    const deadlineChanged = newDeadline !== oldDeadline;
     const priorityChanged = priority !== task.priority;
     // Normalise blank -> null on both sides so "still no description" isn't a change.
     const newDescription = description.trim() || null;
@@ -200,10 +209,22 @@ export default function EditTaskModal({ task, projects, allLabels, onSaved, onCl
                   disabled={saving}
                   className="flex-1 px-3 py-2 border border-zinc-200 rounded-md text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-shadow duration-150 cursor-pointer"
                 />
+                {/* Optional time; blank = date-only. Disabled without a date. */}
+                <input
+                  type="time"
+                  value={deadlineTime}
+                  onChange={(e) => setDeadlineTime(e.target.value)}
+                  aria-label="Deadline time (optional)"
+                  disabled={saving || !deadline}
+                  className="w-28 px-2 py-2 border border-zinc-200 rounded-md text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-shadow duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                />
                 {deadline && (
                   <button
                     type="button"
-                    onClick={() => setDeadline("")}
+                    onClick={() => {
+                      setDeadline("");
+                      setDeadlineTime("");
+                    }}
                     disabled={saving}
                     className="text-sm text-zinc-500 hover:text-zinc-900 focus:outline-none focus:underline cursor-pointer"
                   >

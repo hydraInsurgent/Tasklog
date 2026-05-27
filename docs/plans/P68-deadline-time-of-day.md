@@ -1,6 +1,6 @@
 # Feature Implementation Plan: Deadline time-of-day
 
-**Overall Progress:** `0%`
+**Overall Progress:** `80%`
 
 **Tracking issue:** [#68](https://github.com/hydraInsurgent/Tasklog/issues/68)
 **Branch:** `feature/deadline-time-of-day-#68`
@@ -35,23 +35,23 @@ dueStatus now reflects the time for "overdue" on timed deadlines.
 
 ## Tasks
 
-- [ ] 🟥 **Step 1: Backend - dueStatus considers time** `[sequential]` → depends on: nothing
-  - [ ] 🟥 1.1 Rework `TaskModel.ComputeDueStatus(DateTime? deadline, DateTime now)`: `hasTime = deadline.Value.TimeOfDay != TimeSpan.Zero`; overdue via the Decision-2 rule; then today/this_week/later on `now.Date`. `DueStatus` getter passes `DateTime.Now`.
-  - [ ] 🟥 1.2 Tests: timed deadline earlier-today -> overdue; timed deadline later-today -> today; timed deadline tomorrow -> this_week/later; date-only today -> today (all day); date-only yesterday -> overdue. Existing dueStatus tests (date-only) still pass after the `today`->`now` rename.
+- [x] 🟩 **Step 1: Backend - dueStatus considers time** `[sequential]` → depends on: nothing
+  - [x] 🟩 1.1 Reworked `ComputeDueStatus(deadline, now)` with the hasTime/midnight rule; `DueStatus` getter passes `DateTime.Now`.
+  - [x] 🟩 1.2 +4 tests (timed past-today -> overdue, timed future-today -> today, date-only-today all day, timed tomorrow -> this_week). All 129 existing tests still pass (date-only unaffected). 133 backend total.
 
-- [ ] 🟥 **Step 2: MCP - description note** `[sequential]` → depends on: Step 1
-  - [ ] 🟥 2.1 No code change (deadline params already accept datetimes). Add a clause to `create_task`/`update_task` deadline descriptions: "include a time for a specific moment (e.g. 2026-06-01T15:00); date-only = end of day." A light test asserting a datetime deadline serializes unchanged (already covered by existing update body tests - extend only if useful).
+- [x] 🟩 **Step 2: MCP - description note** `[sequential]` → depends on: Step 1
+  - [x] 🟩 2.1 Added the datetime clause to `create_task` + `update_task` deadline describe text (date = end of day; datetime = specific moment). No code/schema change; existing deadline body tests already cover datetime serialization. 85 MCP tests pass.
 
-- [ ] 🟥 **Step 3: Web UI - time input + display** `[sequential]` → depends on: Step 1 `[UI]`
-  - [ ] 🟥 3.1 `format.ts`: add `hasTimeComponent(iso)` + `formatDeadline(iso)` (date, plus ", h:mmaaa" when timed). Keep `formatDate` for created/completed.
-  - [ ] 🟥 3.2 `AddTaskForm`: add an optional `type="time"` input beside the date; on submit combine `date` (+ optional `time`) into the deadline string (date-only or `YYYY-MM-DDTHH:mm:ss`); reset both.
-  - [ ] 🟥 3.3 `EditTaskModal`: date + optional time inputs prefilled (time only if non-midnight via `hasTimeComponent`); diff compares the canonical `YYYY-MM-DDTHH:mm:ss` (or null) form; send that.
-  - [ ] 🟥 3.4 Deadline pill (TaskCard + TasksClient desktop) uses `formatDeadline` so the time shows when present. Detail page deadline row too.
-  - [ ] 🟥 3.5 Tests: `hasTimeComponent` (midnight vs timed vs date-only string), `formatDeadline` (with/without time); fixtures unchanged (date-only); keep green; clean tsc + build.
+- [x] 🟩 **Step 3: Web UI - time input + display** `[sequential]` → depends on: Step 1 `[UI]`
+  - [x] 🟩 3.1 `format.ts`: added `hasTimeComponent(iso)` (HH:mm substring) + `formatDeadline(iso)` (date + locale time when timed). `formatDate` kept for created/completed.
+  - [x] 🟩 3.2 `AddTaskForm`: optional `type=time` input beside the date (disabled w/o a date); combines on submit; resets both.
+  - [x] 🟩 3.3 `EditTaskModal`: `toTimeInput` helper + time state prefilled; diff compares the canonical `YYYY-MM-DDTHH:mm:ss`/null form; Clear resets both.
+  - [x] 🟩 3.4 Deadline pill (TaskCard + TasksClient desktop) + detail-page deadline row use `formatDeadline`.
+  - [x] 🟩 3.5 +5 tests (hasTimeComponent x3, formatDeadline x2); fixed the TaskCard deadline test to a date-only fixture (the old one had a tz-dependent time). 61 frontend tests green; clean tsc + next build.
 
-- [ ] 🟥 **Step 4: Docs + CHANGELOG** `[sequential]` → depends on: Steps 1-3
-  - [ ] 🟥 4.1 architecture.md: note Deadline may carry a time + the dueStatus time rule. engineering-guidelines: the midnight=date-only sentinel convention. product-design.md: deadlines can have an optional time.
-  - [ ] 🟥 4.2 CHANGELOG.md: v2.12.0 section. coverage.md: new counts + checklists.
+- [x] 🟩 **Step 4: Docs + CHANGELOG** `[sequential]` → depends on: Steps 1-3
+  - [x] 🟩 4.1 architecture.md: Deadline-may-carry-time + dueStatus time rule. engineering-guidelines: midnight=date-only sentinel pattern. product-design.md: optional deadline time.
+  - [x] 🟩 4.2 CHANGELOG.md: v2.12.0 section. coverage.md: counts (133 backend / 85 MCP / 61 frontend) + dueStatus-time + format checklists.
 
 - [ ] 🟥 **Step 5: Deploy + smoke test** `[sequential]` → depends on: Step 4
   - [ ] 🟥 5.1 Check phone reachable (dozes); stash frontend WIP, `./scripts/deploy-phone.sh`, restore (pop) after. (No migration - no data-integrity check needed beyond the usual.)

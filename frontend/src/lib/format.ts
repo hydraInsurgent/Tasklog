@@ -54,6 +54,26 @@ export function formatDate(iso: string): string {
   });
 }
 
+// True when a deadline carries a meaningful time-of-day (not midnight = date-only).
+// Checks the "HH:mm" substring directly so it is timezone-safe (avoids new Date()
+// re-interpreting a bare date as UTC and shifting the hour in the local zone).
+export function hasTimeComponent(iso: string): boolean {
+  return iso.length > 10 && iso.slice(11, 16) !== "00:00";
+}
+
+// Format a deadline for display: date, plus the time when the deadline is timed
+// (e.g. "12 Mar 2026, 3:00 pm"). Date-only deadlines show just the date.
+export function formatDeadline(iso: string): string {
+  const date = formatDate(iso);
+  if (!hasTimeComponent(iso)) return date;
+  const time = new Date(iso).toLocaleTimeString("en-GB", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+  return `${date}, ${time}`;
+}
+
 // Priority metadata for the Todoist P1-P4 scale. P1 is the most urgent.
 // P4 (none) has no dot so the default view stays uncluttered. Colors follow the
 // agreed scheme: P1 red, P2 orange, P3 blue.

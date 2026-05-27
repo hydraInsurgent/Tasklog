@@ -2,6 +2,19 @@
 
 ---
 
+## v2.12.0 - Deadline time-of-day
+*May 2026*
+
+### Added
+
+- Deadlines can now include an optional time of day ("due Friday at 3pm"), set via a time field beside the date on the add-task form and the edit modal. Leave it blank for a date-only deadline, exactly as before (#68)
+- `dueStatus` reflects the time: a timed deadline becomes `overdue` the moment it passes, while a date-only deadline stays due all that calendar day (then overdue the next). today / this_week / later are still calendar-based
+- The deadline shows its time wherever it's displayed (list pill, task detail). MCP `create_task`/`update_task` already accepted a datetime; their descriptions now spell out the date-vs-datetime distinction
+
+No DB migration (the deadline column already stored a datetime). Interpreted in the server's local time.
+
+---
+
 ## v2.11.0 - Task description field
 *May 2026*
 

@@ -88,7 +88,8 @@ describe('TaskCard', () => {
   })
 
   it('shows the formatted deadline when the task has a deadline', () => {
-    render(<TaskCard {...makeProps({ task: { ...baseTask, deadline: '2026-03-20T12:00:00.000Z' } })} />)
+    // Date-only deadline (midnight) shows just the date - deterministic across timezones.
+    render(<TaskCard {...makeProps({ task: { ...baseTask, deadline: '2026-03-20T00:00:00' } })} />)
     expect(screen.getByText('20 Mar 2026')).toBeInTheDocument()
   })
 
