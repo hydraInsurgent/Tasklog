@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| [P69-task-comments.md](plans/P69-task-comments.md) | #69 | feature/task-comments-#69 | In Progress |
+| _none_ | | | |
 
 ---
 
@@ -77,6 +77,7 @@ Recently completed work (keep last 10):
 
 | # | Title | Type | Closed |
 |---|-------|------|--------|
+| #69 | Task comments + completion-log foundation (v2.13.0) | feature | 2026-05-27 |
 | #68 | Deadline time-of-day (v2.12.0) | feature | 2026-05-27 |
 | #67 | Task description field (v2.11.0) | feature | 2026-05-27 |
 | #66 | Agent ergonomics (bulk_set_priority + name resolution) (v2.10.7) | feature | 2026-05-27 |
@@ -86,7 +87,6 @@ Recently completed work (keep last 10):
 | #61 | Computed dueStatus field + MCP tool-description shape hints (v2.10.3) | feature | 2026-05-27 |
 | #59 | Update task (title/deadline) + edit modal + quick deadline (v2.10.2) | feature | 2026-05-27 |
 | #57 | MCP task filtering + tool consolidation (v2.10.1) | feature | 2026-05-26 |
-| #50 | MCP server for claude.ai custom connector | feature | 2026-05-20 |
 
 ---
 
@@ -101,5 +101,5 @@ Untracked ideas - not estimated, not prioritized, not committed to. Just things 
 - Relative time display for completed date - show "just now", "2 hours ago", "3 days ago" instead of a formatted date. CompletedAt timestamp is already stored so this would be a UI-only change.
 - Cross-device sync / live updates - changes on one device reflect on another without a manual reload.
 - Project color codes - each project could have an assigned color shown as a swatch in the sidebar and next to tasks. The Edit Project dialog is already planned as a modal, making this a natural future addition (add a color picker field).
-- Rich task detail - subtasks (checklist items under a parent task) and comments/progress notes for long-running work. (The description-field slice is now planned in proposal-next-versions.md v2.11.0; subtasks need a self-referencing model, comments a TaskComment table - both still parked here.)
+- Rich task detail - subtasks (checklist items under a parent task) for long-running work. (Description shipped in v2.11.0; comments shipped in v2.13.0 via the TaskComment table. Subtasks still parked here - they need a self-referencing model.)
 - Theme selection - allow the user to switch between light, dark, and high-contrast color themes. Theme changes affect overall background, header/navbar, and general UI chrome. Project colors, label colors, and other user-assigned colors remain unchanged.
