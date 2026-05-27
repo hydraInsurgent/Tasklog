@@ -1,6 +1,6 @@
 # Feature Implementation Plan: Advanced recurrence grammar
 
-**Overall Progress:** `0%`
+**Overall Progress:** `35%`
 
 **Tracking issue:** [#71](https://github.com/hydraInsurgent/Tasklog/issues/71)
 **Branch:** `feature/advanced-recurrence-grammar-#71`
@@ -50,14 +50,14 @@ Completing a recurring task whose end condition is reached: marks it done + logs
 
 ## Tasks
 
-- [ ] 🟥 **Step 1: Backend - extend RecurrenceRule + end-condition gate** `[sequential]` → depends on: nothing
-  - [ ] 🟥 1.1 `RecurrenceRule` fields: add `int? Ordinal`, `DateTime? Until`, `int? Count`; allow negative `MonthDay`; honor `Interval` for weekly + monthly. Update the constructor.
-  - [ ] 🟥 1.2 `TryParse` accept-branches: `BYDAY` ordinal token (`3TH`/`-1MO`) → `Ordinal` + single weekday (reject >1 ordinaled day, ordinal outside {+1..+4,-1}); negative `BYMONTHDAY` (-1..-28); weekly/monthly `INTERVAL>1`; `UNTIL` (YYYYMMDD or ISO) → DateTime; `COUNT` (>=1) → int; reject `UNTIL`+`COUNT` together. Keep rejecting `BYSETPOS`/`BYWEEKNO`/`BYYEARDAY`/sub-daily/`YEARLY`.
-  - [ ] 🟥 1.3 `Serialize` round-trips all new parts in canonical order (`FREQ;INTERVAL;BYDAY|BYMONTHDAY;UNTIL|COUNT`).
-  - [ ] 🟥 1.4 `NextDeadline`: monthly nth-weekday (first-of-target-month → first matching weekday → `+7*(N-1)`, clamp `+5`→last; `-1`→last); negative `BYMONTHDAY` (`daysInMonth+1+value`, clamp); weekly `INTERVAL>1` (week-anchored, `weekDiff%Interval==0`); monthly `INTERVAL>1` (`AddMonths(Interval)`). Time-of-day preserved.
-  - [ ] 🟥 1.5 New `bool ShouldSpawn(DateTime next, int existingSeriesCount)` → `(Until==null || next.Date<=Until) && (Count==null || existingSeriesCount<Count)`.
-  - [ ] 🟥 1.6 `TasksController.Complete`: in the recurring branch, `existingCount = CountAsync(SeriesId)`, spawn only if `rule.ShouldSpawn(next, existingCount)`; when the series ends, mark complete + log "Completed {date} - recurrence series complete." (no spawn). Spawning path keeps the existing "next occurrence due" comment.
-  - [ ] 🟥 1.7 Tests: `RecurrenceRuleTests` (nth-weekday +1..+4/-1/clamp-5th; negative month-day/-1/clamp; weekly INTERVAL=2 single+multi; monthly INTERVAL=2; UNTIL/COUNT round-trip; reject >1 ordinaled / UNTIL+COUNT / bad ordinal; `ShouldSpawn` truth table) + `TasksControllerTests` (COUNT stops at the Nth; UNTIL stops past the date; series-complete comment; nth-weekday/interval spawn advances right). All backend tests green.
+- [x] 🟩 **Step 1: Backend - extend RecurrenceRule + end-condition gate** `[sequential]` → depends on: nothing
+  - [x] 🟩 1.1 `RecurrenceRule` fields: `int? Ordinal`, `DateTime? Until`, `int? Count`; negative `MonthDay`; `Interval` honored for weekly + monthly.
+  - [x] 🟩 1.2 `TryParse` accept-branches: monthly BYDAY-ordinal (single, {+1..+4,-1}), negative BYMONTHDAY (-1..-28), weekly/monthly INTERVAL>1, UNTIL (YYYYMMDD/ISO), COUNT (>=1), UNTIL+COUNT rejected. Still rejects BYSETPOS/sub-daily/YEARLY/weekly-ordinal.
+  - [x] 🟩 1.3 `Serialize` canonical round-trip (FREQ;INTERVAL;BYDAY|BYMONTHDAY;UNTIL|COUNT); UNTIL normalized to YYYYMMDD.
+  - [x] 🟩 1.4 `NextDeadline`: monthly nth-weekday (+N and -1), negative BYMONTHDAY (from end, clamp), weekly week-anchored INTERVAL (`weekDiff%Interval==0`), monthly `AddMonths(Interval)`. Time-of-day preserved.
+  - [x] 🟩 1.5 `ShouldSpawn(next, existingSeriesCount)` gate.
+  - [x] 🟩 1.6 `Complete`: counts SeriesId rows + `ShouldSpawn`; series-complete comment (no spawn) when the end is reached, else the existing "next occurrence due" comment.
+  - [x] 🟩 1.7 Tests: RecurrenceRuleTests (advanced round-trips, NextDeadline nth-weekday/last-day/interval, validation, ShouldSpawn truth table) + TasksControllerTests (COUNT stops at Nth, UNTIL stops past date, series-complete comment, nth-weekday spawn). Pruned 6 now-valid v2.14.0 reject cases. **216 backend tests pass** (was 190).
 
 - [ ] 🟥 **Step 2: MCP - teach the new grammar** `[sequential]` → depends on: Step 1
   - [ ] 🟥 2.1 Extend `RECURRENCE_DESCRIPTION` in `tools/tasks.ts` with the new forms + 1-2 examples (3rd-Thursday, last-day, every-other-week, UNTIL, COUNT). No api-client signature change (recurrence is already a string).

@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace Tasklog.Api.Services
 {
     // The frequencies the recurrence core supports. SECONDLY/MINUTELY/HOURLY/YEARLY
@@ -12,29 +14,42 @@ namespace Tasklog.Api.Services
     // which both matches Todoist's "advance from the scheduled date" semantics and sidesteps
     // the DateTime.Now/UtcNow inconsistency (#18).
     //
-    // Storage is an RRULE-shaped string (RFC 5545), so the grammar can grow in later
-    // versions (advanced parts in v2.15.0, natural-language entry in v2.16.0) without a
-    // new migration. See docs/research/rrule-rfc5545-2026-05-27.md for the grammar and the
-    // per-version subset. The core deliberately REJECTS grammar it cannot expand (returns
-    // an error -> the controller turns that into a 400) rather than storing a rule that
-    // would silently fail to advance.
+    // Storage is an RRULE-shaped string (RFC 5545). See docs/research/rrule-rfc5545-2026-05-27.md
+    // for the grammar and the per-version subset. v2.14.0 shipped the core (daily / every-N /
+    // weekly-on-weekdays / monthly-on-day, repeating forever); v2.15.0 adds the advanced forms:
+    // nth-weekday-of-month (BYDAY=3TH), day-from-month-end (BYMONTHDAY=-1), weekly/monthly
+    // INTERVAL>1, and end conditions (UNTIL / COUNT). The parser still REJECTS grammar the
+    // expander can't advance (returns an error -> the controller turns that into a 400) rather
+    // than storing a rule that would silently fail.
     public sealed class RecurrenceRule
     {
         public RecurrenceFreq Freq { get; }
-        // Repeat every N units of Freq. Default 1. For the core, only Daily honors >1
-        // ("every N days"); Weekly/Monthly are validated to Interval==1.
+        // Repeat every N units of Freq. Default 1. Honored for daily, weekly, and monthly.
         public int Interval { get; }
-        // For Weekly: the weekday(s) the task recurs on (non-empty). Empty otherwise.
+        // For Weekly: the weekday(s) the task recurs on (non-empty). For Monthly nth-weekday:
+        // exactly one weekday (paired with Ordinal). Empty for Monthly day-of-month.
         public IReadOnlyList<DayOfWeek> Weekdays { get; }
-        // For Monthly: the day of month 1..31. 0 otherwise.
+        // For Monthly day-of-month: 1..31, or negative from the end (-1 = last day .. -28).
+        // 0 when the monthly rule is an nth-weekday instead.
         public int MonthDay { get; }
+        // For Monthly nth-weekday: the ordinal (+1..+4, or -1 = last) applied to Weekdays[0],
+        // e.g. "3rd Thursday" / "last Monday". Null for every other rule. (v2.15.0)
+        public int? Ordinal { get; }
+        // End conditions, mutually exclusive (RFC 5545). Null = repeats forever. (v2.15.0)
+        public DateTime? Until { get; } // inclusive last date the series may land on
+        public int? Count { get; }      // total number of occurrences in the series
 
-        private RecurrenceRule(RecurrenceFreq freq, int interval, IReadOnlyList<DayOfWeek> weekdays, int monthDay)
+        private RecurrenceRule(
+            RecurrenceFreq freq, int interval, IReadOnlyList<DayOfWeek> weekdays,
+            int monthDay, int? ordinal, DateTime? until, int? count)
         {
             Freq = freq;
             Interval = interval;
             Weekdays = weekdays;
             MonthDay = monthDay;
+            Ordinal = ordinal;
+            Until = until;
+            Count = count;
         }
 
         // Map between RFC 5545 two-letter weekday codes and DayOfWeek.
@@ -52,8 +67,8 @@ namespace Tasklog.Api.Services
             CodeToDay.ToDictionary(kv => kv.Value, kv => kv.Key);
 
         // Parse and validate an RRULE-shaped string into a rule. Returns false with a
-        // human-readable error (and a null rule) for anything the core does not support,
-        // so the controller can surface a 400. Case-insensitive on keys/values.
+        // human-readable error (and a null rule) for anything the supported subset does not
+        // cover, so the controller can surface a 400. Case-insensitive on keys/values.
         public static bool TryParse(string? raw, out RecurrenceRule? rule, out string? error)
         {
             rule = null;
@@ -85,16 +100,13 @@ namespace Tasklog.Api.Services
                 }
             }
 
-            // Reject parts the core cannot expand up front, with a hint at the version
-            // that will support them, so a recurrence that "looked accepted" never fails
-            // silently at spawn time.
+            // Reject parts the expander cannot handle up front, so a recurrence that "looked
+            // accepted" never fails silently at spawn time. UNTIL/COUNT/INTERVAL are now known.
             foreach (var key in parts.Keys)
             {
                 var upper = key.ToUpperInvariant();
-                if (upper is "FREQ" or "INTERVAL" or "BYDAY" or "BYMONTHDAY") continue;
-                error = upper is "COUNT" or "UNTIL"
-                    ? $"End conditions ({upper}) are not supported yet."
-                    : $"Unsupported recurrence part '{key}'.";
+                if (upper is "FREQ" or "INTERVAL" or "BYDAY" or "BYMONTHDAY" or "UNTIL" or "COUNT") continue;
+                error = $"Unsupported recurrence part '{key}'.";
                 return false;
             }
 
@@ -104,7 +116,7 @@ namespace Tasklog.Api.Services
                 return false;
             }
 
-            // INTERVAL: optional, default 1, positive integer.
+            // INTERVAL: optional, default 1, positive integer (honored for all frequencies).
             var interval = 1;
             if (parts.TryGetValue("INTERVAL", out var intervalRaw))
             {
@@ -115,56 +127,82 @@ namespace Tasklog.Api.Services
                 }
             }
 
+            // End conditions: UNTIL (a date) or COUNT (a positive int), mutually exclusive.
+            if (parts.ContainsKey("UNTIL") && parts.ContainsKey("COUNT"))
+            {
+                error = "UNTIL and COUNT cannot both be set.";
+                return false;
+            }
+            DateTime? until = null;
+            if (parts.TryGetValue("UNTIL", out var untilRaw))
+            {
+                if (!TryParseUntil(untilRaw, out var u))
+                {
+                    error = "UNTIL must be a date (YYYYMMDD or ISO 8601).";
+                    return false;
+                }
+                until = u;
+            }
+            int? count = null;
+            if (parts.TryGetValue("COUNT", out var countRaw))
+            {
+                if (!int.TryParse(countRaw, out var c) || c < 1)
+                {
+                    error = "COUNT must be a positive integer.";
+                    return false;
+                }
+                count = c;
+            }
+
             switch (freqRaw.ToUpperInvariant())
             {
                 case "DAILY":
-                    // Every day / every N days. No BYDAY or BYMONTHDAY in the core.
+                    // Every day / every N days. No BYDAY or BYMONTHDAY.
                     if (parts.ContainsKey("BYDAY") || parts.ContainsKey("BYMONTHDAY"))
                     {
-                        error = "FREQ=DAILY does not take BYDAY/BYMONTHDAY in the core. Use FREQ=WEEKLY for specific weekdays.";
+                        error = "FREQ=DAILY does not take BYDAY/BYMONTHDAY. Use FREQ=WEEKLY for specific weekdays.";
                         return false;
                     }
-                    rule = new RecurrenceRule(RecurrenceFreq.Daily, interval, Array.Empty<DayOfWeek>(), 0);
+                    rule = new RecurrenceRule(RecurrenceFreq.Daily, interval, Array.Empty<DayOfWeek>(), 0, null, until, count);
                     return true;
 
                 case "WEEKLY":
-                    if (interval != 1)
-                    {
-                        error = "Weekly INTERVAL other than 1 is not supported yet.";
-                        return false;
-                    }
                     if (!parts.TryGetValue("BYDAY", out var bydayRaw) || string.IsNullOrWhiteSpace(bydayRaw))
                     {
                         error = "FREQ=WEEKLY requires BYDAY (e.g. BYDAY=MO,WE,FR).";
                         return false;
                     }
-                    if (!TryParseWeekdays(bydayRaw, out var weekdays, out error))
+                    if (!TryParsePlainWeekdays(bydayRaw, out var weekdays, out error))
                         return false;
-                    rule = new RecurrenceRule(RecurrenceFreq.Weekly, 1, weekdays!, 0);
+                    rule = new RecurrenceRule(RecurrenceFreq.Weekly, interval, weekdays!, 0, null, until, count);
                     return true;
 
                 case "MONTHLY":
-                    if (interval != 1)
+                    var hasByDay = parts.TryGetValue("BYDAY", out var monthlyByDay) && !string.IsNullOrWhiteSpace(monthlyByDay);
+                    var hasByMonthDay = parts.TryGetValue("BYMONTHDAY", out var monthDayRaw);
+                    if (hasByDay == hasByMonthDay)
                     {
-                        error = "Monthly INTERVAL other than 1 is not supported yet.";
+                        error = "FREQ=MONTHLY requires exactly one of BYMONTHDAY (e.g. 15, -1) or BYDAY (e.g. 3TH).";
                         return false;
                     }
-                    if (parts.ContainsKey("BYDAY"))
+                    if (hasByDay)
                     {
-                        error = "Nth-weekday recurrence (e.g. BYDAY=3TH) is not supported yet.";
+                        // Nth-weekday: a single ordinaled token like 3TH or -1MO.
+                        if (!TryParseOrdinalWeekday(monthlyByDay!, out var ordinal, out var weekday, out error))
+                            return false;
+                        rule = new RecurrenceRule(RecurrenceFreq.Monthly, interval, new[] { weekday }, 0, ordinal, until, count);
+                        return true;
+                    }
+                    // Day-of-month: 1..31, or -1..-28 from the end.
+                    if (!int.TryParse(monthDayRaw, out var monthDay)
+                        || monthDay == 0
+                        || monthDay > 31
+                        || monthDay < -28)
+                    {
+                        error = "BYMONTHDAY must be 1..31, or -1..-28 to count from the end of the month.";
                         return false;
                     }
-                    if (!parts.TryGetValue("BYMONTHDAY", out var monthDayRaw))
-                    {
-                        error = "FREQ=MONTHLY requires BYMONTHDAY (e.g. BYMONTHDAY=15).";
-                        return false;
-                    }
-                    if (!int.TryParse(monthDayRaw, out var monthDay) || monthDay < 1 || monthDay > 31)
-                    {
-                        error = "BYMONTHDAY must be a day of month between 1 and 31.";
-                        return false;
-                    }
-                    rule = new RecurrenceRule(RecurrenceFreq.Monthly, 1, Array.Empty<DayOfWeek>(), monthDay);
+                    rule = new RecurrenceRule(RecurrenceFreq.Monthly, interval, Array.Empty<DayOfWeek>(), monthDay, null, until, count);
                     return true;
 
                 default:
@@ -173,9 +211,17 @@ namespace Tasklog.Api.Services
             }
         }
 
-        // Parse a BYDAY list (e.g. "MO,WE,FR") into distinct weekdays. Rejects nth-weekday
-        // tokens (e.g. "3TH"), which are v2.15.0, and any unknown code.
-        private static bool TryParseWeekdays(string raw, out IReadOnlyList<DayOfWeek>? weekdays, out string? error)
+        // Parse a UNTIL value: RFC basic date "YYYYMMDD", or an ISO 8601 date(time).
+        private static bool TryParseUntil(string raw, out DateTime value)
+        {
+            if (raw.Length == 8 && raw.All(char.IsDigit)
+                && DateTime.TryParseExact(raw, "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None, out value))
+                return true;
+            return DateTime.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.None, out value);
+        }
+
+        // Parse a plain BYDAY list (WEEKLY) - distinct weekdays, NO ordinal prefixes.
+        private static bool TryParsePlainWeekdays(string raw, out IReadOnlyList<DayOfWeek>? weekdays, out string? error)
         {
             weekdays = null;
             error = null;
@@ -185,8 +231,9 @@ namespace Tasklog.Api.Services
                 var code = token.ToUpperInvariant();
                 if (!CodeToDay.TryGetValue(code, out var day))
                 {
-                    error = CodeToDay.Keys.Any(c => code.EndsWith(c, StringComparison.Ordinal))
-                        ? $"Nth-weekday recurrence ('{token}') is not supported yet."
+                    // A token with a leading ordinal (e.g. 3TH) is nth-weekday - only valid MONTHLY.
+                    error = code.Length > 2 && CodeToDay.ContainsKey(code[^2..])
+                        ? $"Nth-weekday ('{token}') is only valid with FREQ=MONTHLY."
                         : $"Unknown weekday code '{token}'.";
                     return false;
                 }
@@ -197,59 +244,146 @@ namespace Tasklog.Api.Services
                 error = "BYDAY must list at least one weekday.";
                 return false;
             }
-            // Canonical order (Sun..Sat) so the serialized form is deterministic.
             days.Sort();
             weekdays = days;
             return true;
         }
 
-        // Serialize back to a canonical RRULE-shaped string. Storing the canonical form
-        // (not the raw input) keeps the column consistent regardless of input casing/order.
-        public string Serialize() => Freq switch
+        // Parse a single ordinaled BYDAY token (MONTHLY nth-weekday), e.g. "3TH", "-1MO", "+2WE".
+        // Exactly one token; ordinal in {+1..+4, -1}; the trailing two letters are the weekday.
+        private static bool TryParseOrdinalWeekday(string raw, out int ordinal, out DayOfWeek weekday, out string? error)
         {
-            RecurrenceFreq.Daily => Interval == 1 ? "FREQ=DAILY" : $"FREQ=DAILY;INTERVAL={Interval}",
-            RecurrenceFreq.Weekly => $"FREQ=WEEKLY;BYDAY={string.Join(",", Weekdays.Select(d => DayToCode[d]))}",
-            RecurrenceFreq.Monthly => $"FREQ=MONTHLY;BYMONTHDAY={MonthDay}",
-            _ => throw new InvalidOperationException($"Unhandled frequency {Freq}."),
-        };
+            ordinal = 0;
+            weekday = default;
+            error = null;
 
-        // Compute the next deadline after `current`, advancing from the scheduled date
-        // (not "now"). The original time-of-day is always preserved (v2.12.0 timed
-        // deadlines): a "daily 15:00" repeat stays at 15:00.
+            var tokens = raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (tokens.Length != 1)
+            {
+                error = "Monthly BYDAY supports a single ordinaled weekday (e.g. 3TH), not a list.";
+                return false;
+            }
+            var token = tokens[0].ToUpperInvariant();
+            if (token.Length < 3 || !CodeToDay.TryGetValue(token[^2..], out weekday))
+            {
+                error = $"Monthly BYDAY must be an ordinal + weekday (e.g. 3TH, -1MO), got '{tokens[0]}'.";
+                return false;
+            }
+            if (!int.TryParse(token[..^2], out ordinal) || !(ordinal is >= 1 and <= 4 || ordinal == -1))
+            {
+                error = "Monthly nth-weekday ordinal must be 1..4 (1st..4th) or -1 (last).";
+                return false;
+            }
+            return true;
+        }
+
+        // Serialize back to a canonical RRULE-shaped string (FREQ;INTERVAL;BYxxx;UNTIL|COUNT).
+        // Storing the canonical form keeps the column consistent regardless of input casing/order.
+        public string Serialize()
+        {
+            var parts = new List<string> { $"FREQ={Freq.ToString().ToUpperInvariant()}" };
+            if (Interval > 1) parts.Add($"INTERVAL={Interval}");
+            switch (Freq)
+            {
+                case RecurrenceFreq.Weekly:
+                    parts.Add($"BYDAY={string.Join(",", Weekdays.Select(d => DayToCode[d]))}");
+                    break;
+                case RecurrenceFreq.Monthly:
+                    if (Ordinal is int ord)
+                        parts.Add($"BYDAY={ord}{DayToCode[Weekdays[0]]}"); // e.g. 3TH or -1MO
+                    else
+                        parts.Add($"BYMONTHDAY={MonthDay}");
+                    break;
+            }
+            if (Until is DateTime until) parts.Add($"UNTIL={until:yyyyMMdd}");
+            if (Count is int count) parts.Add($"COUNT={count}");
+            return string.Join(";", parts);
+        }
+
+        // Compute the next deadline after `current`, advancing from the scheduled date (not
+        // "now"). The original time-of-day is always preserved (v2.12.0 timed deadlines).
         public DateTime NextDeadline(DateTime current)
         {
             var timeOfDay = current.TimeOfDay;
             switch (Freq)
             {
                 case RecurrenceFreq.Daily:
-                    // AddDays preserves the time component.
                     return current.AddDays(Interval);
 
                 case RecurrenceFreq.Weekly:
-                    // The next calendar day strictly after the current deadline whose
-                    // weekday is in the set. With Interval==1, scanning the next 7 days
-                    // always finds one. Reattach the original time-of-day.
-                    for (var offset = 1; offset <= 7; offset++)
+                {
+                    // Week-anchored: a candidate weekday is valid only when its week is a
+                    // whole multiple of Interval weeks from the current deadline's week
+                    // (Sunday-start, matching ComputeDueStatus). At Interval=1 this is just
+                    // "the next matching weekday".
+                    var weekStart = current.Date.AddDays(-(int)current.Date.DayOfWeek);
+                    for (var offset = 1; offset <= Interval * 7 + 7; offset++)
                     {
                         var candidate = current.Date.AddDays(offset);
-                        if (Weekdays.Contains(candidate.DayOfWeek))
-                            return candidate + timeOfDay;
+                        if (!Weekdays.Contains(candidate.DayOfWeek)) continue;
+                        var candidateWeekStart = candidate.AddDays(-(int)candidate.DayOfWeek);
+                        var weekDiff = (candidateWeekStart - weekStart).Days / 7;
+                        if (weekDiff % Interval == 0) return candidate + timeOfDay;
                     }
-                    // Unreachable for a non-empty weekday set, but keep the compiler happy.
-                    return current.AddDays(7);
+                    return current.AddDays(7 * Interval); // unreachable for a non-empty set
+                }
 
                 case RecurrenceFreq.Monthly:
-                    // One month on from the current deadline's month, landing on MonthDay.
-                    // Days beyond the target month's length clamp to the last day
-                    // (e.g. "the 31st" in February -> Feb 28/29).
-                    var firstOfNextMonth = new DateTime(current.Year, current.Month, 1).AddMonths(1);
-                    var daysInMonth = DateTime.DaysInMonth(firstOfNextMonth.Year, firstOfNextMonth.Month);
-                    var day = Math.Min(MonthDay, daysInMonth);
-                    return new DateTime(firstOfNextMonth.Year, firstOfNextMonth.Month, day) + timeOfDay;
+                {
+                    // Interval months on from the current deadline's month.
+                    var firstOfTarget = new DateTime(current.Year, current.Month, 1).AddMonths(Interval);
+                    var year = firstOfTarget.Year;
+                    var month = firstOfTarget.Month;
+                    var daysInMonth = DateTime.DaysInMonth(year, month);
+
+                    int day;
+                    if (Ordinal is int ord)
+                    {
+                        // Nth (or last) occurrence of Weekdays[0] in the target month.
+                        var target = Weekdays[0];
+                        if (ord > 0)
+                        {
+                            var first = new DateTime(year, month, 1);
+                            var firstMatch = 1 + (((int)target - (int)first.DayOfWeek + 7) % 7);
+                            day = firstMatch + 7 * (ord - 1);
+                            if (day > daysInMonth) day -= 7; // clamp a non-existent occurrence to the last
+                        }
+                        else
+                        {
+                            // ord == -1: walk back from the last day to the matching weekday.
+                            var last = new DateTime(year, month, daysInMonth);
+                            day = daysInMonth - (((int)last.DayOfWeek - (int)target + 7) % 7);
+                        }
+                    }
+                    else if (MonthDay < 0)
+                    {
+                        // Count from the end: -1 = last day, -2 = second-to-last, ...
+                        day = daysInMonth + 1 + MonthDay;
+                        if (day < 1) day = 1;
+                    }
+                    else
+                    {
+                        // Day-of-month, clamped to the target month's length.
+                        day = Math.Min(MonthDay, daysInMonth);
+                    }
+
+                    return new DateTime(year, month, day) + timeOfDay;
+                }
 
                 default:
                     throw new InvalidOperationException($"Unhandled frequency {Freq}.");
             }
+        }
+
+        // Whether the series should spawn another occurrence given the just-computed next
+        // deadline and how many occurrences the series already has. Respects the end
+        // conditions: stop once UNTIL is passed, or once COUNT occurrences exist. With no
+        // end condition the series repeats forever. (v2.15.0)
+        public bool ShouldSpawn(DateTime next, int existingSeriesCount)
+        {
+            if (Until is DateTime until && next.Date > until.Date) return false;
+            if (Count is int count && existingSeriesCount >= count) return false;
+            return true;
         }
     }
 }
