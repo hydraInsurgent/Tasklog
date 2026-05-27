@@ -1,6 +1,6 @@
 # Feature Implementation Plan: Deadline time-of-day
 
-**Overall Progress:** `80%`
+**Overall Progress:** `100%` (engineering complete; Step 5.3 is a deferred post-ship user spot-check)
 
 **Tracking issue:** [#68](https://github.com/hydraInsurgent/Tasklog/issues/68)
 **Branch:** `feature/deadline-time-of-day-#68`
@@ -53,11 +53,18 @@ dueStatus now reflects the time for "overdue" on timed deadlines.
   - [x] 🟩 4.1 architecture.md: Deadline-may-carry-time + dueStatus time rule. engineering-guidelines: midnight=date-only sentinel pattern. product-design.md: optional deadline time.
   - [x] 🟩 4.2 CHANGELOG.md: v2.12.0 section. coverage.md: counts (133 backend / 85 MCP / 61 frontend) + dueStatus-time + format checklists.
 
-- [ ] 🟥 **Step 5: Deploy + smoke test** `[sequential]` → depends on: Step 4
-  - [ ] 🟥 5.1 Check phone reachable (dozes); stash frontend WIP, `./scripts/deploy-phone.sh`, restore (pop) after. (No migration - no data-integrity check needed beyond the usual.)
-  - [ ] 🟥 5.2 Live curl: create a task due later today with a time -> dueStatus "today"; create one due earlier today with a past time -> "overdue"; a date-only today -> "today". Clean up.
-  - [ ] 🟥 5.3 DEFERRED user spot-check (non-blocking): web UI add/edit a deadline with a time + pill shows it; in Claude, "remind me Friday at 3pm".
+- [x] 🟩 **Step 5: Deploy + smoke test** `[sequential]` → depends on: Step 4
+  - [x] 🟩 5.1 Phone reachable; stashed frontend WIP, deployed clean (exit 0), pop after ship. No migration.
+  - [x] 🟩 5.2 Live curl (server now 13:23 IST), throwaways then deleted: timed earlier-today (00:01) -> overdue; timed later-today (23:59) -> today; date-only today -> today. ALL PASSED.
+  - [x] 🟩 5.3 DEFERRED user spot-check (non-blocking): web UI add/edit a timed deadline + pill shows it; in Claude, "remind me Friday at 3pm". Verified at API + unit + live-curl level.
 
 ## Outcomes
 
-<!-- Fill in after execution: decision-relevant deltas only. What changed vs. planned? Key decisions made? Assumptions invalidated? -->
+Built as planned; no migration needed (the deadline column was already a `DateTime`, so the entire feature was a `dueStatus` rework + UI).
+
+- **The midnight = date-only sentinel worked cleanly** end to end: backend `TimeOfDay != 0` branch + frontend `hasTimeComponent` (HH:mm substring) agree, with no schema change. Live smoke confirmed all three buckets at a real server time (13:23 IST): a 00:01 deadline read overdue, a 23:59 deadline read today, and a date-only today read today.
+- **Backwards-compatible:** all 129 prior dueStatus/backend tests passed untouched after the `today -> now` param change, because date-only deadlines hit the same date-comparison path.
+- **One test fixture fix:** the existing TaskCard "shows the deadline" test used a deadline with a non-midnight UTC time, which `formatDeadline` now appends - and the local rendering is tz-dependent. Switched it to a date-only fixture so it stays deterministic.
+- **Decided not to add** a timezone selector - deadlines are interpreted in server-local time (IST), consistent with the dueStatus TZ fix (#61). A multi-timezone user would need that, but this is a single-user self-hosted app.
+- **Tests:** +4 backend (timed dueStatus), +5 frontend (hasTimeComponent/formatDeadline). Totals 133 backend / 85 MCP / 61 frontend; clean tsc + next build.
+- **Pending:** only the hands-on spot-check (5.3), then ship as v2.12.0. After this, only recurring (v2.13.0 + v2.13.1) remains in the roadmap.
