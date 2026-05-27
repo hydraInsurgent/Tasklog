@@ -1,6 +1,6 @@
 # Feature Implementation Plan: Task description field
 
-**Overall Progress:** `85%`
+**Overall Progress:** `100%` (engineering complete; Step 5.3 is a deferred post-ship user spot-check)
 
 **Tracking issue:** [#67](https://github.com/hydraInsurgent/Tasklog/issues/67)
 **Branch:** `feature/task-description-#67`
@@ -59,11 +59,17 @@ MCP: create_task / update_task gain a `description` param; Task objects include 
   - [x] 🟩 4.1 architecture.md: `Description` in the Tasks data model + POST/PATCH rows. product-design.md: optional description on tasks.
   - [x] 🟩 4.2 CHANGELOG.md: v2.11.0 section. coverage.md: counts (129 backend / 85 MCP) + description checklists.
 
-- [ ] 🟥 **Step 5: Deploy + smoke test** `[sequential]` → depends on: Step 4
-  - [ ] 🟥 5.1 Check phone reachable (dozes); capture live task count first. Stash frontend WIP, `./scripts/deploy-phone.sh`, restore (pop) after. CONFIRM the migration applied with zero data loss (count unchanged, existing rows report null description).
-  - [ ] 🟥 5.2 Live curl: create with description (verify), create without (null), PATCH set / clear (null) / >2000 -> 400. Clean up.
-  - [ ] 🟥 5.3 DEFERRED user spot-check (non-blocking): web UI add/edit description + detail page; in Claude, "add a note to task N".
+- [x] 🟩 **Step 5: Deploy + smoke test** `[sequential]` → depends on: Step 4
+  - [x] 🟩 5.1 Deployed (twice - see Outcomes; a missed TasksClient commit needed a fix + re-deploy). Migration verified: 25 tasks before and after (zero data loss), all report a description field (null for existing rows).
+  - [x] 🟩 5.2 Live curl on throwaways (then deleted): create with description (trimmed), create without (null), PATCH set, PATCH clear (null), PATCH >2000 -> 400. ALL PASSED.
+  - [x] 🟩 5.3 DEFERRED user spot-check (non-blocking): web UI add/edit description + detail page; in Claude, "add a note to task N". Verified at API + unit + live-curl level.
 
 ## Outcomes
 
-<!-- Fill in after execution: decision-relevant deltas only. What changed vs. planned? Key decisions made? Assumptions invalidated? -->
+Built as planned. Nullable column, so the migration was the plain EF default (no `HasDefaultValue` needed, unlike #64) and applied to the live DB with zero data loss (25 tasks, existing rows -> null).
+
+- **Process slip (caught + recovered):** the `TasksClient.handleAdd` edit (pass description to `createTask`) was made in the working tree but omitted from the v2.11.0 commit's explicit file list, then swept into the stash during deploy. Result: the committed code's web Add-form collected a description but dropped it (backend/MCP/edit-modal fine). Caught via a file-change notice, popped the stash, committed just `TasksClient.tsx`, and re-deployed. Cost: one extra deploy. Lesson: when staging explicit paths to dodge the user's WIP, double-check EVERY file the change touched - `git status` the staged set against the diff before committing.
+- **Clear semantics mirror deadline:** present null/blank clears (stored null), string sets (trimmed), omit keeps. The EditTaskModal diff normalises blank->null on both sides so "still no description" isn't a spurious change.
+- **2000-char cap** on both create and update (input hygiene, like the bulk 500-id cap). Plain text, `whitespace-pre-wrap` on the detail page - no markdown this release.
+- **Tests:** +9 backend, +3 MCP. Totals 129 backend / 85 MCP / 56 frontend; clean tsc + next build.
+- **Pending:** only the hands-on spot-check (5.3), then ship as v2.11.0 (the first minor of the new roadmap).
