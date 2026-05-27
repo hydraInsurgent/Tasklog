@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| _none_ | | | |
+| [P71-advanced-recurrence-grammar.md](plans/P71-advanced-recurrence-grammar.md) | #71 | feature/advanced-recurrence-grammar-#71 | In Progress |
 
 ---
 

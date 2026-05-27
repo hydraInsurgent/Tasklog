@@ -1,0 +1,88 @@
+# Feature Implementation Plan: Advanced recurrence grammar
+
+**Overall Progress:** `100%`
+
+**Tracking issue:** [#71](https://github.com/hydraInsurgent/Tasklog/issues/71)
+**Branch:** `feature/advanced-recurrence-grammar-#71`
+**Target version:** v2.14.1 (patch - NO migration, extends the existing recurrence feature) - third of [proposal-recurring-and-habits.md](proposal-recurring-and-habits.md)
+**Research:** [rrule-rfc5545-2026-05-27.md](../research/rrule-rfc5545-2026-05-27.md) (advanced-grammar additions)
+
+## TLDR
+
+Extend the v2.14.0 recurrence core to the harder RFC 5545 forms it currently rejects: nth-weekday-of-month ("3rd Thursday", "last Friday"), day-from-month-end ("last day"), end conditions (`UNTIL` a date / `COUNT` N times), and `INTERVAL>1` for weekly/monthly ("every other Monday", "every 2 months"). This is mostly turning the parser's existing reject-branches into accept-branches, extending the `NextDeadline` expander, and adding one new seam: an end-condition gate in the spawn-on-complete path so a series can stop.
+
+## Goal State
+
+**Current State:** Recurrence supports daily / every-N-days / weekly-on-weekday(s) / monthly-on-day, and repeats forever. Everything else is a 400.
+**Goal State:** The same plus nth-weekday / last-day / negative month-day / weekly+monthly intervals, and an optional end (a date or a count) after which the series stops spawning. No new storage - it all lives in the RRULE string and the existing SeriesId history.
+
+## Critical Decisions
+
+All locked in `/explore` (RFC 5545 / Todoist conventions).
+
+- **Decision 1: No new DB column; end conditions live in the rule string.** `UNTIL` is a date compared to the next deadline; `COUNT` is evaluated at spawn time by counting rows with the same `SeriesId`. Completing occurrence #k sees exactly k rows, so it spawns iff `k < COUNT` → exactly `COUNT` occurrences. Keeps this release migration-free. Trade-off: deleting a mid-series occurrence skews the `COUNT` tally (acceptable - deletion is rare and destructive; documented).
+
+- **Decision 2: nth-weekday via `BYDAY` ordinal, not `BYSETPOS`.** `BYDAY=3TH` / `-1MO` is the simpler canonical form for every case Tasklog supports, so raw `BYSETPOS` is unnecessary and stays rejected. Only one ordinaled weekday allowed; ordinals `+1..+4` and `-1`; a non-existent `+5` clamps to the last occurrence.
+
+- **Decision 3: `INTERVAL>1` weekly is week-anchored.** A candidate day is valid when its week (Sunday-start, matching `ComputeDueStatus`) is `weekDiff % INTERVAL == 0` from the current deadline's week. This unifies single- and multi-weekday at any interval and reduces to "next matching weekday" at `INTERVAL=1`. Monthly advances `AddMonths(INTERVAL)`.
+
+- **Decision 4: The end-condition gate is the one new control-flow seam.** `RecurrenceRule.ShouldSpawn(next, existingSeriesCount)` returns whether to spawn; `TasksController.Complete` counts the series and calls it. When the series ends, the task is still completed and a "series complete" comment is logged - just no new occurrence.
+
+<!-- GUIDELINES CHECK: No new pattern - extends the pure static RecurrenceRule helper (v2.14.0). No migration (patch bump - extends an existing capability). product-design recurrence line gains the advanced forms. Research file already carries the advanced-grammar semantics. The end-condition gate in Complete is the only new seam; create/update accept the new grammar automatically once TryParse does. -->
+
+## API contract (unchanged shape; grammar widened)
+
+```
+recurrence (string) now also accepts:
+  FREQ=MONTHLY;BYDAY=3TH            3rd Thursday each month  (ordinal +1..+4, or -1 = last)
+  FREQ=MONTHLY;BYMONTHDAY=-1        last day of the month    (-1..-28)
+  FREQ=WEEKLY;INTERVAL=2;BYDAY=MO   every other Monday
+  FREQ=MONTHLY;INTERVAL=3;BYMONTHDAY=1   every 3 months on the 1st
+  ...;UNTIL=20261231               stops after that date
+  ...;COUNT=5                      stops after 5 occurrences   (UNTIL/COUNT mutually exclusive)
+
+Still rejected (400): BYSETPOS, BYWEEKNO, BYYEARDAY, SECONDLY/MINUTELY/HOURLY/YEARLY,
+  >1 ordinaled weekday, ordinal outside {+1..+4,-1}, BYMONTHDAY beyond ±28..31 range, UNTIL+COUNT together.
+
+Completing a recurring task whose end condition is reached: marks it done + logs
+"Completed {date} - recurrence series complete." and does NOT spawn a new occurrence.
+```
+
+## Tasks
+
+- [x] 🟩 **Step 1: Backend - extend RecurrenceRule + end-condition gate** `[sequential]` → depends on: nothing
+  - [x] 🟩 1.1 `RecurrenceRule` fields: `int? Ordinal`, `DateTime? Until`, `int? Count`; negative `MonthDay`; `Interval` honored for weekly + monthly.
+  - [x] 🟩 1.2 `TryParse` accept-branches: monthly BYDAY-ordinal (single, {+1..+4,-1}), negative BYMONTHDAY (-1..-28), weekly/monthly INTERVAL>1, UNTIL (YYYYMMDD/ISO), COUNT (>=1), UNTIL+COUNT rejected. Still rejects BYSETPOS/sub-daily/YEARLY/weekly-ordinal.
+  - [x] 🟩 1.3 `Serialize` canonical round-trip (FREQ;INTERVAL;BYDAY|BYMONTHDAY;UNTIL|COUNT); UNTIL normalized to YYYYMMDD.
+  - [x] 🟩 1.4 `NextDeadline`: monthly nth-weekday (+N and -1), negative BYMONTHDAY (from end, clamp), weekly week-anchored INTERVAL (`weekDiff%Interval==0`), monthly `AddMonths(Interval)`. Time-of-day preserved.
+  - [x] 🟩 1.5 `ShouldSpawn(next, existingSeriesCount)` gate.
+  - [x] 🟩 1.6 `Complete`: counts SeriesId rows + `ShouldSpawn`; series-complete comment (no spawn) when the end is reached, else the existing "next occurrence due" comment.
+  - [x] 🟩 1.7 Tests: RecurrenceRuleTests (advanced round-trips, NextDeadline nth-weekday/last-day/interval, validation, ShouldSpawn truth table) + TasksControllerTests (COUNT stops at Nth, UNTIL stops past date, series-complete comment, nth-weekday spawn). Pruned 6 now-valid v2.14.0 reject cases. **216 backend tests pass** (was 190).
+
+- [x] 🟩 **Step 2: MCP - teach the new grammar** `[sequential]` → depends on: Step 1
+  - [x] 🟩 2.1 `RECURRENCE_DESCRIPTION` extended with the new forms + examples (every-other-Monday, last-day, 3rd-Thursday, every-2-months, UNTIL, COUNT). No api-client signature change.
+  - [x] 🟩 2.2 `api-client.test.ts`: advanced-rule-string wire-contract case. Typecheck clean; **92 MCP tests pass** (was 91).
+
+- [x] 🟩 **Step 3: Web UI - picker + labels for the new forms** `[sequential]` → depends on: Step 1 `[UI]`
+  - [x] 🟩 3.1 `describeRecurrence`: nth-weekday / last-day / from-end-day / weekly+monthly interval labels + "until <date>" / "for N times" suffixes.
+  - [x] 🟩 3.2 `RecurrencePicker` rewritten on a single config object: monthly day-of-month | nth-weekday (ordinal+weekday dropdowns) | last-day; weekly+monthly interval inputs; shared Ends control (never | on date->UNTIL | after N->COUNT). `parseRule` reads all parts back; canonical part order matches the backend Serialize.
+  - [x] 🟩 3.3 **81 frontend tests pass** (was 73, +8). Clean tsc + next build (verified against a clean tree).
+
+- [x] 🟩 **Step 4: Docs + CHANGELOG** `[sequential]` → depends on: Steps 1-3
+  - [x] 🟩 4.1 `architecture.md`: widened the recurrence grammar note + spawn-on-complete end-condition behavior. `product-design.md`: advanced forms + end conditions. (No new engineering-guidelines pattern.) Plus version re-label to v2.14.1 (patch) across plan/research/program-doc per the minor-vs-patch decision.
+  - [x] 🟩 4.2 `CHANGELOG.md`: v2.14.1 section. `coverage.md`: counts (216/92/81) + advanced-grammar checklists + corrected the now-stale #70 "rejects" line.
+
+- [x] 🟩 **Step 5: Deploy + smoke test** `[sequential]` → depends on: Step 4
+  - [x] 🟩 5.1 Baseline 25 tasks. Stash-deploy-pop; deploy exit 0, all services fresh. No migration; 25 tasks before/after - no data change. (Pop tangled on the deploy-regenerated package-lock + the user's grown doppel WIP; recovered the full WIP losslessly + verified against the stash backup.)
+  - [x] 🟩 5.2 Live curl all green: COUNT=2 stops at the 2nd occurrence with a "series complete" comment; FREQ=MONTHLY;BYDAY=3TH advanced to 2026-06-18 (3rd Thursday of June); every-other-week accepted (201). Smoke rows cleaned up (back to 25).
+  - [ ] 🟥 5.3 DEFERRED user spot-check (non-blocking): build a "3rd Thursday, ends after 5" in the web picker; in Claude, "repeat every other Monday until July".
+
+## Outcomes
+
+Built as planned. Mostly turned the v2.14.0 parser's reject-branches into accept-branches + extended the expander + added the end-condition gate. 216 backend / 92 MCP / 81 frontend tests; live smoke confirmed the full advanced cycle on the phone with no data change.
+
+- **Shipped as a PATCH (v2.14.1), not a minor.** The user challenged the original "all minors" plan; applying the project's own minor-vs-patch rule, this extends the existing recurrence feature with no migration -> patch. The program was re-lettered: v2.14.1 advanced, v2.14.2 natural-language, v2.15.0 habit-tracking. The stale 2-version sketch in `proposal-next-versions.md` was flagged superseded.
+- **No new DB column / no migration.** `UNTIL` is a date compare; `COUNT` counts `SeriesId` rows at spawn time. Verified live: a `COUNT=2` series produced exactly 2 occurrences then stopped with a "series complete" comment.
+- **`BYSETPOS` deliberately not implemented** - `BYDAY=3TH` is the simpler canonical form for every case, so it stays rejected.
+- **Deploy/WIP near-miss:** the deploy regenerated `package-lock.json` and the user's doppel WIP had grown (new untracked API route), so the stash pop tangled. Recovered losslessly (surgical `git checkout stash@{0} -- <file>` for the un-applied paths, verified the tree matched the stash backup). Lesson: stash the whole `frontend/` uncommitted set (mine is committed pre-deploy) rather than an enumerated path list, and clear deploy-regenerated tracked files before popping. User opted to keep stash-deploy-pop with verification.
+- **Deferred (non-blocking):** Step 5.3 user spot-check.

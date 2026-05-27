@@ -1,6 +1,6 @@
 # Test Coverage
 
-**Last updated:** 2026-05-27 (#70 - recurrence core: RecurrenceRule helper + spawn-on-complete + MCP + UI)
+**Last updated:** 2026-05-27 (#71 - advanced recurrence grammar: nth-weekday / from-end / intervals / UNTIL+COUNT, v2.14.1)
 
 ---
 
@@ -22,8 +22,8 @@
 | TasksController (ergonomics) | 100% | 100% | +11 tests for bulk setPriority + project/label name resolution (#66) |
 | TasksController (description) | 100% | 100% | +9 tests for description on create/update (#67) |
 | CommentsController | 100% | 100% | +10 tests for task comments (add/list/delete + GetById-includes) (#69) |
-| RecurrenceRule | 100% | 100% | +~35 tests: parse/serialize round-trip, NextDeadline (daily/everyN/weekly/monthly/clamp/time), validation rejects unsupported (#70) |
-| TasksController (recurrence) | 100% | 100% | +13 tests: create/update set+clear, recurrence-without-deadline 400, spawn-on-complete (fields/labels/SeriesId/comment), no double-spawn (#70) - 190 backend tests total |
+| RecurrenceRule | 100% | 100% | #70 core tests + #71 advanced (nth-weekday, last/from-end day, weekly/monthly INTERVAL>1, UNTIL/COUNT round-trip, ShouldSpawn truth table) |
+| TasksController (recurrence) | 100% | 100% | #70 spawn tests + #71 end-condition gate (COUNT stops at Nth, UNTIL stops past date, series-complete comment, nth-weekday spawn) - 216 backend tests total |
 | ProjectsController | 100% | 100% | All methods and branches covered |
 | TasklogDbContext | 100% | 100% | |
 | Program.cs | 0% | - | Framework wiring - not a test target |
@@ -46,9 +46,9 @@
 | oauth/well-known.ts | - | - | - | Returns fixed JSON metadata |
 | server.ts | - | - | - | Hono mount order + request logger; covered by middleware tests + end-to-end smoke |
 
-**91 tests, 0 failures** (was 87; +4 in api-client.test.ts for the recurrence wire contract, #70). Run with: `npm test --prefix mcp` (auto-rebuilds better-sqlite3 for host arch via pretest hook if needed). Note: a fresh `npm install` on the host installs better-sqlite3 without the native binary - run `npm rebuild better-sqlite3` once after install if the OAuth store/token tests fail with `ERR_DLOPEN_FAILED`.
+**92 tests, 0 failures** (was 91; +1 in api-client.test.ts for the advanced recurrence rule strings, #71). Run with: `npm test --prefix mcp` (auto-rebuilds better-sqlite3 for host arch via pretest hook if needed). Note: a fresh `npm install` on the host installs better-sqlite3 without the native binary - run `npm rebuild better-sqlite3` once after install if the OAuth store/token tests fail with `ERR_DLOPEN_FAILED`.
 
-### Next.js Frontend - last run 2026-05-27 (73 tests; +12 for recurrence: describeRecurrence + RecurrencePicker, #70)
+### Next.js Frontend - last run 2026-05-27 (81 tests; +8 for advanced recurrence: describeRecurrence + RecurrencePicker controls, #71)
 
 | Component | Statements | Branches | Lines | Uncovered |
 |---|---|---|---|---|
@@ -191,8 +191,15 @@
 - [x] 🟩 NextDeadline - preserves time-of-day
 - [x] 🟩 NextDeadline - weekly single + multi (soonest matching weekday)
 - [x] 🟩 NextDeadline - monthly same-day, clamps short months, year rollover
-- [x] 🟩 Rejects YEARLY/HOURLY, COUNT/UNTIL, BYSETPOS, nth-weekday (3TH), negative/0/32 BYMONTHDAY, weekly/monthly INTERVAL>1, missing FREQ, weekly w/o BYDAY, monthly w/o BYMONTHDAY, unknown weekday, malformed, empty
+- [x] 🟩 Rejects YEARLY/HOURLY, BYSETPOS, 0/32 BYMONTHDAY, missing FREQ, weekly w/o BYDAY, monthly w/o a day rule, unknown weekday, malformed, empty (post-#71 still-rejected set)
 - [x] 🟩 Rejects FREQ=DAILY with BYDAY (points to WEEKLY)
+
+### RecurrenceRule helper - advanced grammar (#71)
+- [x] 🟩 Round-trips nth-weekday (3TH / -1FR), from-end BYMONTHDAY (-1), weekly/monthly INTERVAL, UNTIL (YYYYMMDD; ISO normalized), COUNT
+- [x] 🟩 NextDeadline - monthly nth-weekday (3rd Thu) + last weekday; last day of month
+- [x] 🟩 NextDeadline - weekly every-other single (+14) + multi (active-week day kept); monthly every-3-months
+- [x] 🟩 Rejects >1 ordinaled weekday, ordinal outside {1..4,-1}, monthly BYDAY w/o ordinal, weekly nth-weekday, BYMONTHDAY<-28, both day rules / neither, UNTIL+COUNT together, bad UNTIL, COUNT=0
+- [x] 🟩 ShouldSpawn truth table - no end (always), UNTIL (inclusive cutoff), COUNT (stops when reached)
 
 ### TasksController - recurrence (#70)
 - [x] 🟩 Create - stores rule + stamps SeriesId; IsRecurring true
@@ -205,6 +212,7 @@
 - [x] 🟩 Complete - re-completing does not double-spawn
 - [x] 🟩 Complete - weekly advances to the next configured weekday
 - [x] 🟩 Update - set assigns SeriesId; set-without-deadline 400; clear nulls rule+SeriesId; invalid rule 400
+- [x] 🟩 (#71) Complete - COUNT=2 stops at the 2nd occurrence; UNTIL stops once past; series-complete comment logged; monthly nth-weekday spawn advances to the 3rd Thursday
 
 ### ProjectsController
 - [x] 🟩 GetAll - returns projects ordered alphabetically
@@ -288,6 +296,8 @@
 - [x] 🟩 RecurrencePicker - disabled + hint without a deadline
 - [x] 🟩 RecurrencePicker - emits FREQ=DAILY; seeds weekday/day-of-month from the deadline on weekly/monthly
 - [x] 🟩 RecurrencePicker - renders an initial rule; emits null on "Does not repeat"
+- [x] 🟩 (#71) describeRecurrence - nth-weekday / last weekday / last day / from-end day / weekly+monthly intervals / "until <date>" / "for N times"
+- [x] 🟩 (#71) RecurrencePicker - builds nth-weekday (seeded 4th Wed) + last-day rules; appends COUNT via the Ends control; reads an nth-weekday rule back into the ordinal/weekday dropdowns
 
 ### deadlinePresets (resolvePreset, injected `now`)
 - [x] 🟩 today - returns today's local date
@@ -381,6 +391,7 @@ its own subprocess, so in-memory DBs are isolated across files.
 - [x] 🟩 description - create/update body sets it; update null clears (#67)
 - [x] 🟩 comments - add_task_comment body; Task.comments optional Comment[] type (#69)
 - [x] 🟩 recurrence - create/update bodies carry recurrence; update null clears; Task carries recurrence/seriesId/isRecurring (#70)
+- [x] 🟩 recurrence - advanced rule strings (3TH, BYMONTHDAY=-1, INTERVAL=2, UNTIL, COUNT) pass through verbatim (#71)
 
 ### Not covered (and why)
 - `tools/tasks.ts`, `tools/projects.ts`, `tools/labels.ts` - thin api-client wrappers; behavior is exercised through `runTool` tests + the end-to-end smoke run with claude.ai.

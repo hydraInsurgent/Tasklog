@@ -2,6 +2,22 @@
 
 ---
 
+## v2.14.1 - Advanced recurrence
+*May 2026*
+
+### Added
+
+- Recurrence now supports the richer Todoist-style patterns (#71):
+  - "the 3rd Thursday" / "the last Friday" of the month (nth-weekday)
+  - "the last day" of the month, or a day counted from the end
+  - intervals: "every other week", "every 2 months"
+  - end conditions: repeat **until** a date, or **for** a set number of times - after which the series stops (and logs a "series complete" note)
+- The recurrence picker on the add/edit forms gained controls for all of these (monthly day-of-month / nth-weekday / last-day, an interval input, and an "Ends" option). Claude can use them too via the same `recurrence` rule string on `create_task`/`update_task`
+
+No database migration - end conditions live in the recurrence rule itself, and "for N times" is tracked from the existing series history. This is a patch (it extends the v2.14.0 recurrence feature rather than adding a new one).
+
+---
+
 ## v2.14.0 - Recurring tasks
 *May 2026*
 

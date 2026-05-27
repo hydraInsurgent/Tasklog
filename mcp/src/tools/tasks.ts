@@ -32,11 +32,15 @@ import { runTool } from './result.js';
 const RECURRENCE_DESCRIPTION =
   'Optional recurrence rule, RRULE-shaped. Supported forms: "FREQ=DAILY" (every ' +
   'day), "FREQ=DAILY;INTERVAL=N" (every N days), "FREQ=WEEKLY;BYDAY=MO,WE,FR" ' +
-  '(those weekdays; codes SU MO TU WE TH FR SA), "FREQ=MONTHLY;BYMONTHDAY=15" ' +
-  '(that day each month). Requires a deadline - the rule advances from it. ' +
-  'Completing a recurring task automatically creates the next occurrence with its ' +
-  'deadline advanced per the rule. (Nth-weekday like "3rd Thursday", end ' +
-  'conditions, and "every other week" are not supported yet.)';
+  '(those weekdays; codes SU MO TU WE TH FR SA), "FREQ=WEEKLY;INTERVAL=2;BYDAY=MO" ' +
+  '(every other Monday), "FREQ=MONTHLY;BYMONTHDAY=15" (that day each month), ' +
+  '"FREQ=MONTHLY;BYMONTHDAY=-1" (last day), "FREQ=MONTHLY;BYDAY=3TH" (3rd Thursday; ' +
+  'ordinal 1-4 or -1 for last), "FREQ=MONTHLY;INTERVAL=2;BYMONTHDAY=1" (every 2 ' +
+  'months). Add an end condition with ";UNTIL=YYYYMMDD" (stops after that date) or ' +
+  '";COUNT=N" (stops after N occurrences) - not both. Requires a deadline - the rule ' +
+  'advances from it. Completing a recurring task automatically creates the next ' +
+  'occurrence with its deadline advanced per the rule, until the end condition is ' +
+  'reached. (Natural-language phrases are not parsed - pass the rule string.)';
 
 export function registerTaskTools(server: McpServer): void {
   server.registerTool(

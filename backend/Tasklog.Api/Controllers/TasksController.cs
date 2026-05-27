@@ -388,31 +388,50 @@ namespace Tasklog.Api.Controllers
             {
                 var next = rule!.NextDeadline(deadline);
 
-                // The next open occurrence: a fresh row carrying the series' identity and
-                // fields. Completion state and comments are intentionally NOT carried -
-                // each occurrence tracks its own. Labels are shared (same Label entities).
-                var nextOccurrence = new TaskModel
-                {
-                    Title = task.Title,
-                    Description = task.Description,
-                    Deadline = next,
-                    CreatedAt = DateTime.Now,
-                    ProjectId = task.ProjectId,
-                    Priority = task.Priority,
-                    Recurrence = task.Recurrence,
-                    SeriesId = task.SeriesId
-                };
-                foreach (var label in task.Labels)
-                    nextOccurrence.Labels.Add(label);
-                _context.Tasks.Add(nextOccurrence);
+                // End conditions (UNTIL / COUNT) are evaluated against how many occurrences
+                // the series already has (this one included): completing occurrence #k sees
+                // exactly k rows, so COUNT=n spawns while k < n, yielding n occurrences total.
+                var seriesCount = task.SeriesId is Guid sid
+                    ? await _context.Tasks.CountAsync(t => t.SeriesId == sid)
+                    : 1;
 
-                // Log the completion on the row just finished - the seam habit-tracking
-                // (v2.17.0) reads from. Show a time only when the deadline carries one.
-                task.Comments.Add(new TaskComment
+                if (rule.ShouldSpawn(next, seriesCount))
                 {
-                    Body = $"Completed {DateTime.Now:yyyy-MM-dd}, next occurrence due {FormatOccurrenceDate(next)}.",
-                    CreatedAt = DateTime.Now
-                });
+                    // The next open occurrence: a fresh row carrying the series' identity and
+                    // fields. Completion state and comments are intentionally NOT carried -
+                    // each occurrence tracks its own. Labels are shared (same Label entities).
+                    var nextOccurrence = new TaskModel
+                    {
+                        Title = task.Title,
+                        Description = task.Description,
+                        Deadline = next,
+                        CreatedAt = DateTime.Now,
+                        ProjectId = task.ProjectId,
+                        Priority = task.Priority,
+                        Recurrence = task.Recurrence,
+                        SeriesId = task.SeriesId
+                    };
+                    foreach (var label in task.Labels)
+                        nextOccurrence.Labels.Add(label);
+                    _context.Tasks.Add(nextOccurrence);
+
+                    // Log the completion on the row just finished - the seam habit-tracking
+                    // (v2.17.0) reads from. Show a time only when the deadline carries one.
+                    task.Comments.Add(new TaskComment
+                    {
+                        Body = $"Completed {DateTime.Now:yyyy-MM-dd}, next occurrence due {FormatOccurrenceDate(next)}.",
+                        CreatedAt = DateTime.Now
+                    });
+                }
+                else
+                {
+                    // End condition reached (UNTIL passed or COUNT met): the series stops here.
+                    task.Comments.Add(new TaskComment
+                    {
+                        Body = $"Completed {DateTime.Now:yyyy-MM-dd} - recurrence series complete.",
+                        CreatedAt = DateTime.Now
+                    });
+                }
             }
 
             await _context.SaveChangesAsync();

@@ -1,6 +1,6 @@
 # Proposal: next six versions (v2.10.6 -> v2.13.1)
 
-**Status:** proposal - not active plans, not yet sized into issues
+**Status:** MOSTLY SHIPPED / partly superseded. v2.10.6, v2.10.7, v2.11.0, v2.12.0 all shipped. The recurring rows (v2.13.0/.1) were re-scoped on 2026-05-27 into a multi-version program - see [proposal-recurring-and-habits.md](proposal-recurring-and-habits.md). This doc is kept for history.
 **Date:** 2026-05-27
 **Source:** gaps surfaced during live MCP testing after the v2.10.1-v2.10.5 roadmap shipped (LLM-as-consumer feedback) + the closest backlog Someday/Maybe items. Supersedes the forward-looking parts of `proposal-mcp-and-ui-additions.md` (whose Features 1/2/3/5/8/9/10 have now shipped).
 

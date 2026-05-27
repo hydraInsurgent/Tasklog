@@ -1652,8 +1652,89 @@ public class TasksControllerTests
         await context.SaveChangesAsync();
         var controller = new TasksController(context);
 
-        var result = await controller.Update(task.Id, Json("{\"recurrence\":\"FREQ=DAILY;COUNT=3\"}"));
+        // BYSETPOS is still unsupported (COUNT alone became valid in v2.15.0).
+        var result = await controller.Update(task.Id, Json("{\"recurrence\":\"FREQ=MONTHLY;BYSETPOS=1;BYDAY=MO\"}"));
 
         result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    // --- Recurrence: end conditions (v2.15.0) ---
+
+    [Fact]
+    public async Task Complete_RecurringWithCount_StopsAtTheNthOccurrence()
+    {
+        using var context = CreateContext();
+        var series = Guid.NewGuid();
+        var task = new TaskModel
+        {
+            Title = "Twice",
+            CreatedAt = DateTime.Now,
+            Deadline = new DateTime(2026, 5, 27),
+            Recurrence = "FREQ=DAILY;COUNT=2",
+            SeriesId = series
+        };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        // Completing #1 spawns #2 (2 occurrences now exist).
+        await controller.Complete(task.Id, new CompleteTaskRequest(true));
+        context.Tasks.Should().HaveCount(2);
+
+        // Completing #2 must NOT spawn a 3rd - COUNT=2 reached.
+        var second = await context.Tasks.SingleAsync(t => t.Id != task.Id);
+        await controller.Complete(second.Id, new CompleteTaskRequest(true));
+        context.Tasks.Should().HaveCount(2);
+
+        var withComments = await context.Tasks.Include(t => t.Comments).SingleAsync(t => t.Id == second.Id);
+        withComments.Comments.Should().ContainSingle().Which.Body.Should().Contain("series complete");
+    }
+
+    [Fact]
+    public async Task Complete_RecurringWithUntil_StopsOncePast()
+    {
+        using var context = CreateContext();
+        var task = new TaskModel
+        {
+            Title = "Until end of May",
+            CreatedAt = DateTime.Now,
+            Deadline = new DateTime(2026, 5, 27),
+            // Next would be 2026-05-28, which is past UNTIL=2026-05-27, so no spawn.
+            Recurrence = "FREQ=DAILY;UNTIL=20260527",
+            SeriesId = Guid.NewGuid()
+        };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        await controller.Complete(task.Id, new CompleteTaskRequest(true));
+
+        context.Tasks.Should().HaveCount(1);
+        var withComments = await context.Tasks.Include(t => t.Comments).SingleAsync();
+        withComments.Comments.Should().ContainSingle().Which.Body.Should().Contain("series complete");
+    }
+
+    [Fact]
+    public async Task Complete_RecurringMonthlyNthWeekday_SpawnsAdvancedOccurrence()
+    {
+        using var context = CreateContext();
+        var task = new TaskModel
+        {
+            Title = "3rd Thursday",
+            CreatedAt = DateTime.Now,
+            Deadline = new DateTime(2026, 5, 27),
+            Recurrence = "FREQ=MONTHLY;BYDAY=3TH",
+            SeriesId = Guid.NewGuid()
+        };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        await controller.Complete(task.Id, new CompleteTaskRequest(true));
+
+        var next = await context.Tasks.SingleAsync(t => t.Id != task.Id);
+        next.Deadline!.Value.DayOfWeek.Should().Be(DayOfWeek.Thursday);
+        next.Deadline.Value.Day.Should().BeInRange(15, 21);
+        next.Recurrence.Should().Be("FREQ=MONTHLY;BYDAY=3TH");
     }
 }
