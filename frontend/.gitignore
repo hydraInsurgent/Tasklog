@@ -40,5 +40,5 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# vendored tarballs (local-only until npm publish)
-/vendor/
+# vendored tarballs - committed so the package.json file: dependency resolves in
+# fresh checkouts (the release-package CI). Move to an npm-published dep to drop these.
