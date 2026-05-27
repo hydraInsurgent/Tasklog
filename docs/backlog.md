@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| _none_ | | | |
+| [P67-task-description.md](plans/P67-task-description.md) | #67 | feature/task-description-#67 | In Progress |
 
 ---
 
