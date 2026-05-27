@@ -86,6 +86,12 @@ export default async function TaskDetailPage({ params }: PageProps) {
           >
             {task.title}
           </h1>
+          {/* Description: plain multiline text, preserved line breaks. Shown only when present. */}
+          {task.description && (
+            <p className="mt-2 text-sm text-zinc-600 whitespace-pre-wrap break-words">
+              {task.description}
+            </p>
+          )}
         </div>
 
         <dl className="divide-y divide-zinc-100">

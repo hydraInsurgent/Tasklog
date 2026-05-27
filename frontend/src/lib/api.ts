@@ -38,6 +38,8 @@ export interface Label {
 export interface Task {
   id: number;
   title: string;
+  // Optional free-text notes/context. Null = no description.
+  description: string | null;
   deadline: string | null; // ISO 8601 date string or null
   // Server-computed due bucket relative to today. Read-only (the API never accepts it).
   // Available for display; the deadline pill keeps its own color thresholds (see format.ts).
@@ -72,12 +74,13 @@ export async function createTask(
   title: string,
   deadline?: string,
   projectId?: number | null,
-  priority?: number
+  priority?: number,
+  description?: string
 ): Promise<Task> {
   const res = await fetch(`${getApiUrl()}/api/tasks`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title, deadline: deadline ?? null, projectId: projectId ?? null, priority }),
+    body: JSON.stringify({ title, deadline: deadline ?? null, projectId: projectId ?? null, priority, description }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
@@ -98,7 +101,7 @@ export async function deleteTask(id: number): Promise<void> {
 // Returns the updated task.
 export async function updateTask(
   id: number,
-  fields: { title?: string; deadline?: string | null; priority?: number },
+  fields: { title?: string; deadline?: string | null; priority?: number; description?: string | null },
 ): Promise<Task> {
   const res = await fetch(`${getApiUrl()}/api/tasks/${id}`, {
     method: "PATCH",

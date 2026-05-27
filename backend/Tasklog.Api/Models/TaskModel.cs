@@ -6,6 +6,9 @@ namespace Tasklog.Api.Models
     {
         public int Id { get; set; }
         public required string Title { get; set; }
+        // Optional free-text notes/context. Null = no description. Capped at 2000 chars
+        // by the controller (the column itself is unconstrained TEXT).
+        public string? Description { get; set; }
         public DateTime? Deadline { get; set; }
         public DateTime CreatedAt { get; set; }
         // Whether the task has been marked as complete by the user.

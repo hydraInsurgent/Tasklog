@@ -168,12 +168,12 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
 
   // Called by AddTaskForm on submit. Updates local state so no full reload is needed.
   // When viewing a specific project, new tasks are assigned to that project automatically.
-  async function handleAdd(title: string, deadline?: string, projectId?: number | null, labelIds?: number[], priority?: number) {
+  async function handleAdd(title: string, deadline?: string, projectId?: number | null, labelIds?: number[], priority?: number, description?: string) {
     // If the caller didn't pass a projectId but we're viewing a specific project,
     // default to that project. Inbox / All views default to null (Inbox).
     const resolvedProjectId =
       projectId !== undefined ? projectId : typeof activeView === "number" ? activeView : null;
-    let task = await createTask(title, deadline, resolvedProjectId, priority);
+    let task = await createTask(title, deadline, resolvedProjectId, priority, description);
 
     // Apply labels immediately after creation if any were selected.
     // setTaskLabels returns the updated task with labels populated.

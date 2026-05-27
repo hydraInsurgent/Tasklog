@@ -80,6 +80,7 @@ A reminder or alert system would be a meaningful scope addition.
 
 **Tasks**
 - A task has a title (required) and an optional deadline.
+- A task can have an optional free-text description (v2.11.0) - notes, context, a link - editable on the add/edit forms and shown on the task detail page. Keeps the title clean instead of stuffing metadata into it.
 - Title and deadline are editable after creation (v2.10.2): an Edit action on each task opens a modal for title, deadline, project, and labels, and the deadline pill has a quick-set popover with presets (Today, Tomorrow, This weekend, Next week, None). The deadline can be cleared. Editing preserves the task's created date and completion history (unlike delete-and-recreate).
 - A task exists until it is deleted.
 - Tasks can be marked complete via a checkbox. Completed tasks hide from the default view with a brief animation.

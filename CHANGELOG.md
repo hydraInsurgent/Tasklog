@@ -2,6 +2,19 @@
 
 ---
 
+## v2.11.0 - Task description field
+*May 2026*
+
+### Added
+
+- Tasks now have an optional free-text `description` - notes, context, a link - so titles stop doubling as metadata storage. Stored as a new nullable `Description` column (DB migration; existing tasks get null) (#67)
+- Editable via an optional multiline field on the add-task form and the edit modal, and shown on the task detail page (line breaks preserved). Cleared by blanking it
+- MCP: `create_task` and `update_task` accept a `description` (pass null on update to clear), and it is included in returned task objects - so Claude can "add a note to task N" or read a task's context
+
+Capped at 2000 characters. Plain text (no markdown rendering this release).
+
+---
+
 ## v2.10.7 - Agent ergonomics (bulk priority + name resolution)
 *May 2026*
 
