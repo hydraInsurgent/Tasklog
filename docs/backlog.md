@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| [P65-list-tasks-query-completeness.md](plans/P65-list-tasks-query-completeness.md) | #65 | feature/list-tasks-query-completeness-#65 | In Progress |
+| _none_ | | | |
 
 ---
 
@@ -77,6 +77,7 @@ Recently completed work (keep last 10):
 
 | # | Title | Type | Closed |
 |---|-------|------|--------|
+| #65 | list_tasks query completeness (createdAt filter, sort, limit) (v2.10.6) | feature | 2026-05-27 |
 | #64 | Task priority (Todoist P1-P4) (v2.10.5) | feature | 2026-05-27 |
 | #63 | Bulk task operations (complete, move-to-project, set-deadline) (v2.10.4) | feature | 2026-05-27 |
 | #61 | Computed dueStatus field + MCP tool-description shape hints (v2.10.3) | feature | 2026-05-27 |
@@ -86,7 +87,6 @@ Recently completed work (keep last 10):
 | #48 | Deploy Tasklog to GCP | feature | 2026-04-18 |
 | #47 | README overhaul and MIT license file | feature | 2026-04-04 |
 | #46 | Labels column missing from desktop task table | bug | 2026-04-03 |
-| #45 | Frontend .next dir missing from distributable | bug | 2026-04-03 |
 
 ---
 
