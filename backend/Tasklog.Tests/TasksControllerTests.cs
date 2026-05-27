@@ -946,4 +946,173 @@ public class TasksControllerTests
         tasks.Should().HaveCount(2);
         tasks.Select(t => t.Id).Should().BeEquivalentTo(new[] { ids[0], ids[1] });
     }
+
+    // --- GetAll: createdAt range, sort, limit (#65) ---
+
+    // Extracts the ordered task list from a GetAll OkObjectResult.
+    private static List<TaskModel> Tasks(IActionResult result) =>
+        result.Should().BeOfType<OkObjectResult>().Subject.Value
+            .Should().BeAssignableTo<IEnumerable<TaskModel>>().Subject.ToList();
+
+    [Fact]
+    public async Task GetAll_CreatedAfter_ReturnsTasksCreatedOnOrAfter()
+    {
+        using var context = CreateContext();
+        context.Tasks.AddRange(
+            new TaskModel { Title = "old", CreatedAt = new DateTime(2026, 1, 1) },
+            new TaskModel { Title = "new", CreatedAt = new DateTime(2026, 6, 1) }
+        );
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.GetAll(new TaskFilterQuery(null, null, null, null, null, null, null, CreatedAfter: new DateTime(2026, 3, 1)));
+
+        Tasks(result).Should().ContainSingle().Which.Title.Should().Be("new");
+    }
+
+    [Fact]
+    public async Task GetAll_CreatedBefore_ReturnsTasksCreatedOnOrBefore()
+    {
+        using var context = CreateContext();
+        context.Tasks.AddRange(
+            new TaskModel { Title = "old", CreatedAt = new DateTime(2026, 1, 1) },
+            new TaskModel { Title = "new", CreatedAt = new DateTime(2026, 6, 1) }
+        );
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.GetAll(new TaskFilterQuery(null, null, null, null, null, null, null, CreatedBefore: new DateTime(2026, 3, 1)));
+
+        Tasks(result).Should().ContainSingle().Which.Title.Should().Be("old");
+    }
+
+    [Fact]
+    public async Task GetAll_SortDeadlineAsc_OrdersEarliestFirstNullsLast()
+    {
+        using var context = CreateContext();
+        context.Tasks.AddRange(
+            new TaskModel { Title = "none", CreatedAt = DateTime.Now, Deadline = null },
+            new TaskModel { Title = "late", CreatedAt = DateTime.Now, Deadline = new DateTime(2026, 12, 31) },
+            new TaskModel { Title = "early", CreatedAt = DateTime.Now, Deadline = new DateTime(2026, 6, 1) }
+        );
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.GetAll(new TaskFilterQuery(null, null, null, null, null, null, null, Sort: "deadline", Order: "asc"));
+
+        Tasks(result).Select(t => t.Title).Should().Equal("early", "late", "none");
+    }
+
+    [Fact]
+    public async Task GetAll_SortDeadlineDesc_OrdersLatestFirstNullsLast()
+    {
+        using var context = CreateContext();
+        context.Tasks.AddRange(
+            new TaskModel { Title = "none", CreatedAt = DateTime.Now, Deadline = null },
+            new TaskModel { Title = "late", CreatedAt = DateTime.Now, Deadline = new DateTime(2026, 12, 31) },
+            new TaskModel { Title = "early", CreatedAt = DateTime.Now, Deadline = new DateTime(2026, 6, 1) }
+        );
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.GetAll(new TaskFilterQuery(null, null, null, null, null, null, null, Sort: "deadline", Order: "desc"));
+
+        // Nulls stay last even in descending order.
+        Tasks(result).Select(t => t.Title).Should().Equal("late", "early", "none");
+    }
+
+    [Fact]
+    public async Task GetAll_SortPriorityAsc_P1First()
+    {
+        using var context = CreateContext();
+        context.Tasks.AddRange(
+            new TaskModel { Title = "p4", CreatedAt = DateTime.Now, Priority = 4 },
+            new TaskModel { Title = "p1", CreatedAt = DateTime.Now, Priority = 1 },
+            new TaskModel { Title = "p2", CreatedAt = DateTime.Now, Priority = 2 }
+        );
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.GetAll(new TaskFilterQuery(null, null, null, null, null, null, null, Sort: "priority", Order: "asc"));
+
+        Tasks(result).Select(t => t.Title).Should().Equal("p1", "p2", "p4");
+    }
+
+    [Fact]
+    public async Task GetAll_SortPriorityDesc_P4First()
+    {
+        using var context = CreateContext();
+        context.Tasks.AddRange(
+            new TaskModel { Title = "p4", CreatedAt = DateTime.Now, Priority = 4 },
+            new TaskModel { Title = "p1", CreatedAt = DateTime.Now, Priority = 1 }
+        );
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.GetAll(new TaskFilterQuery(null, null, null, null, null, null, null, Sort: "priority", Order: "desc"));
+
+        Tasks(result).Select(t => t.Title).Should().Equal("p4", "p1");
+    }
+
+    [Fact]
+    public async Task GetAll_SortCreatedAsc_OldestFirst()
+    {
+        using var context = CreateContext();
+        context.Tasks.AddRange(
+            new TaskModel { Title = "older", CreatedAt = new DateTime(2026, 1, 1) },
+            new TaskModel { Title = "newer", CreatedAt = new DateTime(2026, 6, 1) }
+        );
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.GetAll(new TaskFilterQuery(null, null, null, null, null, null, null, Sort: "created", Order: "asc"));
+
+        Tasks(result).Select(t => t.Title).Should().Equal("older", "newer");
+    }
+
+    [Fact]
+    public async Task GetAll_Limit_CapsToMostRecentN()
+    {
+        using var context = CreateContext();
+        context.Tasks.AddRange(
+            new TaskModel { Title = "oldest", CreatedAt = new DateTime(2026, 1, 1) },
+            new TaskModel { Title = "middle", CreatedAt = new DateTime(2026, 3, 1) },
+            new TaskModel { Title = "newest", CreatedAt = new DateTime(2026, 6, 1) }
+        );
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        // Default sort is created desc, so a limit of 2 returns the two newest.
+        var result = await controller.GetAll(new TaskFilterQuery(null, null, null, null, null, null, null, Limit: 2));
+
+        Tasks(result).Select(t => t.Title).Should().Equal("newest", "middle");
+    }
+
+    [Fact]
+    public async Task GetAll_LimitBelowOne_Returns400()
+    {
+        using var context = CreateContext();
+        var controller = new TasksController(context);
+
+        var result = await controller.GetAll(new TaskFilterQuery(null, null, null, null, null, null, null, Limit: 0));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetAll_DefaultCall_ReturnsAllNewestFirst()
+    {
+        using var context = CreateContext();
+        context.Tasks.AddRange(
+            new TaskModel { Title = "older", CreatedAt = new DateTime(2026, 1, 1) },
+            new TaskModel { Title = "newer", CreatedAt = new DateTime(2026, 6, 1) }
+        );
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.GetAll(EmptyFilter());
+
+        // Unchanged historical behaviour: every row, newest CreatedAt first.
+        Tasks(result).Select(t => t.Title).Should().Equal("newer", "older");
+    }
 }

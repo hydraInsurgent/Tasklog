@@ -2,6 +2,19 @@
 
 ---
 
+## v2.10.6 - list_tasks query completeness
+*May 2026*
+
+### Added
+
+- `GET /api/tasks` (and the MCP `list_tasks` tool) gained `createdAfter` / `createdBefore` filters on a task's creation date - so "what did I add today" is a single filtered call instead of fetching everything and eyeballing dates (#65)
+- Sorting: `sort` (`created` / `deadline` / `priority`) + `order` (`asc` / `desc`), default `created` / `desc` (unchanged from before). Deadline sort lists tasks with no deadline last; priority ascending lists P1 first
+- `limit` caps the result to the first N tasks after sorting (e.g. "top 5 by priority"); omit for all, `limit < 1` returns 400
+
+MCP-only surface growth - the web UI is unaffected. No DB migration.
+
+---
+
 ## v2.10.5 - Task priority (P1-P4)
 *May 2026*
 

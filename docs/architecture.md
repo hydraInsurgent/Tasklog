@@ -181,7 +181,7 @@ LabelTaskModel  (join table - implicit many-to-many)
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/tasks` | Tasks ordered by `CreatedAt` descending. Optional filter query params: `projectIds` (repeated key), `inbox`, `labelIds` (repeated key), `dueBefore`, `dueAfter`, `completed`, `text`, `priorities` (repeated key, P1-P4). Arrays use repeated keys (`?projectIds=3&projectIds=5`), not comma-separated. AND across dimensions, OR within id arrays. No params = all tasks. `inbox=true` + `projectIds` → 400. See P57 plan for the full shape. |
+| GET | `/api/tasks` | Filtered/sorted task list. Filter params: `projectIds` (repeated key), `inbox`, `labelIds` (repeated key), `dueBefore`, `dueAfter`, `createdAfter`, `createdBefore`, `completed`, `text`, `priorities` (repeated key, P1-P4). Sort: `sort` (`created`/`deadline`/`priority`, default `created`) + `order` (`asc`/`desc`, default `desc`; deadline sorts nulls-last, priority asc = P1 first). `limit` caps to the first N after sorting (`<1` → 400). Arrays use repeated keys, not comma-separated. AND across dimensions, OR within id arrays. No params = all tasks, newest-first. `inbox=true` + `projectIds` → 400. |
 | GET | `/api/tasks/{id}` | Single task by ID. 404 if not found |
 | POST | `/api/tasks` | Create task. Body: `{ title, deadline?, projectId?, priority? }`. priority is 1-4 (default 4 = none); 400 if out of range |
 | PATCH | `/api/tasks/{id}` | Partial update of title, deadline, and/or priority. JSON body, present-key detection: omit=keep, `deadline: null`=clear, value=set. priority must be 1-4 (no clear - P4 is none). 400 on empty title / bad date / bad priority. Returns the updated task |

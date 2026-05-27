@@ -112,6 +112,11 @@ export interface TaskFilter {
   completed?: boolean;
   text?: string;
   priorities?: number[]; // P1-P4 values; OR within
+  createdAfter?: string; // ISO 8601 datetime; inclusive >=
+  createdBefore?: string; // ISO 8601 datetime; inclusive <=
+  sort?: string; // created | deadline | priority
+  order?: string; // asc | desc
+  limit?: number; // cap result to first N after sorting
 }
 
 // Serialize the filter object into URLSearchParams, omitting undefined fields.
@@ -140,6 +145,11 @@ export function buildTaskQuery(filter?: TaskFilter): string {
   if (filter.priorities && filter.priorities.length > 0) {
     for (const p of filter.priorities) params.append('priorities', String(p));
   }
+  if (filter.createdAfter) params.set('createdAfter', filter.createdAfter);
+  if (filter.createdBefore) params.set('createdBefore', filter.createdBefore);
+  if (filter.sort) params.set('sort', filter.sort);
+  if (filter.order) params.set('order', filter.order);
+  if (filter.limit !== undefined) params.set('limit', String(filter.limit));
   const qs = params.toString();
   return qs ? `?${qs}` : '';
 }
