@@ -1,6 +1,6 @@
 # Feature Implementation Plan: Advanced recurrence grammar
 
-**Overall Progress:** `35%`
+**Overall Progress:** `50%`
 
 **Tracking issue:** [#71](https://github.com/hydraInsurgent/Tasklog/issues/71)
 **Branch:** `feature/advanced-recurrence-grammar-#71`
@@ -59,9 +59,9 @@ Completing a recurring task whose end condition is reached: marks it done + logs
   - [x] 🟩 1.6 `Complete`: counts SeriesId rows + `ShouldSpawn`; series-complete comment (no spawn) when the end is reached, else the existing "next occurrence due" comment.
   - [x] 🟩 1.7 Tests: RecurrenceRuleTests (advanced round-trips, NextDeadline nth-weekday/last-day/interval, validation, ShouldSpawn truth table) + TasksControllerTests (COUNT stops at Nth, UNTIL stops past date, series-complete comment, nth-weekday spawn). Pruned 6 now-valid v2.14.0 reject cases. **216 backend tests pass** (was 190).
 
-- [ ] 🟥 **Step 2: MCP - teach the new grammar** `[sequential]` → depends on: Step 1
-  - [ ] 🟥 2.1 Extend `RECURRENCE_DESCRIPTION` in `tools/tasks.ts` with the new forms + 1-2 examples (3rd-Thursday, last-day, every-other-week, UNTIL, COUNT). No api-client signature change (recurrence is already a string).
-  - [ ] 🟥 2.2 `api-client.test.ts`: 1-2 wire-contract cases for the new rule strings (they're strings, so mostly documentation). Typecheck clean; MCP tests green.
+- [x] 🟩 **Step 2: MCP - teach the new grammar** `[sequential]` → depends on: Step 1
+  - [x] 🟩 2.1 `RECURRENCE_DESCRIPTION` extended with the new forms + examples (every-other-Monday, last-day, 3rd-Thursday, every-2-months, UNTIL, COUNT). No api-client signature change.
+  - [x] 🟩 2.2 `api-client.test.ts`: advanced-rule-string wire-contract case. Typecheck clean; **92 MCP tests pass** (was 91).
 
 - [ ] 🟥 **Step 3: Web UI - picker + labels for the new forms** `[sequential]` → depends on: Step 1 `[UI]`
   - [ ] 🟥 3.1 `format.ts` `describeRecurrence`: new labels ("Monthly on the 3rd Thursday", "Monthly on the last day", "Every 2 weeks on Mon", append "until 31 Dec 2026" / "for 5 times").

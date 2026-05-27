@@ -189,6 +189,18 @@ describe('recurrence wire contract', () => {
   test('update body null stops the task repeating', () => {
     assert.equal(JSON.stringify({ recurrence: null }), '{"recurrence":null}');
   });
+  test('advanced rule strings (v2.15.0) pass through verbatim', () => {
+    // nth-weekday, last-day, every-other-week, and end conditions are just strings on the wire.
+    for (const rule of [
+      'FREQ=MONTHLY;BYDAY=3TH',
+      'FREQ=MONTHLY;BYMONTHDAY=-1',
+      'FREQ=WEEKLY;INTERVAL=2;BYDAY=MO',
+      'FREQ=DAILY;UNTIL=20261231',
+      'FREQ=DAILY;COUNT=5',
+    ]) {
+      assert.equal(JSON.stringify({ recurrence: rule }), `{"recurrence":"${rule}"}`);
+    }
+  });
   test('Task carries recurrence / seriesId / isRecurring', () => {
     const t: Pick<Task, 'recurrence' | 'seriesId' | 'isRecurring'> = {
       recurrence: 'FREQ=DAILY',
