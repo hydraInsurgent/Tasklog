@@ -16,10 +16,9 @@ The v2.10.x roadmap delivered the core MCP + UI parity. Living with it surfaced 
 | **v2.10.7** | Agent ergonomics | patch | no | - |
 | **v2.11.0** | Task description field | minor | yes | - |
 | **v2.12.0** | Deadline time-of-day | minor | no | - (precedes v2.13.0) |
-| **v2.13.0** | Recurring tasks - core | minor | yes | v2.12.0 |
-| **v2.13.1** | Recurring tasks - UX | patch | no | v2.13.0 |
+| ~~v2.13.0/.1~~ Recurring | **EXPANDED** | - | - | see below |
 
-Three patches, three minors. The patches cluster naturally: two cheap MCP batches up front, and the recurring-UI tail riding off its own minor.
+v2.10.6, v2.10.7, v2.11.0, v2.12.0 are **shipped**. The recurring rows were re-scoped on 2026-05-27: the user chose full Todoist-level recurrence + habit-tracking, which is a multi-version program now tracked in [proposal-recurring-and-habits.md](proposal-recurring-and-habits.md) (v2.13.0 -> v2.17.0). The original v2.13.0/.1 sketches below are superseded by that doc.
 
 ## How to read this
 
