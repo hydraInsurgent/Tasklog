@@ -43,6 +43,13 @@ export interface Task {
   completedAt: string | null;
   projectId: number | null;
   labels: Label[];
+  // Recurrence rule (RRULE-shaped, e.g. "FREQ=DAILY", "FREQ=WEEKLY;BYDAY=MO,WE").
+  // Null = the task does not repeat. Completing a recurring task spawns the next occurrence.
+  recurrence: string | null;
+  // Links all occurrences of the same repeating task. Null for non-recurring tasks.
+  seriesId: string | null;
+  // Convenience flag, server-computed: whether the task repeats. Read-only.
+  isRecurring: boolean;
   // Timestamped comments. Present on get_task (single task); absent on list_tasks.
   comments?: Comment[];
 }
@@ -175,6 +182,7 @@ export const createTask = (body: {
   projectId?: number;
   priority?: number;
   description?: string;
+  recurrence?: string;
 }): Promise<Task> =>
   request('/api/tasks', { method: 'POST', body: JSON.stringify(body) });
 
@@ -187,7 +195,13 @@ export const deleteTask = (id: number): Promise<void> =>
 // sets it. Pass {} and nothing changes.
 export const updateTask = (
   id: number,
-  body: { title?: string; deadline?: string | null; priority?: number; description?: string | null },
+  body: {
+    title?: string;
+    deadline?: string | null;
+    priority?: number;
+    description?: string | null;
+    recurrence?: string | null;
+  },
 ): Promise<Task> =>
   request(`/api/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
 

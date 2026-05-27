@@ -31,6 +31,9 @@ describe('Task.dueStatus shape (server-computed, pass-through)', () => {
       completedAt: null,
       projectId: null,
       labels: [],
+      recurrence: null,
+      seriesId: null,
+      isRecurring: false,
     };
     assert.ok(allowed.includes(sample.dueStatus));
     assert.equal(sample.priority, 4);
@@ -166,6 +169,34 @@ describe('description wire contract', () => {
   });
   test('update body null clears description', () => {
     assert.equal(JSON.stringify({ description: null }), '{"description":null}');
+  });
+});
+
+// Recurrence flows through create/update bodies; null on update stops repeating (#70).
+describe('recurrence wire contract', () => {
+  test('create body carries recurrence', () => {
+    assert.equal(
+      JSON.stringify({ title: 'x', deadline: '2026-05-27', recurrence: 'FREQ=DAILY' }),
+      '{"title":"x","deadline":"2026-05-27","recurrence":"FREQ=DAILY"}',
+    );
+  });
+  test('update body sets recurrence', () => {
+    assert.equal(
+      JSON.stringify({ recurrence: 'FREQ=WEEKLY;BYDAY=MO,WE' }),
+      '{"recurrence":"FREQ=WEEKLY;BYDAY=MO,WE"}',
+    );
+  });
+  test('update body null stops the task repeating', () => {
+    assert.equal(JSON.stringify({ recurrence: null }), '{"recurrence":null}');
+  });
+  test('Task carries recurrence / seriesId / isRecurring', () => {
+    const t: Pick<Task, 'recurrence' | 'seriesId' | 'isRecurring'> = {
+      recurrence: 'FREQ=DAILY',
+      seriesId: 'a1b2',
+      isRecurring: true,
+    };
+    assert.equal(t.isRecurring, true);
+    assert.equal(t.recurrence, 'FREQ=DAILY');
   });
 });
 

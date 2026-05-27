@@ -1,6 +1,6 @@
 # Feature Implementation Plan: Recurrence core (recurring tasks)
 
-**Overall Progress:** `30%`
+**Overall Progress:** `48%`
 
 **Tracking issue:** [#70](https://github.com/hydraInsurgent/Tasklog/issues/70)
 **Branch:** `feature/recurrence-core-#70`
@@ -80,10 +80,10 @@ MCP: create_task / update_task gain a `recurrence` string param (subset taught i
   - [x] 🟩 1.6 `Complete`: open->completed transition guard (no double-spawn); spawns next occurrence (carries fields + labels, same SeriesId), logs a completion comment; returns the completed task. Bulk untouched.
   - [x] 🟩 1.7 Tests: `RecurrenceRuleTests` + `TasksControllerTests` recurrence cases. **190 backend tests pass** (was 143, +47).
 
-- [ ] 🟥 **Step 2: MCP - recurrence on create/update + in the Task shape** `[sequential]` → depends on: Step 1
-  - [ ] 🟥 2.1 `api-client.ts`: `Task` gains `recurrence: string | null`, `seriesId: string | null`, `isRecurring: boolean`; `createTask`/`updateTask` bodies gain `recurrence?: string | null`.
-  - [ ] 🟥 2.2 `tools/tasks.ts`: add a `recurrence` string param to `create_task` and `update_task` schemas, with a description teaching the supported subset + examples + "completing a recurring task marks it done and creates the next occurrence." `set_task_completion` unchanged. Tool COUNT unchanged (no new tool) - refresh the header comment wording only if it references field coverage.
-  - [ ] 🟥 2.3 `api-client.test.ts`: recurrence wire-contract tests (create/update send `recurrence`; `Task` type carries the new fields). Typecheck clean; MCP tests green.
+- [x] 🟩 **Step 2: MCP - recurrence on create/update + in the Task shape** `[sequential]` → depends on: Step 1
+  - [x] 🟩 2.1 `api-client.ts`: `Task` gained recurrence/seriesId/isRecurring; `createTask`/`updateTask` bodies gained `recurrence?`.
+  - [x] 🟩 2.2 `tools/tasks.ts`: shared `RECURRENCE_DESCRIPTION` (teaches the subset + examples + spawn-on-complete) on `create_task` + `update_task`; header + list_tasks Returns refreshed. No new tool.
+  - [x] 🟩 2.3 `api-client.test.ts`: recurrence wire-contract tests + updated the Task sample. Typecheck clean; **91 MCP tests pass** (was 87, +4).
 
 - [ ] 🟥 **Step 3: Web UI - recurrence picker + recurring badge** `[sequential]` → depends on: Step 1 `[UI]`
   - [ ] 🟥 3.1 `api.ts`: `Task` type gains recurrence/seriesId/isRecurring; `createTask`/`updateTask` carry `recurrence`. `format.ts`: `describeRecurrence(rule)` -> human label ("Every day", "Every 3 days", "Weekly on Mon, Wed", "Monthly on the 15th").
