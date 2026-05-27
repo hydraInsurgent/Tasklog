@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| [P70-recurrence-core.md](plans/P70-recurrence-core.md) | #70 | feature/recurrence-core-#70 | In Progress |
+| _none_ | | | |
 
 ---
 
@@ -77,6 +77,7 @@ Recently completed work (keep last 10):
 
 | # | Title | Type | Closed |
 |---|-------|------|--------|
+| #70 | Recurrence core (recurring tasks) (v2.14.0) | feature | 2026-05-27 |
 | #69 | Task comments + completion-log foundation (v2.13.0) | feature | 2026-05-27 |
 | #68 | Deadline time-of-day (v2.12.0) | feature | 2026-05-27 |
 | #67 | Task description field (v2.11.0) | feature | 2026-05-27 |
@@ -86,7 +87,6 @@ Recently completed work (keep last 10):
 | #63 | Bulk task operations (complete, move-to-project, set-deadline) (v2.10.4) | feature | 2026-05-27 |
 | #61 | Computed dueStatus field + MCP tool-description shape hints (v2.10.3) | feature | 2026-05-27 |
 | #59 | Update task (title/deadline) + edit modal + quick deadline (v2.10.2) | feature | 2026-05-27 |
-| #57 | MCP task filtering + tool consolidation (v2.10.1) | feature | 2026-05-26 |
 
 ---
 
