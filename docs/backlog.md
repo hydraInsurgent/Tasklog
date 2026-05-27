@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| [P68-deadline-time-of-day.md](plans/P68-deadline-time-of-day.md) | #68 | feature/deadline-time-of-day-#68 | In Progress |
+| _none_ | | | |
 
 ---
 
@@ -77,6 +77,7 @@ Recently completed work (keep last 10):
 
 | # | Title | Type | Closed |
 |---|-------|------|--------|
+| #68 | Deadline time-of-day (v2.12.0) | feature | 2026-05-27 |
 | #67 | Task description field (v2.11.0) | feature | 2026-05-27 |
 | #66 | Agent ergonomics (bulk_set_priority + name resolution) (v2.10.7) | feature | 2026-05-27 |
 | #65 | list_tasks query completeness (createdAt filter, sort, limit) (v2.10.6) | feature | 2026-05-27 |
@@ -86,7 +87,6 @@ Recently completed work (keep last 10):
 | #59 | Update task (title/deadline) + edit modal + quick deadline (v2.10.2) | feature | 2026-05-27 |
 | #57 | MCP task filtering + tool consolidation (v2.10.1) | feature | 2026-05-26 |
 | #50 | MCP server for claude.ai custom connector | feature | 2026-05-20 |
-| #48 | Deploy Tasklog to GCP | feature | 2026-04-18 |
 
 ---
 
