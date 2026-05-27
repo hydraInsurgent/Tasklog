@@ -1,4 +1,4 @@
-import { deadlineColorClass, formatDate, formatDeadline, hasTimeComponent, projectName, priorityMeta, PRIORITY_OPTIONS } from '@/lib/format'
+import { deadlineColorClass, formatDate, formatDeadline, hasTimeComponent, projectName, priorityMeta, PRIORITY_OPTIONS, describeRecurrence } from '@/lib/format'
 
 describe('deadlineColorClass', () => {
   beforeEach(() => {
@@ -103,5 +103,29 @@ describe('formatDeadline', () => {
     const out = formatDeadline('2026-06-01T15:00:00')
     expect(out).toContain('1 Jun 2026')
     expect(out).toMatch(/3[:.]00/)
+  })
+})
+
+describe('describeRecurrence', () => {
+  it('returns empty string for null', () => {
+    expect(describeRecurrence(null)).toBe('')
+  })
+  it('describes daily', () => {
+    expect(describeRecurrence('FREQ=DAILY')).toBe('Every day')
+  })
+  it('describes every N days', () => {
+    expect(describeRecurrence('FREQ=DAILY;INTERVAL=3')).toBe('Every 3 days')
+  })
+  it('describes weekly with ordered weekdays', () => {
+    // Input out of order normalizes to week order.
+    expect(describeRecurrence('FREQ=WEEKLY;BYDAY=FR,MO,WE')).toBe('Weekly on Mon, Wed, Fri')
+  })
+  it('describes monthly with an ordinal', () => {
+    expect(describeRecurrence('FREQ=MONTHLY;BYMONTHDAY=15')).toBe('Monthly on the 15th')
+    expect(describeRecurrence('FREQ=MONTHLY;BYMONTHDAY=1')).toBe('Monthly on the 1st')
+    expect(describeRecurrence('FREQ=MONTHLY;BYMONTHDAY=22')).toBe('Monthly on the 22nd')
+  })
+  it('falls back to "Repeats" for an unrecognised rule', () => {
+    expect(describeRecurrence('FREQ=YEARLY')).toBe('Repeats')
   })
 })

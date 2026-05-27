@@ -7,6 +7,7 @@ import { Task, Project } from "@/lib/api";
 import { formatDeadline, deadlineColorClass, projectName, labelColor } from "@/lib/format";
 import DeadlinePopover from "./DeadlinePopover";
 import PriorityDot from "./PriorityDot";
+import RecurringBadge from "./RecurringBadge";
 
 interface Props {
   task: Task;
@@ -147,6 +148,7 @@ export default function TaskCard({
                 />
               )}
             </span>
+            <RecurringBadge recurrence={task.recurrence} />
           </div>
 
           {/* Right side: label names shown as #labelname in the label's color.

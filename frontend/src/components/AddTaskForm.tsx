@@ -5,11 +5,12 @@ import { Plus } from "lucide-react";
 import { Project, Label, createLabel } from "@/lib/api";
 import { labelColor, PRIORITY_OPTIONS } from "@/lib/format";
 import LabelChip from "./LabelChip";
+import RecurrencePicker from "./RecurrencePicker";
 
 interface Props {
   // Called by the parent when the form submits. Parent handles the API call
   // and any feedback display, so this component stays focused on form state.
-  onAdd: (title: string, deadline?: string, projectId?: number | null, labelIds?: number[], priority?: number, description?: string) => Promise<void>;
+  onAdd: (title: string, deadline?: string, projectId?: number | null, labelIds?: number[], priority?: number, description?: string, recurrence?: string) => Promise<void>;
   // Projects list for the optional project dropdown. Omit to hide the dropdown.
   projects?: Project[];
   // Which project to pre-select (e.g. the current sidebar view). Null = Inbox.
@@ -27,6 +28,11 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
   const [priority, setPriority] = useState(4);
   // Optional free-text description.
   const [description, setDescription] = useState("");
+  // Optional recurrence rule (RRULE-shaped) or null for a one-off task.
+  const [recurrence, setRecurrence] = useState<string | null>(null);
+  // Bumped on a successful add to remount RecurrencePicker (which owns its
+  // sub-state after mount) so the picker resets along with the other fields.
+  const [pickerKey, setPickerKey] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   // Separate error state for label creation so it doesn't interfere with
@@ -159,13 +165,17 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
           ? `${deadline}T${deadlineTime}`
           : deadline
         : undefined;
-      await onAdd(title.trim(), deadlineValue, projectId, labelIds, priority, description.trim() || undefined);
+      // Recurrence needs a deadline to anchor from; drop it if the deadline was cleared.
+      const recurrenceValue = deadlineValue ? recurrence ?? undefined : undefined;
+      await onAdd(title.trim(), deadlineValue, projectId, labelIds, priority, description.trim() || undefined, recurrenceValue);
       // Clear the form on success.
       setTitle("");
       setDeadline("");
       setDeadlineTime("");
       setPriority(4);
       setDescription("");
+      setRecurrence(null);
+      setPickerKey((k) => k + 1);
       setSelectedLabels([]);
       setLabelInput("");
     } catch (err) {
@@ -290,6 +300,19 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
               </option>
             ))}
           </select>
+        </div>
+
+        {/* Recurrence picker. Needs a deadline to anchor from (it disables itself
+            and hints otherwise). Date alone is enough; the time is carried by the
+            deadline value when the occurrence is spawned. */}
+        <div className="sm:w-48">
+          <RecurrencePicker
+            key={pickerKey}
+            value={recurrence}
+            onChange={setRecurrence}
+            deadline={deadline || undefined}
+            disabled={loading}
+          />
         </div>
 
         {/* Labels autocomplete - only shown when allLabels is provided and non-empty */}

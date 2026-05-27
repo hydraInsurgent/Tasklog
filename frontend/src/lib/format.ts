@@ -103,3 +103,56 @@ export const PRIORITY_OPTIONS: { value: number; meta: PriorityMeta }[] = [
   { value: 3, meta: PRIORITY_META[3] },
   { value: 4, meta: PRIORITY_META[4] },
 ];
+
+// Map RFC 5545 weekday codes to short day names, in week order (the recurrence
+// core only emits the codes below). Used by describeRecurrence.
+const WEEKDAY_NAMES: Record<string, string> = {
+  SU: "Sun", MO: "Mon", TU: "Tue", WE: "Wed", TH: "Thu", FR: "Fri", SA: "Sat",
+};
+const WEEKDAY_ORDER = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
+
+// Ordinal suffix for a day-of-month (1st, 2nd, 3rd, 4th, ... 21st ...).
+function ordinal(n: number): string {
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1: return `${n}st`;
+    case 2: return `${n}nd`;
+    case 3: return `${n}rd`;
+    default: return `${n}th`;
+  }
+}
+
+// Turn an RRULE-shaped recurrence string into a short human label for the
+// recurring badge ("Every day", "Every 3 days", "Weekly on Mon, Wed",
+// "Monthly on the 15th"). Mirrors the supported subset (see the backend
+// RecurrenceRule helper); falls back to "Repeats" for anything unrecognised
+// so the badge never shows a raw rule string.
+export function describeRecurrence(rule: string | null): string {
+  if (!rule) return "";
+  const parts = new Map<string, string>();
+  for (const seg of rule.split(";")) {
+    const [k, v] = seg.split("=");
+    if (k && v) parts.set(k.trim().toUpperCase(), v.trim());
+  }
+  const freq = parts.get("FREQ")?.toUpperCase();
+  const interval = Number(parts.get("INTERVAL") ?? "1");
+
+  if (freq === "DAILY") {
+    return interval > 1 ? `Every ${interval} days` : "Every day";
+  }
+  if (freq === "WEEKLY") {
+    const days = (parts.get("BYDAY") ?? "")
+      .split(",")
+      .map((d) => d.trim().toUpperCase())
+      .filter((d) => WEEKDAY_NAMES[d])
+      .sort((a, b) => WEEKDAY_ORDER.indexOf(a) - WEEKDAY_ORDER.indexOf(b))
+      .map((d) => WEEKDAY_NAMES[d]);
+    return days.length > 0 ? `Weekly on ${days.join(", ")}` : "Weekly";
+  }
+  if (freq === "MONTHLY") {
+    const day = Number(parts.get("BYMONTHDAY"));
+    return day >= 1 ? `Monthly on the ${ordinal(day)}` : "Monthly";
+  }
+  return "Repeats";
+}

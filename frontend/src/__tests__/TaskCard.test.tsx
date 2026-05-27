@@ -17,6 +17,9 @@ const baseTask: Task = {
   createdAt: '2026-03-14T00:00:00Z',
   completedAt: null,
   labels: [],
+  recurrence: null,
+  seriesId: null,
+  isRecurring: false,
 }
 
 const projects: Project[] = [

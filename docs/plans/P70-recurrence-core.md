@@ -1,6 +1,6 @@
 # Feature Implementation Plan: Recurrence core (recurring tasks)
 
-**Overall Progress:** `48%`
+**Overall Progress:** `70%`
 
 **Tracking issue:** [#70](https://github.com/hydraInsurgent/Tasklog/issues/70)
 **Branch:** `feature/recurrence-core-#70`
@@ -85,12 +85,12 @@ MCP: create_task / update_task gain a `recurrence` string param (subset taught i
   - [x] 🟩 2.2 `tools/tasks.ts`: shared `RECURRENCE_DESCRIPTION` (teaches the subset + examples + spawn-on-complete) on `create_task` + `update_task`; header + list_tasks Returns refreshed. No new tool.
   - [x] 🟩 2.3 `api-client.test.ts`: recurrence wire-contract tests + updated the Task sample. Typecheck clean; **91 MCP tests pass** (was 87, +4).
 
-- [ ] 🟥 **Step 3: Web UI - recurrence picker + recurring badge** `[sequential]` → depends on: Step 1 `[UI]`
-  - [ ] 🟥 3.1 `api.ts`: `Task` type gains recurrence/seriesId/isRecurring; `createTask`/`updateTask` carry `recurrence`. `format.ts`: `describeRecurrence(rule)` -> human label ("Every day", "Every 3 days", "Weekly on Mon, Wed", "Monthly on the 15th").
-  - [ ] 🟥 3.2 New `RecurrencePicker` component (None / Daily / Every N days / Weekly + weekday chips / Monthly + day-of-month) that builds the RRULE string; wire into `AddTaskForm` and `EditTaskModal` (a recurrence needs a deadline - surface that inline).
-  - [ ] 🟥 3.3 Recurring badge (a repeat glyph + `describeRecurrence` label/tooltip) on `TaskCard`, the desktop table row, and the task detail page.
-  - [ ] 🟥 3.4 `TasksClient.handleComplete`: after completing a recurring task, refetch the list so the freshly-spawned occurrence appears immediately (don't wait for the poll).
-  - [ ] 🟥 3.5 Frontend tests still green; clean tsc + next build. `describeRecurrence` + `RecurrencePicker` (render/onChange) unit tests if practical.
+- [x] 🟩 **Step 3: Web UI - recurrence picker + recurring badge** `[sequential]` → depends on: Step 1 `[UI]`
+  - [x] 🟩 3.1 `api.ts`: Task gained recurrence/seriesId/isRecurring; create/update carry recurrence (update now surfaces the backend message). `format.ts`: `describeRecurrence`.
+  - [x] 🟩 3.2 `RecurrencePicker` (None / Daily+interval / Weekly+weekday chips / Monthly+day), seeds defaults from the deadline; wired into `AddTaskForm` (resets via key) + `EditTaskModal` (diff-aware, sends the deadline alongside a new recurrence). Disabled + hinted without a deadline.
+  - [x] 🟩 3.3 `RecurringBadge` (Repeat glyph + describeRecurrence tooltip) on `TaskCard`, the desktop row, and the detail page (with label).
+  - [x] 🟩 3.4 `TasksClient.handleComplete`: after a recurring completion, fetch and prepend only the new (unknown-id) occurrence so it shows immediately without disturbing the hide animation.
+  - [x] 🟩 3.5 **73 frontend tests pass** (was 61, +12: describeRecurrence + RecurrencePicker). Clean tsc + next build (verified against a clean tree). Palette/focus/contrast per UI-SPEC; weekday chips wrap in the narrow add-form column.
 
 - [ ] 🟥 **Step 4: Docs + CHANGELOG** `[sequential]` → depends on: Steps 1-3
   - [ ] 🟥 4.1 `architecture.md`: Recurrence + SeriesId columns in the data model; `RecurrenceRule` helper + the new `Services/` folder; recurrence on create/update + spawn-on-complete behavior. `engineering-guidelines.md`: note the pure-static-helper precedent extended (Services/ folder, still no DI service layer). `product-design.md`: tasks can recur.

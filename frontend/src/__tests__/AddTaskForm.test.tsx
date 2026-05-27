@@ -24,8 +24,8 @@ describe('AddTaskForm', () => {
     await userEvent.click(screen.getByRole('button', { name: /add task/i }))
 
     await waitFor(() => {
-      // 5th arg is the priority (default P4 = 4); 6th is the description (none).
-      expect(onAdd).toHaveBeenCalledWith('Buy milk', undefined, 1, undefined, 4, undefined)
+      // 5th arg priority (default P4 = 4); 6th description (none); 7th recurrence (none).
+      expect(onAdd).toHaveBeenCalledWith('Buy milk', undefined, 1, undefined, 4, undefined, undefined)
     })
   })
 

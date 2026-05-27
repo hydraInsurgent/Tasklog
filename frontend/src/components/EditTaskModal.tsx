@@ -12,6 +12,7 @@ import {
   getTask,
 } from "@/lib/api";
 import { labelColor, PRIORITY_OPTIONS } from "@/lib/format";
+import RecurrencePicker from "./RecurrencePicker";
 
 interface Props {
   // The task being edited. The modal is rendered only when this is non-null.
@@ -49,6 +50,8 @@ export default function EditTaskModal({ task, projects, allLabels, onSaved, onCl
   const [labelIds, setLabelIds] = useState<number[]>(task.labels.map((l) => l.id));
   const [priority, setPriority] = useState(task.priority);
   const [description, setDescription] = useState(task.description ?? "");
+  // Recurrence rule (RRULE-shaped) or null. Cleared if the deadline is removed.
+  const [recurrence, setRecurrence] = useState<string | null>(task.recurrence);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -102,24 +105,30 @@ export default function EditTaskModal({ task, projects, allLabels, onSaved, onCl
     // Normalise blank -> null on both sides so "still no description" isn't a change.
     const newDescription = description.trim() || null;
     const descriptionChanged = newDescription !== (task.description ?? null);
+    // Recurrence needs a deadline to anchor from; clearing the deadline also clears it.
+    const newRecurrence = newDeadline ? recurrence : null;
+    const recurrenceChanged = newRecurrence !== (task.recurrence ?? null);
     const projectChanged = projectId !== origProjectId;
     const labelsChanged =
       origLabelIds.length !== newLabelIds.length ||
       origLabelIds.some((id, i) => id !== newLabelIds[i]);
 
-    if (!titleChanged && !deadlineChanged && !priorityChanged && !descriptionChanged && !projectChanged && !labelsChanged) {
+    if (!titleChanged && !deadlineChanged && !priorityChanged && !descriptionChanged && !recurrenceChanged && !projectChanged && !labelsChanged) {
       onClose(); // nothing to do
       return;
     }
 
     setSaving(true);
     try {
-      if (titleChanged || deadlineChanged || priorityChanged || descriptionChanged) {
-        const body: { title?: string; deadline?: string | null; priority?: number; description?: string | null } = {};
+      if (titleChanged || deadlineChanged || priorityChanged || descriptionChanged || recurrenceChanged) {
+        const body: { title?: string; deadline?: string | null; priority?: number; description?: string | null; recurrence?: string | null } = {};
         if (titleChanged) body.title = trimmed;
-        if (deadlineChanged) body.deadline = newDeadline;
+        // Send the deadline whenever the recurrence is being set, so the backend
+        // sees the anchor in the same PATCH (it processes deadline before recurrence).
+        if (deadlineChanged || (recurrenceChanged && newRecurrence)) body.deadline = newDeadline;
         if (priorityChanged) body.priority = priority;
         if (descriptionChanged) body.description = newDescription;
+        if (recurrenceChanged) body.recurrence = newRecurrence;
         await updateTask(task.id, body);
       }
       if (projectChanged) {
@@ -233,6 +242,14 @@ export default function EditTaskModal({ task, projects, allLabels, onSaved, onCl
                 )}
               </div>
             </div>
+
+            {/* Recurrence - anchored on the deadline above (disabled without one). */}
+            <RecurrencePicker
+              value={recurrence}
+              onChange={setRecurrence}
+              deadline={deadline || undefined}
+              disabled={saving}
+            />
 
             {/* Project */}
             {projects.length > 0 && (
