@@ -1,6 +1,6 @@
 # Feature Implementation Plan: Recurrence core (recurring tasks)
 
-**Overall Progress:** `85%`
+**Overall Progress:** `100%`
 
 **Tracking issue:** [#70](https://github.com/hydraInsurgent/Tasklog/issues/70)
 **Branch:** `feature/recurrence-core-#70`
@@ -96,11 +96,18 @@ MCP: create_task / update_task gain a `recurrence` string param (subset taught i
   - [x] 🟩 4.1 `architecture.md`: Recurrence + SeriesId columns + isRecurring; Services/ folder + RecurrenceRule; recurrence on create/update + spawn-on-complete endpoint note; MCP prose + repo tree (RecurrencePicker/RecurringBadge). `engineering-guidelines.md`: pure-static-helper-in-Services precedent (not a DI service). `product-design.md`: tasks can recur + tool count 20->21 fix + recurrence in the MCP line.
   - [x] 🟩 4.2 `CHANGELOG.md`: v2.14.0 section. `coverage.md`: counts (190/91/73) + RecurrenceRule + TasksController-recurrence + MCP + frontend checklists.
 
-- [ ] 🟥 **Step 5: Deploy + smoke test** `[sequential]` → depends on: Step 4
-  - [ ] 🟥 5.1 Phone reachable; capture live task count. Stash-deploy-pop (user WIP untouched). `./scripts/deploy-phone.sh`. CONFIRM the migration applied with zero data loss.
-  - [ ] 🟥 5.2 Live curl: create a recurring task (daily, with a deadline) -> 201 with `recurrence`/`seriesId`/`isRecurring`; complete it -> verify a new open occurrence exists with the deadline advanced +1 day, the same `seriesId`, and a completion comment on the original; create recurrence-without-deadline -> 400; bad rule -> 400. Clean up the smoke rows.
+- [x] 🟩 **Step 5: Deploy + smoke test** `[sequential]` → depends on: Step 4
+  - [x] 🟩 5.1 Phone reachable; baseline 25 tasks / 9 projects. Stash-deploy-pop (WIP untouched). Deploy exit 0, all 4 services fresh-restarted, migration ran. Post-migration 25/9 - zero data loss.
+  - [x] 🟩 5.2 Live curl all green: create recurring -> 201 (recurrence/seriesId/isRecurring); recurrence-without-deadline -> 400; FREQ=YEARLY -> 400; complete -> spawned occurrence (id 63) same seriesId, deadline +1 day, open, while the original stays completed; completion comment "Completed 2026-05-27, next occurrence due 2026-05-28." Smoke rows cleaned up (back to 25).
   - [ ] 🟥 5.3 DEFERRED user spot-check (non-blocking): set a recurrence in the web add form, complete it, watch the next occurrence appear; in Claude, "make task N repeat every weekday".
 
 ## Outcomes
 
-<!-- Fill in after execution: decision-relevant deltas only. What changed vs. planned? Key decisions made? Assumptions invalidated? -->
+Built as planned, no scope drift. The biggest version of the program; all five steps landed cleanly. 190 backend / 91 MCP / 73 frontend tests pass; live smoke confirmed the full spawn-on-complete cycle on the phone with zero data loss.
+
+- **No new architecture.** The recurrence logic is a pure static `RecurrenceRule` helper under a new `Services/` folder - the same shape as `ComputeDueStatus`, NOT a DI service layer. Because it advances from the passed-in deadline (Todoist semantics) it never reads the clock, sidestepping the `DateTime.Now`/`UtcNow` deviation (#18). Recorded in engineering-guidelines.
+- **Spawn hook is the single `Complete` endpoint.** Both the web checkbox and MCP `set_task_completion` route through `PATCH /api/tasks/{id}/complete`; the spawn + completion-comment live there. An open->completed transition guard prevents double-spawning on re-completion. Bulk-complete deliberately does not spawn (documented limitation).
+- **Canonical storage.** Rules are validated and re-serialized on write (`freq=weekly;byday=fr,mo` -> `FREQ=WEEKLY;BYDAY=MO,FR`), so the column is always canonical and we never persist a rule the expander can't advance (unsupported grammar -> 400).
+- **Contract unchanged for `Complete`.** It still returns the completed task; the web `handleComplete` fetches and prepends only the new (unknown-id) occurrence so it appears instantly without disturbing the hide animation.
+- **Deferred (non-blocking):** Step 5.3 user spot-check, consistent with prior versions.
+- **Sets up the rest of the program:** v2.15.0 (advanced grammar) extends `RecurrenceRule` + the picker; v2.17.0 (habit tracking) reads the per-completion comments + the SeriesId history this lays down.
