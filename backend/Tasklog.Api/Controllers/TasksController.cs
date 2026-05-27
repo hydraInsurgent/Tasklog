@@ -122,8 +122,9 @@ namespace Tasklog.Api.Controllers
             // (the historical newest-first behaviour). Deadline sorts nulls-last in
             // both directions (the `== null` key orders non-null before null), and
             // every sort breaks ties on CreatedAt desc for stable ordering.
+            var sortKey = filter.Sort?.ToLowerInvariant();
             var descending = !string.Equals(filter.Order, "asc", StringComparison.OrdinalIgnoreCase);
-            IOrderedQueryable<TaskModel> ordered = (filter.Sort?.ToLowerInvariant()) switch
+            IOrderedQueryable<TaskModel> ordered = sortKey switch
             {
                 "deadline" => descending
                     ? query.OrderBy(t => t.Deadline == null).ThenByDescending(t => t.Deadline)
@@ -140,7 +141,7 @@ namespace Tasklog.Api.Controllers
             // Stable tiebreak so equal sort keys (e.g. same deadline/priority) have a
             // deterministic order. Skip it for the created sort - CreatedAt is already
             // the key there (and re-applying it would be redundant).
-            IQueryable<TaskModel> sorted = filter.Sort?.ToLowerInvariant() is "deadline" or "priority"
+            IQueryable<TaskModel> sorted = sortKey is "deadline" or "priority"
                 ? ordered.ThenByDescending(t => t.CreatedAt)
                 : ordered;
 
