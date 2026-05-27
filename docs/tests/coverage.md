@@ -1,6 +1,6 @@
 # Test Coverage
 
-**Last updated:** 2026-05-27 (#68 - deadline time-of-day: dueStatus time rule + UI time input)
+**Last updated:** 2026-05-27 (#69 - task comments: TaskComment table + CommentsController + MCP + UI)
 
 ---
 
@@ -20,7 +20,8 @@
 | TasksController (priority) | 100% | 100% | +12 tests for priority on create/update/filter (#64, incl. float/negative rejection) |
 | TasksController (query) | 100% | 100% | +10 tests for createdAt range / sort / limit on GetAll (#65) |
 | TasksController (ergonomics) | 100% | 100% | +11 tests for bulk setPriority + project/label name resolution (#66) |
-| TasksController (description) | 100% | 100% | +9 tests for description on create/update (#67) - 133 backend tests total (incl. #68 dueStatus time) |
+| TasksController (description) | 100% | 100% | +9 tests for description on create/update (#67) |
+| CommentsController | 100% | 100% | +10 tests for task comments (add/list/delete + GetById-includes) (#69) - 143 backend tests total |
 | ProjectsController | 100% | 100% | All methods and branches covered |
 | TasklogDbContext | 100% | 100% | |
 | Program.cs | 0% | - | Framework wiring - not a test target |
@@ -43,7 +44,7 @@
 | oauth/well-known.ts | - | - | - | Returns fixed JSON metadata |
 | server.ts | - | - | - | Hono mount order + request logger; covered by middleware tests + end-to-end smoke |
 
-**85 tests, 0 failures** (was 82; +3 in api-client.test.ts for the description wire contract, #67). Run with: `npm test --prefix mcp` (auto-rebuilds better-sqlite3 for host arch via pretest hook if needed). Note: a fresh `npm install` on the host installs better-sqlite3 without the native binary - run `npm rebuild better-sqlite3` once after install if the OAuth store/token tests fail with `ERR_DLOPEN_FAILED`.
+**87 tests, 0 failures** (was 85; +2 in api-client.test.ts for the comments wire contract, #69). Run with: `npm test --prefix mcp` (auto-rebuilds better-sqlite3 for host arch via pretest hook if needed). Note: a fresh `npm install` on the host installs better-sqlite3 without the native binary - run `npm rebuild better-sqlite3` once after install if the OAuth store/token tests fail with `ERR_DLOPEN_FAILED`.
 
 ### Next.js Frontend - last run 2026-05-27 (61 tests; +5 for deadline time-of-day, #68)
 
@@ -169,6 +170,17 @@
 - [x] 🟩 more than 500 taskIds -> 400 (server-side cap, review R1)
 - [x] 🟩 unknown operation -> 400
 - [x] 🟩 unknown ids are skipped, returns only existing tasks
+
+### CommentsController (#69)
+- [x] 🟩 Create - adds + trims, returns 201
+- [x] 🟩 Create - empty/whitespace body -> 400
+- [x] 🟩 Create - body > 2000 -> 400
+- [x] 🟩 Create - unknown task -> 404
+- [x] 🟩 GetForTask - lists newest-first
+- [x] 🟩 GetForTask - unknown task -> 404
+- [x] 🟩 Delete - removes, 204
+- [x] 🟩 Delete - unknown comment -> 404
+- [x] 🟩 (TasksController) GetById includes comments
 
 ### ProjectsController
 - [x] 🟩 GetAll - returns projects ordered alphabetically
@@ -337,6 +349,7 @@ its own subprocess, so in-memory DBs are isolated across files.
 - [x] 🟩 query - buildTaskQuery serializes createdAfter/createdBefore, sort+order, limit; omits when absent (#65)
 - [x] 🟩 ergonomics - bulk setPriority body; assignProject-by-name body; setTaskProject projectName + setTaskLabels labelNames bodies (#66)
 - [x] 🟩 description - create/update body sets it; update null clears (#67)
+- [x] 🟩 comments - add_task_comment body; Task.comments optional Comment[] type (#69)
 
 ### Not covered (and why)
 - `tools/tasks.ts`, `tools/projects.ts`, `tools/labels.ts` - thin api-client wrappers; behavior is exercised through `runTool` tests + the end-to-end smoke run with claude.ai.

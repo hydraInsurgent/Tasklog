@@ -1,10 +1,11 @@
 /**
  * MCP tools for task operations.
  *
- * Twelve tools wrap the task-related Tasklog API endpoints: eight single-task
- * tools plus four bulk tools (bulk_set_completion, bulk_assign_to_project,
- * bulk_set_deadline, bulk_set_priority) that apply one operation to many tasks
- * in a single transactional call. The completion toggle is a single tool
+ * Thirteen tools wrap the task-related Tasklog API endpoints: nine single-task
+ * tools (incl. add_task_comment) plus four bulk tools (bulk_set_completion,
+ * bulk_assign_to_project, bulk_set_deadline, bulk_set_priority) that apply one
+ * operation to many tasks in a single transactional call. The completion toggle
+ * is a single tool
  * (set_task_completion) that takes a boolean - earlier versions split it into
  * separate complete_task and uncomplete_task tools, but the LLM picks the right
  * value from natural language reliably and one tool reduces the surface area.
@@ -139,7 +140,8 @@ export function registerTaskTools(server: McpServer): void {
       title: 'Get Task',
       description:
         'Fetch a single task by id. Returns: the task (same shape as ' +
-        'list_tasks items, including dueStatus) or 404 if not found.',
+        'list_tasks items, including dueStatus) plus its comments[] ' +
+        '({ id, body, createdAt }, newest first), or 404 if not found.',
       inputSchema: {
         id: z.number().int().positive().describe('The task id.'),
       },
@@ -388,6 +390,28 @@ export function registerTaskTools(server: McpServer): void {
     },
     async ({ taskId, labelIds, labelNames }) =>
       runTool('set_task_labels', () => api.setTaskLabels(taskId, { labelIds, labelNames })),
+  );
+
+  server.registerTool(
+    'add_task_comment',
+    {
+      title: 'Add Task Comment',
+      description:
+        'Add a timestamped free-text comment/note to a task. Use when the user ' +
+        'says "add a note to X", "log progress on X", "comment on X". Read a ' +
+        "task's comments via get_task. Returns: the created comment " +
+        '{ id, body, createdAt }.',
+      inputSchema: {
+        taskId: z.number().int().positive().describe('The task id to comment on.'),
+        body: z
+          .string()
+          .min(1)
+          .max(2000)
+          .describe('The comment text (1-2000 chars).'),
+      },
+    },
+    async ({ taskId, body }) =>
+      runTool('add_task_comment', () => api.addTaskComment(taskId, body)),
   );
 
   // --- Bulk tools (act on many tasks in one transactional call) ---

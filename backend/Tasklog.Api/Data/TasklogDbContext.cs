@@ -10,6 +10,7 @@ namespace Tasklog.Api.Data
         public DbSet<TaskModel> Tasks => Set<TaskModel>();
         public DbSet<Project> Projects => Set<Project>();
         public DbSet<Label> Labels => Set<Label>();
+        public DbSet<TaskComment> Comments => Set<TaskComment>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -25,6 +26,13 @@ namespace Tasklog.Api.Data
             modelBuilder.Entity<TaskModel>()
                 .Property(t => t.Priority)
                 .HasDefaultValue(4);
+
+            // A task's comments are deleted with the task (cascade via the FK).
+            modelBuilder.Entity<TaskComment>()
+                .HasOne(c => c.Task)
+                .WithMany(t => t.Comments)
+                .HasForeignKey(c => c.TaskId)
+                .OnDelete(DeleteBehavior.Cascade);
         }
     }
 }

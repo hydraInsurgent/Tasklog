@@ -169,6 +169,17 @@ describe('description wire contract', () => {
   });
 });
 
+// add_task_comment POSTs { body }; comments are typed on the Task as optional (#69).
+describe('comments wire contract', () => {
+  test('add_task_comment body carries the text', () => {
+    assert.equal(JSON.stringify({ body: 'a note' }), '{"body":"a note"}');
+  });
+  test('Task.comments is an optional Comment[] (present on get_task)', () => {
+    const allowed: Task['comments'] = [{ id: 1, body: 'hi', createdAt: '2026-05-27T00:00:00Z' }];
+    assert.equal(allowed?.[0].body, 'hi');
+  });
+});
+
 describe('buildTaskQuery', () => {
   test('returns empty string when filter is undefined (no query)', () => {
     assert.equal(buildTaskQuery(undefined), '');

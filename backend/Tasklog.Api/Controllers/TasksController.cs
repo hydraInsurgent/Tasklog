@@ -162,8 +162,11 @@ namespace Tasklog.Api.Controllers
         public async Task<IActionResult> GetById(int id)
         {
             // FindAsync does not support Include, so we use FirstOrDefaultAsync here.
+            // Comments are loaded only here (the single-task view), not in GetAll,
+            // to keep list payloads small. Newest comment first.
             var task = await _context.Tasks
                 .Include(t => t.Labels)
+                .Include(t => t.Comments.OrderByDescending(c => c.CreatedAt))
                 .FirstOrDefaultAsync(t => t.Id == id);
 
             if (task is null)
