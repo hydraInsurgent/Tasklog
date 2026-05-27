@@ -1,6 +1,6 @@
 # Feature Implementation Plan: Task comments + completion-log foundation
 
-**Overall Progress:** `85%`
+**Overall Progress:** `100%`
 
 **Tracking issue:** [#69](https://github.com/hydraInsurgent/Tasklog/issues/69)
 **Branch:** `feature/task-comments-#69`
@@ -60,11 +60,17 @@ MCP: add_task_comment(taskId, body) -> the created comment; get_task includes co
   - [x] 🟩 4.1 architecture.md: Comments table + comments endpoints + GetById-includes; MCP tool count 20 -> 21 (prose + tree). product-design.md: tasks can have comments.
   - [x] 🟩 4.2 CHANGELOG.md: v2.13.0 section. coverage.md: counts (143 backend / 87 MCP / 61 frontend) + CommentsController + comments-wire checklists.
 
-- [ ] 🟥 **Step 5: Deploy + smoke test** `[sequential]` → depends on: Step 4
-  - [ ] 🟥 5.1 Check phone reachable (dozes); capture live task count. Stash frontend WIP, `./scripts/deploy-phone.sh`, restore (pop) after. CONFIRM the migration applied with zero data loss (count unchanged).
-  - [ ] 🟥 5.2 Live curl: add a comment (201), GET lists it, add empty -> 400, add to unknown task -> 404, DELETE (204), get_task/{id} includes comments. Clean up.
+- [x] 🟩 **Step 5: Deploy + smoke test** `[sequential]` → depends on: Step 4
+  - [x] 🟩 5.1 Phone reachable; baseline 25 tasks / 9 projects. Stash-deploy-pop (WIP DoppelWidget untouched). Deploy exit 0, all 4 services fresh-restarted, migration ran. Post-migration count 25/9 - zero data loss.
+  - [x] 🟩 5.2 Live curl all green: add 201 (body trimmed, createdAt +05:30), GET 200 newest-first, empty -> 400, unknown task -> 404, GetById includes comments[], DELETE 204, re-DELETE 404. Smoke comments cleaned up (task 51 back to []).
   - [ ] 🟥 5.3 DEFERRED user spot-check (non-blocking): web UI add/delete a comment on a task's detail page; in Claude, "add a note to task N".
 
 ## Outcomes
 
-<!-- Fill in after execution: decision-relevant deltas only. What changed vs. planned? Key decisions made? Assumptions invalidated? -->
+Built exactly as planned, no scope drift. New `TaskComment` entity + `CommentsController` sub-resource, MCP `add_task_comment` + comments in `get_task`, web comments section on the detail page. 143 backend / 87 MCP / 61 frontend tests pass.
+
+- **Step 5.3 (user spot-check) left deferred** - non-blocking, consistent with prior versions. All behavior verified at API + unit + live-curl.
+- **Decision 4 held:** MCP gets add + read only (no delete tool). Delete stays UI-only; cascade FK handles task-deletion cleanup.
+- **Live smoke confirmed timezone correctness** - `createdAt` returns `+05:30` (Asia/Kolkata), so comment timestamps read in user-local time, same as deadlines.
+- **No new architecture pattern** - first new top-level entity since Labels (#30), reused the same EF + controller + `[JsonIgnore]` back-nav conventions. Migration -> minor bump (v2.13.0).
+- **Foundation for v2.17.0 habit log** is in place: a per-task timestamped log the completion tracker can append to.
