@@ -1,6 +1,6 @@
 # Test Coverage
 
-**Last updated:** 2026-05-27 (#71 - advanced recurrence grammar: nth-weekday / from-end / intervals / UNTIL+COUNT, v2.14.1)
+**Last updated:** 2026-05-27 (#72 - natural-language quick-add: quickAdd parser + QuickAddInput, v2.15.0)
 
 ---
 
@@ -48,7 +48,7 @@
 
 **92 tests, 0 failures** (was 91; +1 in api-client.test.ts for the advanced recurrence rule strings, #71). Run with: `npm test --prefix mcp` (auto-rebuilds better-sqlite3 for host arch via pretest hook if needed). Note: a fresh `npm install` on the host installs better-sqlite3 without the native binary - run `npm rebuild better-sqlite3` once after install if the OAuth store/token tests fail with `ERR_DLOPEN_FAILED`.
 
-### Next.js Frontend - last run 2026-05-27 (81 tests; +8 for advanced recurrence: describeRecurrence + RecurrencePicker controls, #71)
+### Next.js Frontend - last run 2026-05-27 (118 tests; +37 for quick-add: quickAdd parser + QuickAddInput + AddTaskForm integration, #72)
 
 | Component | Statements | Branches | Lines | Uncovered |
 |---|---|---|---|---|
@@ -298,6 +298,14 @@
 - [x] 🟩 RecurrencePicker - renders an initial rule; emits null on "Does not repeat"
 - [x] 🟩 (#71) describeRecurrence - nth-weekday / last weekday / last day / from-end day / weekly+monthly intervals / "until <date>" / "for N times"
 - [x] 🟩 (#71) RecurrencePicker - builds nth-weekday (seeded 4th Wed) + last-day rules; appends COUNT via the Ends control; reads an nth-weekday rule back into the ordinal/weekday dropdowns
+
+### quickAdd + QuickAddInput (natural-language quick-add, #72)
+- [x] 🟩 parseQuickAdd - #project (known)/@label(s)/pN tokens; unknown #project left in title; last pN wins; plain title untouched
+- [x] 🟩 parseQuickAdd - dates: date-only vs timed (isCertain), absolute ("jan 27"), offset ("in 3 days"); injected refDate
+- [x] 🟩 parseQuickAdd - every recurrence phrase -> expected RRULE; "until"->UNTIL; "[for] N times"->COUNT; cleanedTitle stripping; token spans
+- [x] 🟩 parseQuickAdd - bare multi-weekday ("friday and saturday") -> FREQ=WEEKLY;BYDAY=FR,SA;UNTIL=<last>, anchored on the soonest; "every ..." stays ongoing; single weekday stays one-off
+- [x] 🟩 AddTaskForm - quick-add tokens parse on submit (#Work + p1 -> project/priority, cleaned title)
+- [x] 🟩 QuickAddInput - tint span for a known #project (none for unknown); #/@ autosuggest; arrow-key nav + Enter select; Repeat chip for a recurrence; remove (unlink) a chip
 
 ### deadlinePresets (resolvePreset, injected `now`)
 - [x] 🟩 today - returns today's local date

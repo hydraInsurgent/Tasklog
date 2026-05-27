@@ -4,8 +4,10 @@ import { useState, useEffect, useRef, FormEvent } from "react";
 import { Plus } from "lucide-react";
 import { Project, Label, createLabel } from "@/lib/api";
 import { labelColor, PRIORITY_OPTIONS } from "@/lib/format";
+import { parseQuickAdd } from "@/lib/quickAdd";
 import LabelChip from "./LabelChip";
 import RecurrencePicker from "./RecurrencePicker";
+import QuickAddInput from "./QuickAddInput";
 
 interface Props {
   // Called by the parent when the form submits. Parent handles the API call
@@ -52,6 +54,9 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
   const labelInputRef = useRef<HTMLInputElement>(null);
   // Ref to the suggestions list so we can avoid closing it when clicking inside.
   const suggestionsRef = useRef<HTMLUListElement>(null);
+  // Last recurrence rule applied from the title, so we only remount the picker when the
+  // parsed recurrence actually changes (not on every keystroke).
+  const lastParsedRecurrence = useRef<string | undefined>(undefined);
 
   // Whether to render the labels field at all.
   const showLabelsField = allLabels && allLabels.length > 0;
@@ -60,6 +65,44 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
   useEffect(() => {
     setSelectedProjectId(defaultProjectId != null ? String(defaultProjectId) : "inbox");
   }, [defaultProjectId]);
+
+  // Live-reflect quick-add tokens into the structured controls as you type, so the
+  // Deadline / Project / Priority boxes show what the title captured (the in-field
+  // highlight + chips show it too - both, per request). Only a control whose token is
+  // present in the title is set, so manual edits to dimensions the title doesn't mention
+  // are preserved. Recurrence is shown via the chip, not pushed into the picker (which
+  // owns its own state after mount).
+  useEffect(() => {
+    if (!title.trim()) return;
+    const parsed = parseQuickAdd(title, projects ?? []);
+
+    // Deadline: an explicit parsed date fills the box; a recurrence with no date anchors
+    // to today (only if the box is empty) so the box shows it and the rule has an anchor.
+    if (parsed.deadline) {
+      const [d, t] = parsed.deadline.split("T");
+      setDeadline(d);
+      setDeadlineTime(t ? t.slice(0, 5) : "");
+    } else if (parsed.recurrence) {
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      setDeadline((prev) => prev || today);
+    }
+
+    if (parsed.priority) setPriority(parsed.priority);
+    if (parsed.projectName && projects) {
+      const match = projects.find((p) => p.name.toLowerCase() === parsed.projectName!.toLowerCase());
+      if (match) setSelectedProjectId(String(match.id));
+    }
+
+    // Recurrence: reflect it into the picker by remounting it with the parsed rule (the
+    // picker owns its sub-state after mount). Only when the parsed rule actually changes,
+    // so manual picker edits survive subsequent typing that doesn't touch the recurrence.
+    if (parsed.recurrence && parsed.recurrence !== lastParsedRecurrence.current) {
+      lastParsedRecurrence.current = parsed.recurrence;
+      setRecurrence(parsed.recurrence);
+      setPickerKey((k) => k + 1);
+    }
+  }, [title, projects]);
 
   // Recompute suggestions whenever the input text or selected labels change.
   useEffect(() => {
@@ -108,6 +151,19 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
     setSelectedLabels((prev) => prev.filter((l) => l.id !== labelId));
   }
 
+  // Resolve a label name to an existing Label (case-insensitive) or create it.
+  // Shared by the label field and quick-add @tokens. Returns null on failure.
+  async function resolveOrCreateLabel(name: string): Promise<Label | null> {
+    if (!allLabels) return null;
+    const existing = allLabels.find((l) => l.name.toLowerCase() === name.toLowerCase());
+    if (existing) return existing;
+    try {
+      return await createLabel(name, allLabels.length % 10);
+    } catch {
+      return null;
+    }
+  }
+
   // Handle Enter key in the label input: select first suggestion or create a new label.
   async function handleLabelKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key !== "Enter") return;
@@ -153,21 +209,50 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
       return;
     }
 
-    const projectId = selectedProjectId === "inbox" ? null : parseInt(selectedProjectId, 10);
-    const labelIds = selectedLabels.length > 0 ? selectedLabels.map((l) => l.id) : undefined;
-
     setLoading(true);
     try {
-      // Combine the date with an optional time. No date -> no deadline. Date + time
-      // -> a timed deadline; date alone -> date-only (backend stores midnight).
-      const deadlineValue = deadline
+      // Parse the title as a Todoist-style quick-add line. A plain title yields no
+      // tokens and everything falls through to the structured controls below, so
+      // this is transparent for users who don't use the syntax.
+      const parsed = parseQuickAdd(title, projects ?? []);
+      const finalTitle = parsed.cleanedTitle || title.trim();
+
+      // The structured controls' deadline (date + optional time). A parsed date wins.
+      const controlDeadline = deadline
         ? deadlineTime
           ? `${deadline}T${deadlineTime}`
           : deadline
         : undefined;
-      // Recurrence needs a deadline to anchor from; drop it if the deadline was cleared.
-      const recurrenceValue = deadlineValue ? recurrence ?? undefined : undefined;
-      await onAdd(title.trim(), deadlineValue, projectId, labelIds, priority, description.trim() || undefined, recurrenceValue);
+      let finalDeadline = parsed.deadline ?? controlDeadline;
+
+      // Recurrence: a parsed "every ..." wins, else the picker (which only allows a
+      // rule when a deadline is set). A recurrence needs a deadline anchor - if none
+      // was given, default to today (date-only) so the series can start.
+      const finalRecurrence = parsed.recurrence ?? (controlDeadline ? recurrence ?? undefined : undefined);
+      if (finalRecurrence && !finalDeadline) {
+        const now = new Date();
+        finalDeadline = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      }
+
+      // Priority: a parsed pN wins, else the control (default P4).
+      const finalPriority = parsed.priority ?? priority;
+
+      // Project: a recognized #project wins, else the dropdown selection.
+      let finalProjectId: number | null = selectedProjectId === "inbox" ? null : parseInt(selectedProjectId, 10);
+      if (parsed.projectName && projects) {
+        const match = projects.find((p) => p.name.toLowerCase() === parsed.projectName!.toLowerCase());
+        if (match) finalProjectId = match.id;
+      }
+
+      // Labels: those picked in the field plus any @tokens (resolved/created), deduped.
+      const labelObjs: Label[] = [...selectedLabels];
+      for (const name of parsed.labelNames ?? []) {
+        const label = await resolveOrCreateLabel(name);
+        if (label && !labelObjs.some((l) => l.id === label.id)) labelObjs.push(label);
+      }
+      const labelIds = labelObjs.length > 0 ? labelObjs.map((l) => l.id) : undefined;
+
+      await onAdd(finalTitle, finalDeadline, finalProjectId, labelIds, finalPriority, description.trim() || undefined, finalRecurrence);
       // Clear the form on success.
       setTitle("");
       setDeadline("");
@@ -175,6 +260,7 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
       setPriority(4);
       setDescription("");
       setRecurrence(null);
+      lastParsedRecurrence.current = undefined;
       setPickerKey((k) => k + 1);
       setSelectedLabels([]);
       setLabelInput("");
@@ -207,14 +293,16 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
           >
             Title
           </label>
-          <input
+          {/* Quick-add field: recognizes a date, "every ..." recurrence, #project,
+              @label and pN inline and highlights them as you type (parsed on submit). */}
+          <QuickAddInput
             id="task-title"
-            type="text"
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="What needs to be done?"
-            className="w-full px-3 py-2 border border-zinc-200 rounded-md text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-shadow duration-150"
+            onChange={setTitle}
+            projects={projects ?? []}
+            labels={allLabels ?? []}
             disabled={loading}
+            placeholder={'e.g. "Email Mark friday #Work @urgent p1"'}
           />
           {/* Inline error placed directly below the field (error-placement rule). */}
           {error && (

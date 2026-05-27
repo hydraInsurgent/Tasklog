@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| _none_ | | | |
+| [P72-natural-language-quick-add.md](plans/P72-natural-language-quick-add.md) | #72 | feature/natural-language-recurrence-#72 | In Progress |
 
 ---
 

@@ -29,6 +29,19 @@ describe('AddTaskForm', () => {
     })
   })
 
+  it('parses quick-add tokens from the title on submit (#project + pN)', async () => {
+    const onAdd = jest.fn().mockResolvedValue(undefined)
+    render(<AddTaskForm onAdd={onAdd} projects={projects} />)
+
+    await userEvent.type(screen.getByLabelText(/title/i), 'Email Mark #Work p1')
+    await userEvent.click(screen.getByRole('button', { name: /add task/i }))
+
+    await waitFor(() => {
+      // #Work -> projectId 1, p1 -> priority 1, tokens stripped from the title.
+      expect(onAdd).toHaveBeenCalledWith('Email Mark', undefined, 1, undefined, 1, undefined, undefined)
+    })
+  })
+
   it('clears title and deadline fields after successful submission', async () => {
     const onAdd = jest.fn().mockResolvedValue(undefined)
     render(<AddTaskForm onAdd={onAdd} />)
