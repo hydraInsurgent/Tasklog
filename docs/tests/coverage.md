@@ -1,6 +1,6 @@
 # Test Coverage
 
-**Last updated:** 2026-05-27 (#65 - list_tasks query completeness: createdAt range, sort, limit)
+**Last updated:** 2026-05-27 (#66 - agent ergonomics: bulk_set_priority + name resolution)
 
 ---
 
@@ -18,7 +18,8 @@
 | TaskModel.ComputeDueStatus | 100% | 100% | +11 tests for the dueStatus bucket logic (#61) |
 | TasksController.Bulk | 100% | 100% | +13 tests for POST /api/tasks/bulk (#63, incl. the 500-id cap) |
 | TasksController (priority) | 100% | 100% | +12 tests for priority on create/update/filter (#64, incl. float/negative rejection) |
-| TasksController (query) | 100% | 100% | +10 tests for createdAt range / sort / limit on GetAll (#65) - 109 backend tests total |
+| TasksController (query) | 100% | 100% | +10 tests for createdAt range / sort / limit on GetAll (#65) |
+| TasksController (ergonomics) | 100% | 100% | +11 tests for bulk setPriority + project/label name resolution (#66) - 120 backend tests total |
 | ProjectsController | 100% | 100% | All methods and branches covered |
 | TasklogDbContext | 100% | 100% | |
 | Program.cs | 0% | - | Framework wiring - not a test target |
@@ -41,7 +42,7 @@
 | oauth/well-known.ts | - | - | - | Returns fixed JSON metadata |
 | server.ts | - | - | - | Hono mount order + request logger; covered by middleware tests + end-to-end smoke |
 
-**78 tests, 0 failures** (was 74; +4 in api-client.test.ts for the createdAt-range/sort/limit query serialization, #65). Run with: `npm test --prefix mcp` (auto-rebuilds better-sqlite3 for host arch via pretest hook if needed). Note: a fresh `npm install` on the host installs better-sqlite3 without the native binary - run `npm rebuild better-sqlite3` once after install if the OAuth store/token tests fail with `ERR_DLOPEN_FAILED`.
+**82 tests, 0 failures** (was 78; +4 in api-client.test.ts for the bulk setPriority + projectName/labelNames request bodies, #66). Run with: `npm test --prefix mcp` (auto-rebuilds better-sqlite3 for host arch via pretest hook if needed). Note: a fresh `npm install` on the host installs better-sqlite3 without the native binary - run `npm rebuild better-sqlite3` once after install if the OAuth store/token tests fail with `ERR_DLOPEN_FAILED`.
 
 ### Next.js Frontend - last run 2026-05-26
 
@@ -128,6 +129,18 @@
 - [x] 🟩 limit - caps to the most-recent N (respects default sort)
 - [x] 🟩 limit < 1 -> 400
 - [x] 🟩 default call - all rows, newest-first (unchanged behaviour)
+
+### TasksController - agent ergonomics (#66)
+- [x] 🟩 bulk setPriority - sets priority on all
+- [x] 🟩 bulk setPriority - out of range (0, 5) -> 400
+- [x] 🟩 bulk setPriority - missing priority -> 400
+- [x] 🟩 AssignProject by name - resolves (case-insensitive)
+- [x] 🟩 AssignProject by name - ambiguous (2 matches) -> 400
+- [x] 🟩 AssignProject by name - missing -> 400
+- [x] 🟩 AssignProject - name wins over a (wrong) id
+- [x] 🟩 SetLabels by name - resolves + applies
+- [x] 🟩 SetLabels by name - unknown name -> 400
+- [x] 🟩 bulk assignProject by name - resolves
 
 ### TasksController.Bulk (POST /api/tasks/bulk)
 - [x] 🟩 complete true - sets IsCompleted + CompletedAt on all
@@ -305,6 +318,7 @@ its own subprocess, so in-memory DBs are isolated across files.
 - [x] 🟩 priority - create/update body carries priority (#64)
 - [x] 🟩 priority - buildTaskQuery serializes priorities as repeated keys + omits empty (#64)
 - [x] 🟩 query - buildTaskQuery serializes createdAfter/createdBefore, sort+order, limit; omits when absent (#65)
+- [x] 🟩 ergonomics - bulk setPriority body; assignProject-by-name body; setTaskProject projectName + setTaskLabels labelNames bodies (#66)
 
 ### Not covered (and why)
 - `tools/tasks.ts`, `tools/projects.ts`, `tools/labels.ts` - thin api-client wrappers; behavior is exercised through `runTool` tests + the end-to-end smoke run with claude.ai.

@@ -123,11 +123,11 @@ export async function completeTask(id: number, isCompleted: boolean): Promise<Ta
 
 // POST /api/tasks/bulk - apply one operation to many tasks in a single
 // transaction. data carries the per-operation payload. Returns the affected tasks.
-export type BulkOperation = "complete" | "assignProject" | "setDeadline";
+export type BulkOperation = "complete" | "assignProject" | "setDeadline" | "setPriority";
 export async function bulkTasks(
   operation: BulkOperation,
   taskIds: number[],
-  data?: { isCompleted?: boolean; projectId?: number | null; deadline?: string | null },
+  data?: { isCompleted?: boolean; projectId?: number | null; deadline?: string | null; priority?: number },
 ): Promise<Task[]> {
   const res = await fetch(`${getApiUrl()}/api/tasks/bulk`, {
     method: "POST",

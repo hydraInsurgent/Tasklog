@@ -88,7 +88,7 @@ A reminder or alert system would be a meaningful scope addition.
 - Deadlines are visible to the user but the app does not enforce or act on them.
 - Every task carries a server-computed \`dueStatus\` (overdue / today / this_week / later / none), derived from the deadline relative to today (v2.10.3). It centralizes the due-bucket logic so Claude and any future client get a consistent answer without recomputing it.
 - A task can belong to a project (optional). Tasks with no project are in Inbox.
-- Bulk actions (v2.10.4): a "Select" mode on the task list lets you pick several tasks and, from a bulk-actions bar, complete/reopen them, move them to a project (or Inbox), or set/clear their deadline in one step. The same three operations are available to Claude via bulk MCP tools. There is no bulk delete - deletion stays one task at a time.
+- Bulk actions (v2.10.4): a "Select" mode on the task list lets you pick several tasks and, from a bulk-actions bar, complete/reopen them, move them to a project (or Inbox), or set/clear their deadline in one step. The same operations are available to Claude via bulk MCP tools, with bulk priority added in v2.10.7. There is no bulk delete - deletion stays one task at a time.
 - Priority (v2.10.5): each task has a priority on the Todoist P1-P4 scale (P1 = Urgent, P2 = High, P3 = Medium, P4 = None, the default). It is set on the add/edit forms, shown as a small colored dot (P1-P3), filterable, and editable/queryable via Claude. P4 tasks show no dot, keeping the default view clean.
 
 **Projects**
@@ -124,7 +124,7 @@ A reminder or alert system would be a meaningful scope addition.
 
 **AI integration (v2.10, filtering added v2.10.1, editing added v2.10.2)**
 - Tasklog is reachable from claude.ai via a Model Context Protocol custom connector.
-- The Tasklog API is exposed as 19 MCP tools (incl. three bulk tools). `list_tasks` accepts optional filters (project, inbox, labels, deadline range, creation-date range, completion, title substring, priority) plus sort + order + limit, so Claude can answer scoped questions like "what's due this week in Work", "what did I add today", or "top 5 by priority" in a single call. Completion is a single `set_task_completion(id, isCompleted)` toggle. `update_task(id, title?, deadline?, priority?)` renames / reschedules / reprioritizes without delete-and-recreate.
+- The Tasklog API is exposed as 20 MCP tools (incl. four bulk tools). `list_tasks` accepts optional filters (project, inbox, labels, deadline range, creation-date range, completion, title substring, priority) plus sort + order + limit, so Claude can answer scoped questions like "what's due this week in Work", "what did I add today", or "top 5 by priority" in a single call. Completion is a single `set_task_completion(id, isCompleted)` toggle. `update_task(id, title?, deadline?, priority?)` renames / reschedules / reprioritizes without delete-and-recreate. Project/label assignment accepts a name as well as an id (v2.10.7), so Claude can "move these to Work" or "tag these urgent" without a lookup first.
 - The connector works on claude.ai web and mobile (Pro / Max plan).
 - Connecting requires logging in with GitHub once; only the allow-listed username is permitted.
 - All tool calls execute against the same SQLite database the web UI reads from. Tasks created via Claude appear instantly in the web UI on next refresh.

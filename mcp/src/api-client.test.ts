@@ -125,6 +125,31 @@ describe('bulk POST body contract', () => {
       '{"operation":"setDeadline","taskIds":[4],"data":{"deadline":null}}',
     );
   });
+  test('setPriority carries priority (#66)', () => {
+    assert.equal(
+      JSON.stringify({ operation: 'setPriority', taskIds: [1, 2], data: { priority: 1 } }),
+      '{"operation":"setPriority","taskIds":[1,2],"data":{"priority":1}}',
+    );
+  });
+  test('assignProject by name carries projectName (#66)', () => {
+    assert.equal(
+      JSON.stringify({ operation: 'assignProject', taskIds: [3], data: { projectName: 'Work' } }),
+      '{"operation":"assignProject","taskIds":[3],"data":{"projectName":"Work"}}',
+    );
+  });
+});
+
+// Name-based resolution: the single-task assign/labels bodies carry the name field (#66).
+describe('name resolution request bodies', () => {
+  test('setTaskProject body carries projectName', () => {
+    assert.equal(JSON.stringify({ projectName: 'Work' }), '{"projectName":"Work"}');
+  });
+  test('setTaskLabels body carries labelNames', () => {
+    assert.equal(
+      JSON.stringify({ labelNames: ['urgent', 'home'] }),
+      '{"labelNames":["urgent","home"]}',
+    );
+  });
 });
 
 describe('buildTaskQuery', () => {

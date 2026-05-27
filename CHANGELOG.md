@@ -2,6 +2,18 @@
 
 ---
 
+## v2.10.7 - Agent ergonomics (bulk priority + name resolution)
+*May 2026*
+
+### Added
+
+- `bulk_set_priority` - set the priority on many tasks at once, closing the bulk asymmetry (complete/move/deadline already had bulk variants). Available as a `setPriority` operation on `POST /api/tasks/bulk`, a `bulk_set_priority` MCP tool, and a "Set priority" action on the web bulk-actions bar. MCP tool count: 19 → 20 (#66)
+- Name-based resolution: `assign_task_to_project` / `bulk_assign_to_project` accept a `projectName`, and `set_task_labels` accepts `labelNames`, resolved server-side (case-insensitive, exact). So Claude can "move these to Work" or "tag these urgent" without a `list_projects`/`list_labels` lookup first. Ids still work; an ambiguous or unknown name returns a clear 400
+
+No DB migration. The web UI gains the bulk priority action; the rest is MCP/API surface.
+
+---
+
 ## v2.10.6 - list_tasks query completeness
 *May 2026*
 

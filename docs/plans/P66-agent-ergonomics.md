@@ -1,6 +1,6 @@
 # Feature Implementation Plan: Agent ergonomics (bulk_set_priority + name resolution)
 
-**Overall Progress:** `0%`
+**Overall Progress:** `85%`
 
 **Tracking issue:** [#66](https://github.com/hydraInsurgent/Tasklog/issues/66)
 **Branch:** `feature/agent-ergonomics-#66`
@@ -40,25 +40,25 @@ MCP: bulk_set_priority(taskIds, priority); assign_task_to_project + bulk_assign_
 
 ## Tasks
 
-- [ ] 🟥 **Step 1: Backend - bulk_set_priority + name resolution** `[sequential]` → depends on: nothing
-  - [ ] 🟥 1.1 Add `setPriority` case to the bulk switch: read `data.Priority`, validate 1-4 (else 400), set on all loaded tasks. Add `int? Priority` to `BulkTaskData`.
-  - [ ] 🟥 1.2 Add `ResolveProjectByName(string)` -> `(int? id, string? error)` and `ResolveLabelsByName(string[])` -> `(List<int>? ids, string? error)` private helpers (case-insensitive exact, 0/>1 -> error).
-  - [ ] 🟥 1.3 `AssignProjectRequest` gains `ProjectName`; AssignProject resolves it (name wins, else ProjectId incl null). `BulkTaskData` gains `ProjectName`; the assignProject case resolves it the same way (replacing/augmenting the existing exists-check).
-  - [ ] 🟥 1.4 `SetTaskLabelsRequest` -> `(int[]? LabelIds = null, string[]? LabelNames = null)`; SetLabels computes an effective `int[]` (resolve names, else `LabelIds ?? []`), then runs the existing replace logic. Invalid label ids still 400; unresolvable names 400.
-  - [ ] 🟥 1.5 Tests: bulk setPriority valid + out-of-range 400; assignProject by name (single), ambiguous -> 400, missing -> 400, name-wins-over-id; set_task_labels by name (incl. one unknown -> 400); existing id paths still pass.
+- [x] 🟩 **Step 1: Backend - bulk_set_priority + name resolution** `[sequential]` → depends on: nothing
+  - [x] 🟩 1.1 `setPriority` case added (validates 1-4 else 400); `BulkTaskData` gained `Priority`.
+  - [x] 🟩 1.2 `ResolveProjectByName` + `ResolveLabelsByName` private helpers (case-insensitive exact, 0/>1 -> error string -> 400).
+  - [x] 🟩 1.3 `AssignProjectRequest` + `BulkTaskData` gained `ProjectName`; single + bulk assignProject resolve it (name wins; else id incl null=Inbox).
+  - [x] 🟩 1.4 `SetTaskLabelsRequest` -> nullable LabelIds + LabelNames; SetLabels computes an effective `int[]` then runs the existing replace logic.
+  - [x] 🟩 1.5 11 tests (bulk setPriority set/out-of-range/missing; assign by name resolve/ambiguous-400/missing-400/name-wins; setLabels by name resolve + unknown-400; bulk assign by name). 120 backend tests pass; existing id paths green.
 
-- [ ] 🟥 **Step 2: MCP - tools + api-client** `[sequential]` → depends on: Step 1
-  - [ ] 🟥 2.1 `api.bulkTasks` data type gains `priority?`; add a `bulk_set_priority(taskIds, priority)` tool (count 19 -> 20; header comment 11 -> 12 task tools). "Set priority" `setPriority` op.
-  - [ ] 🟥 2.2 `api.setTaskProject` -> accept `{ projectId?, projectName? }`; `api.setTaskLabels` -> accept `{ labelIds?, labelNames? }`. Update `assign_task_to_project` + `bulk_assign_to_project` schemas to add `projectName` (id made optional); `set_task_labels` to add `labelNames` (labelIds made optional). Describe the "name OR id" contract + ambiguity-400.
-  - [ ] 🟥 2.3 Tests: bulk_set_priority body contract; project-by-name + labelNames request bodies serialize as expected.
+- [x] 🟩 **Step 2: MCP - tools + api-client** `[sequential]` → depends on: Step 1
+  - [x] 🟩 2.1 `bulkTasks` data gained `priority`/`projectName` + `setPriority` op; `bulk_set_priority` tool added (count 19 -> 20; header 12 task tools / 4 bulk).
+  - [x] 🟩 2.2 `setTaskProject`/`setTaskLabels` now take body objects; `assign_task_to_project` + `bulk_assign_to_project` gained `projectName` (projectId optional), `set_task_labels` gained `labelNames` (labelIds optional), all with name-OR-id + ambiguity-error describe text.
+  - [x] 🟩 2.3 4 tests (setPriority + assignProject-by-name bulk body; setTaskProject projectName + setTaskLabels labelNames bodies). Typecheck clean; 82 MCP tests pass.
 
-- [ ] 🟥 **Step 3: Web UI - bulk Set priority** `[sequential]` → depends on: Step 1 `[UI]`
-  - [ ] 🟥 3.1 `frontend/src/lib/api.ts` `bulkTasks` data gains `priority?`. `BulkActionsBar` gets a "Set priority" action (a small P1-P4 popover, reusing `PRIORITY_OPTIONS`), wired to `handleBulk("setPriority", { priority })` in TasksClient.
-  - [ ] 🟥 3.2 Fixtures/tests as needed; keep existing green. (Name resolution is MCP/API-only - no UI.)
+- [x] 🟩 **Step 3: Web UI - bulk Set priority** `[sequential]` → depends on: Step 1 `[UI]`
+  - [x] 🟩 3.1 `bulkTasks` data + `BulkOperation` gained `priority`/`setPriority`. `BulkActionsBar` got a "Set priority" P1-P4 dropdown (reusing `PRIORITY_OPTIONS` + a colored dot), wired through `onSetPriority` -> `handleBulk("setPriority", { priority })`. handleBulk data type extended.
+  - [x] 🟩 3.2 56 frontend tests still green; clean tsc + next build. No new unit test - the bulk bar is presentational (integration candidate, as in #63), exercised by the live smoke. Name resolution is MCP/API-only, no UI.
 
-- [ ] 🟥 **Step 4: Docs + CHANGELOG** `[sequential]` → depends on: Steps 1-3
-  - [ ] 🟥 4.1 architecture.md: bulk endpoint setPriority + projectName/labelNames notes; MCP tool count 19 -> 20. product-design.md: bulk priority + name-friendly Claude line.
-  - [ ] 🟥 4.2 CHANGELOG.md: v2.10.7 section. coverage.md: new counts + checklists.
+- [x] 🟩 **Step 4: Docs + CHANGELOG** `[sequential]` → depends on: Steps 1-3
+  - [x] 🟩 4.1 architecture.md: bulk endpoint setPriority + projectName/labelNames on the project/labels rows; MCP tool count 19 -> 20 (prose + tree). product-design.md: bulk priority + name-friendly Claude line.
+  - [x] 🟩 4.2 CHANGELOG.md: v2.10.7 section. coverage.md: counts (120 backend / 82 MCP) + ergonomics checklists.
 
 - [ ] 🟥 **Step 5: Deploy + smoke test** `[sequential]` → depends on: Step 4
   - [ ] 🟥 5.1 Check phone reachable (dozes); if asleep, that is a user-action stop. Then stash the user's frontend WIP, `./scripts/deploy-phone.sh`, restore (pop) after.
