@@ -1,6 +1,6 @@
 # Feature Implementation Plan: Natural-language quick-add
 
-**Overall Progress:** `30%`
+**Overall Progress:** `50%`
 
 **Tracking issue:** [#72](https://github.com/hydraInsurgent/Tasklog/issues/72)
 **Branch:** `feature/natural-language-recurrence-#72`
@@ -52,9 +52,9 @@ Dropped (no Tasklog field): `+assignee`, `!reminder`, `/section`.
   - [x] 🟩 1.2 `matchRecurrence` (hand-rolled, ordered matchers) onto the v2.14.x grammar: daily / every-N-days / weekday / `<weekday-list>` / every-other / every-N-weeks / weekly / every-N-months / nth-weekday / last-day / day-of-month / monthly, + `until <date>`→UNTIL / `[for] N times`→COUNT. Emits canonical RRULE.
   - [x] 🟩 1.3 26 tests (tokens, known/unknown project, dates date-only vs timed + absolute + offset, every recurrence form, end conditions, combined line, spans). **107 frontend tests pass** (was 81).
 
-- [ ] 🟥 **Step 2: AddTaskForm - parse-on-submit + field pre-fill + autosuggest** `[sequential]` → depends on: Step 1 `[UI]`
-  - [ ] 🟥 2.1 On submit, run `parseQuickAdd`; resolve `projectName` against loaded projects (unknown → ignore the match, keep in title); resolve/auto-create `labelNames` (reuse the existing label-create logic); set deadline/recurrence/priority; call `onAdd` with the cleaned title + parsed fields. Pre-fill the structured controls from the parse so they show what was captured (and can override).
-  - [ ] 🟥 2.2 Autosuggest: when the caret sits inside a `#…`/`@…` token being typed, show a dropdown of matching projects/labels (reuse the existing label-autocomplete dropdown pattern). Selecting completes the token in the title.
+- [x] 🟩 **Step 2: AddTaskForm - parse-on-submit** `[sequential]` → depends on: Step 1 `[UI]`
+  - [x] 🟩 2.1 On submit, `parseQuickAdd(title, projects)`; merge with the structured controls (a parsed token wins; otherwise the control's value): deadline / recurrence (default anchor = today if a recurrence has no date) / priority / `#project` (resolved to id) / `@label`s (resolved-or-created via a shared `resolveOrCreateLabel`, deduped with picked labels); `onAdd(cleanedTitle, ...)`. Plain titles fall straight through to the controls (transparent). +1 integration test (6 AddTaskForm tests).
+  - [~] regrouped: `#`/`@` autosuggest moved into Step 3 - it shares the title-field caret/overlay machinery with the live highlight, so they're built together.
 
 - [ ] 🟥 **Step 3: Live inline highlighting overlay** `[sequential]` → depends on: Step 2 `[UI]`
   - [ ] 🟥 3.1 Backdrop-overlay: a `position:absolute` div behind a transparent-text input/textarea, font/padding/scroll matched, rendering the title with recognized spans wrapped in colored `<span>`s (date/recurrence, `#project`, `@label` in the label color, `pN` in the priority color). Re-parse + re-render on each keystroke.

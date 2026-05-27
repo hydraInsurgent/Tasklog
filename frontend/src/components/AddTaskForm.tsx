@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, FormEvent } from "react";
 import { Plus } from "lucide-react";
 import { Project, Label, createLabel } from "@/lib/api";
 import { labelColor, PRIORITY_OPTIONS } from "@/lib/format";
+import { parseQuickAdd } from "@/lib/quickAdd";
 import LabelChip from "./LabelChip";
 import RecurrencePicker from "./RecurrencePicker";
 
@@ -108,6 +109,19 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
     setSelectedLabels((prev) => prev.filter((l) => l.id !== labelId));
   }
 
+  // Resolve a label name to an existing Label (case-insensitive) or create it.
+  // Shared by the label field and quick-add @tokens. Returns null on failure.
+  async function resolveOrCreateLabel(name: string): Promise<Label | null> {
+    if (!allLabels) return null;
+    const existing = allLabels.find((l) => l.name.toLowerCase() === name.toLowerCase());
+    if (existing) return existing;
+    try {
+      return await createLabel(name, allLabels.length % 10);
+    } catch {
+      return null;
+    }
+  }
+
   // Handle Enter key in the label input: select first suggestion or create a new label.
   async function handleLabelKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key !== "Enter") return;
@@ -153,21 +167,50 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
       return;
     }
 
-    const projectId = selectedProjectId === "inbox" ? null : parseInt(selectedProjectId, 10);
-    const labelIds = selectedLabels.length > 0 ? selectedLabels.map((l) => l.id) : undefined;
-
     setLoading(true);
     try {
-      // Combine the date with an optional time. No date -> no deadline. Date + time
-      // -> a timed deadline; date alone -> date-only (backend stores midnight).
-      const deadlineValue = deadline
+      // Parse the title as a Todoist-style quick-add line. A plain title yields no
+      // tokens and everything falls through to the structured controls below, so
+      // this is transparent for users who don't use the syntax.
+      const parsed = parseQuickAdd(title, projects ?? []);
+      const finalTitle = parsed.cleanedTitle || title.trim();
+
+      // The structured controls' deadline (date + optional time). A parsed date wins.
+      const controlDeadline = deadline
         ? deadlineTime
           ? `${deadline}T${deadlineTime}`
           : deadline
         : undefined;
-      // Recurrence needs a deadline to anchor from; drop it if the deadline was cleared.
-      const recurrenceValue = deadlineValue ? recurrence ?? undefined : undefined;
-      await onAdd(title.trim(), deadlineValue, projectId, labelIds, priority, description.trim() || undefined, recurrenceValue);
+      let finalDeadline = parsed.deadline ?? controlDeadline;
+
+      // Recurrence: a parsed "every ..." wins, else the picker (which only allows a
+      // rule when a deadline is set). A recurrence needs a deadline anchor - if none
+      // was given, default to today (date-only) so the series can start.
+      const finalRecurrence = parsed.recurrence ?? (controlDeadline ? recurrence ?? undefined : undefined);
+      if (finalRecurrence && !finalDeadline) {
+        const now = new Date();
+        finalDeadline = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      }
+
+      // Priority: a parsed pN wins, else the control (default P4).
+      const finalPriority = parsed.priority ?? priority;
+
+      // Project: a recognized #project wins, else the dropdown selection.
+      let finalProjectId: number | null = selectedProjectId === "inbox" ? null : parseInt(selectedProjectId, 10);
+      if (parsed.projectName && projects) {
+        const match = projects.find((p) => p.name.toLowerCase() === parsed.projectName!.toLowerCase());
+        if (match) finalProjectId = match.id;
+      }
+
+      // Labels: those picked in the field plus any @tokens (resolved/created), deduped.
+      const labelObjs: Label[] = [...selectedLabels];
+      for (const name of parsed.labelNames ?? []) {
+        const label = await resolveOrCreateLabel(name);
+        if (label && !labelObjs.some((l) => l.id === label.id)) labelObjs.push(label);
+      }
+      const labelIds = labelObjs.length > 0 ? labelObjs.map((l) => l.id) : undefined;
+
+      await onAdd(finalTitle, finalDeadline, finalProjectId, labelIds, finalPriority, description.trim() || undefined, finalRecurrence);
       // Clear the form on success.
       setTitle("");
       setDeadline("");
