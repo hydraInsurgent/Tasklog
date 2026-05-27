@@ -1,6 +1,6 @@
 # Feature Implementation Plan: Natural-language quick-add
 
-**Overall Progress:** `50%`
+**Overall Progress:** `70%`
 
 **Tracking issue:** [#72](https://github.com/hydraInsurgent/Tasklog/issues/72)
 **Branch:** `feature/natural-language-recurrence-#72`
@@ -56,10 +56,10 @@ Dropped (no Tasklog field): `+assignee`, `!reminder`, `/section`.
   - [x] 🟩 2.1 On submit, `parseQuickAdd(title, projects)`; merge with the structured controls (a parsed token wins; otherwise the control's value): deadline / recurrence (default anchor = today if a recurrence has no date) / priority / `#project` (resolved to id) / `@label`s (resolved-or-created via a shared `resolveOrCreateLabel`, deduped with picked labels); `onAdd(cleanedTitle, ...)`. Plain titles fall straight through to the controls (transparent). +1 integration test (6 AddTaskForm tests).
   - [~] regrouped: `#`/`@` autosuggest moved into Step 3 - it shares the title-field caret/overlay machinery with the live highlight, so they're built together.
 
-- [ ] 🟥 **Step 3: Live inline highlighting overlay** `[sequential]` → depends on: Step 2 `[UI]`
-  - [ ] 🟥 3.1 Backdrop-overlay: a `position:absolute` div behind a transparent-text input/textarea, font/padding/scroll matched, rendering the title with recognized spans wrapped in colored `<span>`s (date/recurrence, `#project`, `@label` in the label color, `pN` in the priority color). Re-parse + re-render on each keystroke.
-  - [ ] 🟥 3.2 Click a highlighted token to unlink it (mark that span ignored → treated as plain text). Accessible (the input stays the real control; overlay is `aria-hidden`).
-  - [ ] 🟥 3.3 **Risk note:** the overlay is the fiddly part. If it proves too unreliable in the time available, ship Steps 1-2 (parse-on-submit + autosuggest) and split the live highlight to a follow-up - FLAG to the user, do not silently drop.
+- [x] 🟩 **Step 3: `QuickAddInput` - live highlight overlay + autosuggest + captured chips** `[sequential]` → depends on: Step 2 `[UI]`
+  - [x] 🟩 3.1 New `QuickAddInput.tsx`: backdrop div (transparent text + tint rectangles behind token spans, by type) behind a transparent-bg input, metrics matched, horizontal-scroll synced; re-parses each render. Swapped into AddTaskForm's title field.
+  - [x] 🟩 3.2 `#`/`@` autosuggest dropdown (reuses the label-autocomplete pattern) with keyboard nav (↑/↓ + Enter selects instead of submitting, Esc closes) + mouse.
+  - [x] 🟩 3.3 Click-to-unlink delivered as a **captured-chips row** below the field: each token shown with its type ("Repeat"/"Due"/"Project"/"Label"/"Priority") + an ✕ to remove it. Doubles as confirmation a repeat was captured (user feedback); avoids the contenteditable rewrite. 115 frontend tests (+7 QuickAddInput).
 
 - [ ] 🟥 **Step 4: Docs + CHANGELOG + program re-letter** `[sequential]` → depends on: Steps 1-3
   - [ ] 🟥 4.1 `engineering-guidelines.md`: first frontend dep (chrono-node) + the backdrop-overlay pattern. `product-design.md`: NL quick-add creation flow. `architecture.md`: chrono-node dep + `quickAdd.ts` in the tree/components note.

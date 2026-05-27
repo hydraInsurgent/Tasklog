@@ -7,6 +7,7 @@ import { labelColor, PRIORITY_OPTIONS } from "@/lib/format";
 import { parseQuickAdd } from "@/lib/quickAdd";
 import LabelChip from "./LabelChip";
 import RecurrencePicker from "./RecurrencePicker";
+import QuickAddInput from "./QuickAddInput";
 
 interface Props {
   // Called by the parent when the form submits. Parent handles the API call
@@ -250,14 +251,16 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
           >
             Title
           </label>
-          <input
+          {/* Quick-add field: recognizes a date, "every ..." recurrence, #project,
+              @label and pN inline and highlights them as you type (parsed on submit). */}
+          <QuickAddInput
             id="task-title"
-            type="text"
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="What needs to be done?"
-            className="w-full px-3 py-2 border border-zinc-200 rounded-md text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-shadow duration-150"
+            onChange={setTitle}
+            projects={projects ?? []}
+            labels={allLabels ?? []}
             disabled={loading}
+            placeholder={'e.g. "Email Mark friday #Work @urgent p1"'}
           />
           {/* Inline error placed directly below the field (error-placement rule). */}
           {error && (
