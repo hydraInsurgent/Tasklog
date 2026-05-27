@@ -1,6 +1,6 @@
 # Feature Implementation Plan: list_tasks query completeness
 
-**Overall Progress:** `75%`
+**Overall Progress:** `100%` (engineering complete; Step 4.3 is a deferred post-ship user spot-check)
 
 **Tracking issue:** [#65](https://github.com/hydraInsurgent/Tasklog/issues/65)
 **Branch:** `feature/list-tasks-query-completeness-#65`
@@ -56,11 +56,19 @@ list_tasks (MCP): same params surfaced on the tool; arrays/dates serialized as t
   - [x] 🟩 3.1 architecture.md: rewrote the `GET /api/tasks` row with createdAfter/before, sort/order, limit.
   - [x] 🟩 3.2 CHANGELOG.md: v2.10.6 section. coverage.md: counts (109 backend / 78 MCP) + query checklists.
 
-- [ ] 🟥 **Step 4: Deploy + smoke test** `[sequential]` → depends on: Step 3
-  - [ ] 🟥 4.1 `./scripts/deploy-phone.sh`.
-  - [ ] 🟥 4.2 Live curl: `?createdAfter=<today>` returns only today's tasks; `?sort=deadline&order=asc` orders with nulls last; `?sort=priority` P1 first; `?limit=3` returns 3; `?limit=0` -> 400.
-  - [ ] 🟥 4.3 DEFERRED user spot-check (non-blocking): in Claude, "what did I add today", "show my tasks by deadline", "top 5 by priority".
+- [x] 🟩 **Step 4: Deploy + smoke test** `[sequential]` → depends on: Step 3
+  - [x] 🟩 4.1 `./scripts/deploy-phone.sh` clean (exit 0). (Phone had dozed off; woke it. First attempt also hit the user's in-progress doppel frontend dep - stashed the frontend WIP, deployed, restored it.)
+  - [x] 🟩 4.2 Live curl on throwaways (then deleted): sort=deadline asc + desc both **nulls-last on real SQLite** (R1 confirmed), sort=priority asc = P1 first, createdAfter=today returns the 3 just-created, limit=2 caps, limit=0 -> 400. ALL PASSED.
+  - [x] 🟩 4.3 DEFERRED user spot-check (non-blocking): in Claude, "what did I add today", "show my tasks by deadline", "top 5 by priority". Verified at API + unit + live-curl level.
 
 ## Outcomes
 
-<!-- Fill in after execution: decision-relevant deltas only. What changed vs. planned? Key decisions made? Assumptions invalidated? -->
+Built exactly as planned - a clean additive extension of the existing `[FromQuery]` filter + `OrderBy` chain, no migration, no UI change.
+
+- **R1 (the one real risk) cleared on live SQLite.** The deadline nulls-last ordering (`OrderBy(t => t.Deadline == null)`) was only provable on EF InMemory at unit-test time; the live curl confirmed it sorts nulls-last in both directions on real SQLite too. This is the #57 provider-divergence class, and it held.
+- **`filter.Limit is < 1`** correctly skips `null` (relational patterns don't match null), so omitted-limit needs no guard - confirmed by the default-call test and live `limit=0 -> 400`.
+- **Backwards-compatible:** default `created`/`desc` reproduces the prior newest-first behaviour; every existing GetAll test stayed green.
+- **Review:** single-pass, no blocks/warns; R2 (hoist the sort key) applied inline; R3 (limit-check placement) left as cosmetic.
+- **Tests:** +10 backend, +4 MCP. Totals 109 backend / 78 MCP.
+- **Two operational snags during deploy (not code):** the phone had dozed off (Android Doze suspends Termux networking - woke it via screen unlock), and the deploy's frontend rebuild hit the user's uncommitted in-progress doppel file-dependency; resolved by stashing just the frontend WIP for the deploy and restoring it after.
+- **Pending:** only the hands-on Claude spot-check (4.3), then ship as v2.10.6.
