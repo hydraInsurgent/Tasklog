@@ -106,11 +106,13 @@ Tasklog/
 │       │   ├── DeadlinePopover.tsx Quick deadline preset picker on the deadline pill (Client Component, v2.10.2)
 │       │   ├── BulkActionsBar.tsx  Sticky bulk-actions bar for multi-select mode (Client Component, v2.10.4)
 │       │   ├── PriorityDot.tsx    Small colored priority dot (P1-P3) next to a task title (v2.10.5)
-│       │   ├── RecurrencePicker.tsx  Recurrence builder (none/daily/weekly/monthly) on the add/edit forms (Client Component, v2.14.0)
-│       │   └── RecurringBadge.tsx Repeat glyph + human label for recurring tasks (v2.14.0)
+│       │   ├── RecurrencePicker.tsx  Recurrence builder (none/daily/weekly/monthly + nth-weekday/interval/Ends) on the add/edit forms (Client Component, v2.14.0+)
+│       │   ├── RecurringBadge.tsx Repeat glyph + human label for recurring tasks (v2.14.0)
+│       │   └── QuickAddInput.tsx  Todoist-style quick-add title field: inline token highlight overlay + #/@ autosuggest + removable captured chips (Client Component, v2.15.0)
 │       │   (list is representative - other components: TaskCard, FilterPanel, LabelsClient, etc.)
 │       └── lib/
 │           ├── api.ts             Typed API call functions (used by both server and client)
+│           ├── quickAdd.ts        Pure parseQuickAdd(): NL title -> {deadline, recurrence, project, labels, priority} + token spans (chrono-node for dates; recurrence/tokens hand-rolled) (v2.15.0)
 │           └── deadlinePresets.ts Pure resolvePreset() for the quick-deadline popover (v2.10.2)
 │
 ├── docs/

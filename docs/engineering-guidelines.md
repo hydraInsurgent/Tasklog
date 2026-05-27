@@ -140,6 +140,11 @@ When adding a new hook, place it in `src/hooks/` and follow the same pattern: ac
 When the same logic appears in more than one place, extracting it to `src/lib/`
 is worth considering. Current candidates: `formatDate`, `deadlineColorClass` (issue #5).
 
+### Additions from v2.15.0
+
+- **First frontend runtime dependency: `chrono-node`** (MIT) for natural-language date parsing in quick-add (`lib/quickAdd.ts`). The project's "avoid unnecessary frameworks" rule explicitly allows a *clear-benefit* dependency, and free-form date NL ("next friday", "jan 27", "in 3 days") is the textbook don't-reinvent case - chrono also returns the matched span, which the highlight overlay and title-stripping need. Recurrence and the `#`/`@`/`pN` tokens are still hand-rolled (bounded grammar we control), so the dependency is scoped to dates only. `quickAdd.ts` itself is a pure function, mirroring the `format.ts` precedent.
+- **Backdrop-overlay highlighting over a normal `<input>`** (`QuickAddInput.tsx`) - a transparent-text-aware backdrop `div` renders tint rectangles behind recognized token spans while the real `<input>` sits on top (scroll synced). This gives inline highlighting without a `contenteditable` rewrite (which true padded inline pills would require). "Unlink a wrong token" is offered as a removable-chips row below the field rather than in-place click, for the same reason. Reach for this overlay pattern when you need to decorate input text without giving up the native input/caret/a11y.
+
 ---
 
 ## MCP server (Node/TypeScript, v2.10+)

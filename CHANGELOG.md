@@ -2,6 +2,22 @@
 
 ---
 
+## v2.15.0 - Natural-language quick-add
+*May 2026*
+
+### Added
+
+- The add-task title field is now a Todoist-style quick-add (#72). Type one line and it recognizes, inline, as you type:
+  - a **due date** in natural language - "tomorrow", "friday", "jan 27", "in 3 days", "next week at 4pm"
+  - a **repeat** - "every day", "every weekday", "every other monday", "every 3rd thursday", "monthly on the 1st"
+  - **`#project`**, **`@label`** (auto-created if new), and **`p1`-`p4`** priority
+- Recognized tokens are highlighted in the field and listed as removable chips below it (click the ✕ to unlink a wrong match). Typing `#` or `@` opens an autosuggest dropdown (arrow keys + Enter, or click). The parsed values also fill the Deadline / Project / Priority / Repeat controls live, so you can confirm or adjust.
+- A bare multi-weekday list like "friday and saturday" (no "every") is treated as those specific days once each - modeled as a weekly repeat ending on the last day - rather than an endless repeat. "every friday and saturday" stays ongoing.
+
+Frontend-only, no migration. Uses `chrono-node` for the free-form date parsing; recurrence and the symbol tokens are parsed in-house onto the existing recurrence grammar. Claude already understood these phrases via the MCP tool descriptions, so this closes the gap for the web UI (where there's no LLM to translate).
+
+---
+
 ## v2.14.1 - Advanced recurrence
 *May 2026*
 

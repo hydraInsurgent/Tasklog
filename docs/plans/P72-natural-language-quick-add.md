@@ -1,6 +1,6 @@
 # Feature Implementation Plan: Natural-language quick-add
 
-**Overall Progress:** `70%`
+**Overall Progress:** `88%`
 
 **Tracking issue:** [#72](https://github.com/hydraInsurgent/Tasklog/issues/72)
 **Branch:** `feature/natural-language-recurrence-#72`
@@ -61,9 +61,9 @@ Dropped (no Tasklog field): `+assignee`, `!reminder`, `/section`.
   - [x] 🟩 3.2 `#`/`@` autosuggest dropdown (reuses the label-autocomplete pattern) with keyboard nav (↑/↓ + Enter selects instead of submitting, Esc closes) + mouse.
   - [x] 🟩 3.3 Click-to-unlink delivered as a **captured-chips row** below the field: each token shown with its type ("Repeat"/"Due"/"Project"/"Label"/"Priority") + an ✕ to remove it. Doubles as confirmation a repeat was captured (user feedback); avoids the contenteditable rewrite. 115 frontend tests (+7 QuickAddInput).
 
-- [ ] 🟥 **Step 4: Docs + CHANGELOG + program re-letter** `[sequential]` → depends on: Steps 1-3
-  - [ ] 🟥 4.1 `engineering-guidelines.md`: first frontend dep (chrono-node) + the backdrop-overlay pattern. `product-design.md`: NL quick-add creation flow. `architecture.md`: chrono-node dep + `quickAdd.ts` in the tree/components note.
-  - [ ] 🟥 4.2 `CHANGELOG.md`: v2.15.0 section. `coverage.md`: counts + checklists. `proposal-recurring-and-habits.md`: insert NL quick-add as v2.15.0, re-letter habit-tracking to v2.16.0.
+- [x] 🟩 **Step 4: Docs + CHANGELOG + program re-letter** `[sequential]` → depends on: Steps 1-3
+  - [x] 🟩 4.1 `engineering-guidelines.md`: first frontend dep (chrono-node) + backdrop-overlay pattern. `product-design.md`: NL quick-add flow. `architecture.md`: chrono-node + `quickAdd.ts`/`QuickAddInput.tsx` in the tree.
+  - [x] 🟩 4.2 `CHANGELOG.md`: v2.15.0 section. `coverage.md`: 118 frontend + quick-add checklist. `proposal-recurring-and-habits.md`: NL quick-add = v2.15.0 (minor, expanded), habit-tracking re-lettered to v2.16.0.
 
 - [ ] 🟥 **Step 5: Deploy + smoke test + ship** `[sequential]` → depends on: Step 4
   - [ ] 🟥 5.1 Tree should be clean (doppel committed); check for any new user WIP first and stash-deploy-pop only if present. Deploy. No migration - confirm live task count unchanged.
