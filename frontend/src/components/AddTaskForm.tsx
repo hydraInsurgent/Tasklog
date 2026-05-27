@@ -54,6 +54,9 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
   const labelInputRef = useRef<HTMLInputElement>(null);
   // Ref to the suggestions list so we can avoid closing it when clicking inside.
   const suggestionsRef = useRef<HTMLUListElement>(null);
+  // Last recurrence rule applied from the title, so we only remount the picker when the
+  // parsed recurrence actually changes (not on every keystroke).
+  const lastParsedRecurrence = useRef<string | undefined>(undefined);
 
   // Whether to render the labels field at all.
   const showLabelsField = allLabels && allLabels.length > 0;
@@ -72,15 +75,32 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
   useEffect(() => {
     if (!title.trim()) return;
     const parsed = parseQuickAdd(title, projects ?? []);
+
+    // Deadline: an explicit parsed date fills the box; a recurrence with no date anchors
+    // to today (only if the box is empty) so the box shows it and the rule has an anchor.
     if (parsed.deadline) {
       const [d, t] = parsed.deadline.split("T");
       setDeadline(d);
       setDeadlineTime(t ? t.slice(0, 5) : "");
+    } else if (parsed.recurrence) {
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      setDeadline((prev) => prev || today);
     }
+
     if (parsed.priority) setPriority(parsed.priority);
     if (parsed.projectName && projects) {
       const match = projects.find((p) => p.name.toLowerCase() === parsed.projectName!.toLowerCase());
       if (match) setSelectedProjectId(String(match.id));
+    }
+
+    // Recurrence: reflect it into the picker by remounting it with the parsed rule (the
+    // picker owns its sub-state after mount). Only when the parsed rule actually changes,
+    // so manual picker edits survive subsequent typing that doesn't touch the recurrence.
+    if (parsed.recurrence && parsed.recurrence !== lastParsedRecurrence.current) {
+      lastParsedRecurrence.current = parsed.recurrence;
+      setRecurrence(parsed.recurrence);
+      setPickerKey((k) => k + 1);
     }
   }, [title, projects]);
 
@@ -240,6 +260,7 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
       setPriority(4);
       setDescription("");
       setRecurrence(null);
+      lastParsedRecurrence.current = undefined;
       setPickerKey((k) => k + 1);
       setSelectedLabels([]);
       setLabelInput("");
