@@ -12,6 +12,7 @@ import CompleteTaskButton from "@/components/CompleteTaskButton";
 import AssignProjectButton from "@/components/AssignProjectButton";
 import AssignLabelsButton from "@/components/AssignLabelsButton";
 import TaskComments from "@/components/TaskComments";
+import RecurringBadge from "@/components/RecurringBadge";
 
 // Format an ISO date string to a readable local date (e.g. "12 Mar 2026").
 function formatDate(iso: string): string {
@@ -118,6 +119,16 @@ export default async function TaskDetailPage({ params }: PageProps) {
             <dd className={`text-sm ${deadlineColorClass(task.deadline)}`}>
               {task.deadline ? formatDeadline(task.deadline) : (
                 <span className="text-zinc-300">Not set</span>
+              )}
+            </dd>
+          </div>
+          <div className="px-6 py-4 flex justify-between items-center">
+            <dt className="text-sm font-medium text-zinc-500">Repeats</dt>
+            <dd className="text-sm">
+              {task.recurrence ? (
+                <RecurringBadge recurrence={task.recurrence} showLabel />
+              ) : (
+                <span className="text-zinc-300">Does not repeat</span>
               )}
             </dd>
           </div>

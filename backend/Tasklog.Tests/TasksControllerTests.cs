@@ -1395,4 +1395,265 @@ public class TasksControllerTests
 
         result.Should().BeOfType<BadRequestObjectResult>();
     }
+
+    // --- Recurrence: create ---
+
+    [Fact]
+    public async Task Create_WithRecurrence_StoresRuleAndStampsSeriesId()
+    {
+        using var context = CreateContext();
+        var controller = new TasksController(context);
+
+        var result = await controller.Create(
+            new CreateTaskRequest("Water plants", new DateTime(2026, 5, 27), null, Recurrence: "FREQ=DAILY"));
+
+        var created = result.Should().BeOfType<CreatedAtActionResult>().Subject;
+        var task = created.Value.Should().BeOfType<TaskModel>().Subject;
+        task.Recurrence.Should().Be("FREQ=DAILY");
+        task.SeriesId.Should().NotBeNull();
+        task.IsRecurring.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Create_RecurrenceWithoutDeadline_Returns400()
+    {
+        using var context = CreateContext();
+        var controller = new TasksController(context);
+
+        var result = await controller.Create(
+            new CreateTaskRequest("No anchor", null, null, Recurrence: "FREQ=DAILY"));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task Create_InvalidRecurrence_Returns400()
+    {
+        using var context = CreateContext();
+        var controller = new TasksController(context);
+
+        var result = await controller.Create(
+            new CreateTaskRequest("Bad rule", new DateTime(2026, 5, 27), null, Recurrence: "FREQ=YEARLY"));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task Create_Recurrence_IsNormalizedToCanonicalForm()
+    {
+        using var context = CreateContext();
+        var controller = new TasksController(context);
+
+        var result = await controller.Create(
+            new CreateTaskRequest("Standup", new DateTime(2026, 5, 27), null, Recurrence: "freq=weekly;byday=fr,mo"));
+
+        var task = result.Should().BeOfType<CreatedAtActionResult>().Subject
+            .Value.Should().BeOfType<TaskModel>().Subject;
+        task.Recurrence.Should().Be("FREQ=WEEKLY;BYDAY=MO,FR");
+    }
+
+    // --- Recurrence: spawn-on-complete ---
+
+    [Fact]
+    public async Task Complete_RecurringTask_SpawnsNextOccurrenceAndLogsComment()
+    {
+        using var context = CreateContext();
+        var task = new TaskModel
+        {
+            Title = "Water plants",
+            CreatedAt = DateTime.Now,
+            Deadline = new DateTime(2026, 5, 27),
+            Recurrence = "FREQ=DAILY",
+            SeriesId = Guid.NewGuid()
+        };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.Complete(task.Id, new CompleteTaskRequest(true));
+
+        // Original stays as a completed history row.
+        var completed = result.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeOfType<TaskModel>().Subject;
+        completed.IsCompleted.Should().BeTrue();
+
+        // Exactly one new open occurrence, same series, deadline advanced one day.
+        context.Tasks.Should().HaveCount(2);
+        var next = await context.Tasks.SingleAsync(t => t.Id != task.Id);
+        next.SeriesId.Should().Be(task.SeriesId);
+        next.Deadline.Should().Be(new DateTime(2026, 5, 28));
+        next.IsCompleted.Should().BeFalse();
+        next.Recurrence.Should().Be("FREQ=DAILY");
+
+        // A completion comment is logged on the finished occurrence.
+        var withComments = await context.Tasks.Include(t => t.Comments).SingleAsync(t => t.Id == task.Id);
+        withComments.Comments.Should().ContainSingle()
+            .Which.Body.Should().Contain("next occurrence due 2026-05-28");
+    }
+
+    [Fact]
+    public async Task Complete_RecurringTask_CarriesFieldsAndLabels()
+    {
+        using var context = CreateContext();
+        var project = new Project { Name = "Home", CreatedAt = DateTime.Now };
+        var label = new Label { Name = "chore", ColorIndex = 4, CreatedAt = DateTime.Now };
+        context.Projects.Add(project);
+        context.Labels.Add(label);
+        await context.SaveChangesAsync();
+
+        var task = new TaskModel
+        {
+            Title = "Tidy desk",
+            Description = "ten minutes",
+            CreatedAt = DateTime.Now,
+            Deadline = new DateTime(2026, 5, 27, 9, 0, 0),
+            ProjectId = project.Id,
+            Priority = 2,
+            Recurrence = "FREQ=DAILY",
+            SeriesId = Guid.NewGuid()
+        };
+        task.Labels.Add(label);
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        await controller.Complete(task.Id, new CompleteTaskRequest(true));
+
+        var next = await context.Tasks.Include(t => t.Labels).SingleAsync(t => t.Id != task.Id);
+        next.Title.Should().Be("Tidy desk");
+        next.Description.Should().Be("ten minutes");
+        next.ProjectId.Should().Be(project.Id);
+        next.Priority.Should().Be(2);
+        next.Deadline.Should().Be(new DateTime(2026, 5, 28, 9, 0, 0)); // time-of-day preserved
+        next.Labels.Should().ContainSingle().Which.Id.Should().Be(label.Id);
+    }
+
+    [Fact]
+    public async Task Complete_NonRecurringTask_DoesNotSpawn()
+    {
+        using var context = CreateContext();
+        var task = new TaskModel { Title = "One off", CreatedAt = DateTime.Now, Deadline = new DateTime(2026, 5, 27) };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        await controller.Complete(task.Id, new CompleteTaskRequest(true));
+
+        context.Tasks.Should().HaveCount(1);
+        var withComments = await context.Tasks.Include(t => t.Comments).SingleAsync();
+        withComments.Comments.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Complete_RecurringTaskCompletedTwice_DoesNotDoubleSpawn()
+    {
+        using var context = CreateContext();
+        var task = new TaskModel
+        {
+            Title = "Daily",
+            CreatedAt = DateTime.Now,
+            Deadline = new DateTime(2026, 5, 27),
+            Recurrence = "FREQ=DAILY",
+            SeriesId = Guid.NewGuid()
+        };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        await controller.Complete(task.Id, new CompleteTaskRequest(true));
+        // Re-completing the already-completed occurrence must not spawn again.
+        await controller.Complete(task.Id, new CompleteTaskRequest(true));
+
+        context.Tasks.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task Complete_RecurringWeekly_AdvancesToNextConfiguredWeekday()
+    {
+        using var context = CreateContext();
+        var task = new TaskModel
+        {
+            Title = "Gym",
+            CreatedAt = DateTime.Now,
+            Deadline = new DateTime(2026, 5, 27), // Wednesday
+            Recurrence = "FREQ=WEEKLY;BYDAY=MO",
+            SeriesId = Guid.NewGuid()
+        };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        await controller.Complete(task.Id, new CompleteTaskRequest(true));
+
+        var next = await context.Tasks.SingleAsync(t => t.Id != task.Id);
+        next.Deadline!.Value.DayOfWeek.Should().Be(DayOfWeek.Monday);
+    }
+
+    // --- Recurrence: update ---
+
+    [Fact]
+    public async Task Update_SetRecurrence_AssignsSeriesId()
+    {
+        using var context = CreateContext();
+        var task = new TaskModel { Title = "Pay rent", CreatedAt = DateTime.Now, Deadline = new DateTime(2026, 6, 1) };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.Update(task.Id, Json("{\"recurrence\":\"FREQ=MONTHLY;BYMONTHDAY=1\"}"));
+
+        var updated = result.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeOfType<TaskModel>().Subject;
+        updated.Recurrence.Should().Be("FREQ=MONTHLY;BYMONTHDAY=1");
+        updated.SeriesId.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task Update_SetRecurrenceWithoutDeadline_Returns400()
+    {
+        using var context = CreateContext();
+        var task = new TaskModel { Title = "No deadline", CreatedAt = DateTime.Now };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.Update(task.Id, Json("{\"recurrence\":\"FREQ=DAILY\"}"));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task Update_ClearRecurrence_NullsRuleAndSeriesId()
+    {
+        using var context = CreateContext();
+        var task = new TaskModel
+        {
+            Title = "Was recurring",
+            CreatedAt = DateTime.Now,
+            Deadline = new DateTime(2026, 6, 1),
+            Recurrence = "FREQ=DAILY",
+            SeriesId = Guid.NewGuid()
+        };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.Update(task.Id, Json("{\"recurrence\":null}"));
+
+        var updated = result.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeOfType<TaskModel>().Subject;
+        updated.Recurrence.Should().BeNull();
+        updated.SeriesId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Update_InvalidRecurrence_Returns400()
+    {
+        using var context = CreateContext();
+        var task = new TaskModel { Title = "X", CreatedAt = DateTime.Now, Deadline = new DateTime(2026, 6, 1) };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.Update(task.Id, Json("{\"recurrence\":\"FREQ=DAILY;COUNT=3\"}"));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
 }

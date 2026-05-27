@@ -12,6 +12,7 @@ import EditTaskModal from "./EditTaskModal";
 import DeadlinePopover from "./DeadlinePopover";
 import BulkActionsBar from "./BulkActionsBar";
 import PriorityDot from "./PriorityDot";
+import RecurringBadge from "./RecurringBadge";
 import FilterPanel, { FilterState, EMPTY_FILTER, hasActiveFilters, activeFilterCount } from "./FilterPanel";
 
 // Feedback shown briefly after an action (replaces TempData flash messages from v1).
@@ -168,12 +169,12 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
 
   // Called by AddTaskForm on submit. Updates local state so no full reload is needed.
   // When viewing a specific project, new tasks are assigned to that project automatically.
-  async function handleAdd(title: string, deadline?: string, projectId?: number | null, labelIds?: number[], priority?: number, description?: string) {
+  async function handleAdd(title: string, deadline?: string, projectId?: number | null, labelIds?: number[], priority?: number, description?: string, recurrence?: string) {
     // If the caller didn't pass a projectId but we're viewing a specific project,
     // default to that project. Inbox / All views default to null (Inbox).
     const resolvedProjectId =
       projectId !== undefined ? projectId : typeof activeView === "number" ? activeView : null;
-    let task = await createTask(title, deadline, resolvedProjectId, priority, description);
+    let task = await createTask(title, deadline, resolvedProjectId, priority, description, recurrence);
 
     // Apply labels immediately after creation if any were selected.
     // setTaskLabels returns the updated task with labels populated.
@@ -249,6 +250,23 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
           hideTimers.current.delete(id);
         }, 1500);
         hideTimers.current.set(id, timer);
+      }
+
+      // Completing a recurring task spawns the next occurrence server-side. Pull
+      // it in immediately (instead of waiting for the next poll) by fetching and
+      // adding only the tasks we don't already have, so the new occurrence shows
+      // up without disturbing the completed row's hide animation.
+      if (isCompleted && updated.isRecurring) {
+        try {
+          const fresh = await getTasks();
+          setTasks((prev) => {
+            const known = new Set(prev.map((t) => t.id));
+            const spawned = fresh.filter((t) => !known.has(t.id));
+            return spawned.length > 0 ? [...spawned, ...prev] : prev;
+          });
+        } catch {
+          // Non-fatal: the background poll will surface the new occurrence shortly.
+        }
       }
     } catch {
       showFeedback("error", "Failed to update task.");
@@ -548,13 +566,16 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
 
                       {/* Task title: links to detail page, with a priority dot */}
                       <td className="px-6 py-4">
-                        <Link
-                          href={`/tasks/${task.id}`}
-                          className="inline-flex items-center gap-1.5 text-zinc-900 font-medium hover:text-blue-600 focus:outline-none focus:underline transition-colors duration-150"
-                        >
-                          <PriorityDot priority={task.priority} />
-                          {task.title}
-                        </Link>
+                        <span className="inline-flex items-center gap-2">
+                          <Link
+                            href={`/tasks/${task.id}`}
+                            className="inline-flex items-center gap-1.5 text-zinc-900 font-medium hover:text-blue-600 focus:outline-none focus:underline transition-colors duration-150"
+                          >
+                            <PriorityDot priority={task.priority} />
+                            {task.title}
+                          </Link>
+                          <RecurringBadge recurrence={task.recurrence} />
+                        </span>
                       </td>
 
                       {/* Project cell - only shown in All Tasks view */}

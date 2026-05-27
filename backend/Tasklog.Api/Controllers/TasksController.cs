@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Tasklog.Api.Data;
 using Tasklog.Api.Models;
+using Tasklog.Api.Services;
 
 namespace Tasklog.Api.Controllers
 {
@@ -194,6 +195,21 @@ namespace Tasklog.Api.Controllers
             if (descError is not null)
                 return BadRequest(new { message = descError });
 
+            // Recurrence is optional. When present it requires a deadline (the anchor the
+            // rule advances from) and must be a rule the core can expand; we store the
+            // canonical serialized form and stamp a fresh SeriesId so future occurrences link.
+            string? recurrence = null;
+            Guid? seriesId = null;
+            if (!string.IsNullOrWhiteSpace(request.Recurrence))
+            {
+                if (request.Deadline is null)
+                    return BadRequest(new { message = "A recurring task needs a deadline to repeat from." });
+                if (!RecurrenceRule.TryParse(request.Recurrence, out var rule, out var ruleError))
+                    return BadRequest(new { message = ruleError });
+                recurrence = rule!.Serialize();
+                seriesId = Guid.NewGuid();
+            }
+
             var task = new TaskModel
             {
                 Title = request.Title.Trim(),
@@ -202,7 +218,9 @@ namespace Tasklog.Api.Controllers
                 CreatedAt = DateTime.Now,
                 // Null means the task goes to Inbox (uncategorized).
                 ProjectId = request.ProjectId,
-                Priority = priority
+                Priority = priority,
+                Recurrence = recurrence,
+                SeriesId = seriesId
             };
 
             _context.Tasks.Add(task);
@@ -288,6 +306,32 @@ namespace Tasklog.Api.Controllers
                 task.Priority = p;
             }
 
+            // recurrence: present + null clears it (task stops repeating; SeriesId nulled);
+            // present + string sets/replaces it (validated; requires the task to have a
+            // deadline - which may have just been set above in this same PATCH; a SeriesId
+            // is assigned if the task wasn't already recurring). Absent leaves it unchanged.
+            if (body.TryGetProperty("recurrence", out var recurrenceEl))
+            {
+                if (recurrenceEl.ValueKind == JsonValueKind.Null)
+                {
+                    task.Recurrence = null;
+                    task.SeriesId = null;
+                }
+                else if (recurrenceEl.ValueKind == JsonValueKind.String)
+                {
+                    if (task.Deadline is null)
+                        return BadRequest(new { message = "A recurring task needs a deadline to repeat from." });
+                    if (!RecurrenceRule.TryParse(recurrenceEl.GetString(), out var rule, out var ruleError))
+                        return BadRequest(new { message = ruleError });
+                    task.Recurrence = rule!.Serialize();
+                    task.SeriesId ??= Guid.NewGuid();
+                }
+                else
+                {
+                    return BadRequest(new { message = "Recurrence must be an RRULE string or null." });
+                }
+            }
+
             await _context.SaveChangesAsync();
 
             return Ok(task);
@@ -310,22 +354,76 @@ namespace Tasklog.Api.Controllers
         }
 
         // PATCH /api/tasks/{id}/complete
-        // Marks a task as complete or incomplete. Returns the updated task.
+        // Marks a task as complete or incomplete. Returns the (completed) task.
+        //
+        // Recurring tasks: completing an open recurring occurrence keeps it as a completed
+        // history row AND spawns the next occurrence (deadline advanced per the rule, the
+        // task's fields carried forward under the same SeriesId), and logs a completion
+        // comment on the row just finished. This is the only spawn path - both the web
+        // checkbox and the MCP set_task_completion tool route through here. Bulk-complete
+        // deliberately does NOT spawn (a documented core limitation).
         [HttpPatch("{id:int}/complete")]
         public async Task<IActionResult> Complete(int id, [FromBody] CompleteTaskRequest request)
         {
-            var task = await _context.Tasks.FindAsync(id);
+            // Load labels too: a spawned occurrence carries the same labels.
+            var task = await _context.Tasks
+                .Include(t => t.Labels)
+                .FirstOrDefaultAsync(t => t.Id == id);
 
             if (task is null)
                 return NotFound(new { message = $"Task {id} not found." });
 
+            // Only spawn on a genuine open -> completed transition, so re-completing an
+            // already-completed task (or reopening it) never creates duplicate occurrences.
+            var transitioningToComplete = request.IsCompleted && !task.IsCompleted;
+
             task.IsCompleted = request.IsCompleted;
             // Record when the task was completed; clear it if marked incomplete again.
             task.CompletedAt = request.IsCompleted ? DateTime.Now : null;
+
+            if (transitioningToComplete
+                && task.Deadline is DateTime deadline
+                && task.Recurrence is not null
+                && RecurrenceRule.TryParse(task.Recurrence, out var rule, out _))
+            {
+                var next = rule!.NextDeadline(deadline);
+
+                // The next open occurrence: a fresh row carrying the series' identity and
+                // fields. Completion state and comments are intentionally NOT carried -
+                // each occurrence tracks its own. Labels are shared (same Label entities).
+                var nextOccurrence = new TaskModel
+                {
+                    Title = task.Title,
+                    Description = task.Description,
+                    Deadline = next,
+                    CreatedAt = DateTime.Now,
+                    ProjectId = task.ProjectId,
+                    Priority = task.Priority,
+                    Recurrence = task.Recurrence,
+                    SeriesId = task.SeriesId
+                };
+                foreach (var label in task.Labels)
+                    nextOccurrence.Labels.Add(label);
+                _context.Tasks.Add(nextOccurrence);
+
+                // Log the completion on the row just finished - the seam habit-tracking
+                // (v2.17.0) reads from. Show a time only when the deadline carries one.
+                task.Comments.Add(new TaskComment
+                {
+                    Body = $"Completed {DateTime.Now:yyyy-MM-dd}, next occurrence due {FormatOccurrenceDate(next)}.",
+                    CreatedAt = DateTime.Now
+                });
+            }
+
             await _context.SaveChangesAsync();
 
             return Ok(task);
         }
+
+        // Format a spawned occurrence's deadline for the completion comment: date only for
+        // a date-only (midnight) deadline, date + HH:mm when it carries a time of day.
+        private static string FormatOccurrenceDate(DateTime when) =>
+            when.TimeOfDay == TimeSpan.Zero ? when.ToString("yyyy-MM-dd") : when.ToString("yyyy-MM-dd HH:mm");
 
         // PATCH /api/tasks/{id}/project
         // Assigns or unassigns a project on an existing task. Returns the updated task.
@@ -549,8 +647,9 @@ namespace Tasklog.Api.Controllers
     }
 
     // Request body shape for task creation. Priority is optional (defaults to 4 = none);
-    // Description is optional free text (null/blank = none).
-    public record CreateTaskRequest(string Title, DateTime? Deadline, int? ProjectId, int? Priority = null, string? Description = null);
+    // Description is optional free text (null/blank = none); Recurrence is an optional
+    // RRULE-shaped string (requires a Deadline to anchor the repeat).
+    public record CreateTaskRequest(string Title, DateTime? Deadline, int? ProjectId, int? Priority = null, string? Description = null, string? Recurrence = null);
 
     // Request body shape for toggling task completion.
     public record CompleteTaskRequest(bool IsCompleted);

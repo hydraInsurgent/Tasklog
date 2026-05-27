@@ -33,6 +33,23 @@ namespace Tasklog.Api.Models
         // (not the list) - see the controller. Cascade-deleted with the task.
         public ICollection<TaskComment> Comments { get; set; } = new List<TaskComment>();
 
+        // Recurrence rule, RRULE-shaped (e.g. "FREQ=DAILY", "FREQ=WEEKLY;BYDAY=MO,WE").
+        // Null = the task does not repeat. Parsed/advanced by the RecurrenceRule helper.
+        // The grammar is validated on write so we never store a rule we cannot expand.
+        public string? Recurrence { get; set; }
+
+        // Links every occurrence of the same repeating task. Set when a task becomes
+        // recurring (a fresh Guid) and carried onto each spawned occurrence, so a series'
+        // history (completed occurrences + the open one) can be queried by SeriesId.
+        // Null for non-recurring tasks.
+        public Guid? SeriesId { get; set; }
+
+        // Read-only convenience flag: whether this task repeats. [NotMapped] so EF ignores
+        // it (it is derived from Recurrence) while System.Text.Json still serializes it,
+        // mirroring DueStatus - clients get `isRecurring` on every task with no extra wiring.
+        [NotMapped]
+        public bool IsRecurring => Recurrence != null;
+
         // Read-only "due bucket" relative to now. [NotMapped] keeps EF Core from
         // treating it as a column (so it is always computed fresh, never stored);
         // System.Text.Json still serializes the getter, so every action that returns

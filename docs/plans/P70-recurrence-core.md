@@ -1,0 +1,113 @@
+# Feature Implementation Plan: Recurrence core (recurring tasks)
+
+**Overall Progress:** `100%`
+
+**Tracking issue:** [#70](https://github.com/hydraInsurgent/Tasklog/issues/70)
+**Branch:** `feature/recurrence-core-#70`
+**Target version:** v2.14.0 (minor - DB migration) - second of [proposal-recurring-and-habits.md](proposal-recurring-and-habits.md)
+**Research:** [rrule-rfc5545-2026-05-27.md](../research/rrule-rfc5545-2026-05-27.md)
+
+## TLDR
+
+Make tasks repeat. A task can carry a recurrence rule (an RRULE-shaped string built from a small typed structure) plus a `SeriesId` (Guid) that links all occurrences of the same repeating task. Completing a recurring task marks it done (kept as history) and spawns the next occurrence with its deadline advanced per the rule and its fields carried forward. The supported subset is daily / every-N-days / weekly-on-weekday(s) / monthly-on-day - grounded in RFC 5545 so later versions can extend the grammar without re-shaping storage.
+
+## Goal State
+
+**Current State:** A task is a one-shot thing. Completing it sets `IsCompleted`/`CompletedAt` and it disappears from the default view. There is no concept of repetition.
+**Goal State:** A task can repeat. The recurrence is set on the add/edit forms (and via Claude). Completing the current occurrence leaves it as a completed history row and immediately creates the next open occurrence (same series, next deadline), with a completion comment logged on the one just finished.
+
+## Critical Decisions
+
+All locked during `/explore` (Todoist conventions). Recorded here so the rationale survives.
+
+- **Decision 1: Storage = a typed structure serialized to an RRULE-shaped string, not literal free-form RRULE and not a bag of columns.**
+  - **Options considered:** (a) literal RRULE string only - flexible but unvalidated and awkward to build/expand; (b) discrete columns (freq/interval/weekday/monthday) - rigid, a migration per grammar addition; (c) a typed struct that parses to/from an RRULE-shaped string stored in one column.
+  - **Chosen:** (c). One nullable `Recurrence` string column holds the rule; a pure helper parses it into a typed struct for validation + expansion. The grammar can grow (v2.15.0/v2.16.0) without a new migration, and the stored shape stays spec-compatible.
+  - **Trade-offs accepted:** parsing on every expansion (microsecond-scale, fine); the string can in principle hold grammar the core expander rejects - mitigated by validating on write (400) so we never persist a rule we cannot advance.
+  - **Research citation:** [rrule-rfc5545-2026-05-27.md](../research/rrule-rfc5545-2026-05-27.md)
+
+- **Decision 2: Separate row per occurrence, linked by `SeriesId` (Guid) - not one row whose deadline advances in place.** History (completed occurrences) is required for habit-tracking (v2.17.0). Completing spawns a new row and keeps the old one. Exactly one open occurrence exists per series at a time.
+
+- **Decision 3: Advance from the scheduled deadline, not the completion timestamp.** Todoist's default. The next deadline is a pure function of the current deadline + the rule; the expander never reads the clock. Consequence: the `RecurrenceRule` helper sidesteps the `DateTime.Now`/`UtcNow` deviation (#18) and is trivially unit-testable. Time-of-day is preserved (v2.12.0 timed deadlines).
+
+- **Decision 4: A recurrence requires a deadline (the anchor).** Setting recurrence on a task with no deadline is a 400. Without an anchor there is nothing to advance.
+
+- **Decision 5: Spawn hooks into the single completion endpoint** `PATCH /api/tasks/{id}/complete`, the one path both the web checkbox and MCP `set_task_completion` use. Bulk-complete (`POST /api/tasks/bulk`) is deliberately NOT modified - bulk-completing recurring tasks does not spawn in the core (documented limitation; recurring tasks are completed individually).
+
+- **Decision 6: Auto-log a completion comment** on the just-completed occurrence (e.g. "Completed 2026-05-27, next due 2026-05-28"), using the v2.13.0 comments table. This is the seam habit-tracking (v2.17.0) reads from.
+
+- **Decision 7: The recurrence logic is a pure static helper** (`RecurrenceRule.cs`), not a DI service. Mirrors the DueStatus precedent (a pure static helper + `[NotMapped]` computed property). The completion endpoint just wires it in.
+
+<!-- GUIDELINES CHECK: No new architecture - reuses the [NotMapped] computed (IsRecurring) + pure-static-helper (RecurrenceRule, like ComputeDueStatus) precedent. It is the first file under backend/Tasklog.Api/Services/ - note the folder in engineering-guidelines, but it is a static helper, NOT the "service layer" pattern (no DI, no state). Migration -> minor bump. product-design "Tasks" rules gain recurrence. No deviation resolved or introduced (the expander avoids #18 by being clock-free). -->
+
+## API contract
+
+```
+Task gains:  recurrence (string|null, RRULE-shaped), seriesId (string/Guid|null), isRecurring (computed bool)
+
+POST /api/tasks            body adds optional `recurrence`
+                           400 if recurrence set but no deadline; 400 if rule unsupported/invalid
+                           recurring task gets a fresh SeriesId
+PATCH /api/tasks/{id}      body adds optional `recurrence` (present-key: omit=keep, null=clear, value=set)
+                           set on a non-recurring task assigns a SeriesId; clear nulls Recurrence + SeriesId
+                           400 if rule unsupported, or set with no deadline on the task
+PATCH /api/tasks/{id}/complete   when completing a recurring task:
+                           - the task is marked done (history) + a completion comment is added to it
+                           - a new occurrence is created: deadline advanced per rule; Title/ProjectId/
+                             Priority/Description/Recurrence/SeriesId + Labels carried; IsCompleted=false
+                           - response is unchanged (the completed task)
+
+Supported rule subset (RFC 5545):
+  FREQ=DAILY                       every day
+  FREQ=DAILY;INTERVAL=N            every N days
+  FREQ=WEEKLY;BYDAY=MO,WE,FR       weekly on those weekdays
+  FREQ=MONTHLY;BYMONTHDAY=D        monthly on day D (1..31; >days-in-month clamps to month end)
+Rejected (400) in the core: SECONDLY/MINUTELY/HOURLY/YEARLY, BYSETPOS, COUNT, UNTIL,
+  nth-weekday (e.g. 3TH), negative BYMONTHDAY, weekly/monthly INTERVAL>1.
+
+MCP: create_task / update_task gain a `recurrence` string param (subset taught in the description);
+     Task shape gains recurrence/seriesId/isRecurring. set_task_completion unchanged (spawn is server-side).
+```
+
+## Tasks
+
+- [x] 🟩 **Step 1: Backend - model, migration, RecurrenceRule helper, controller** `[sequential]` → depends on: nothing
+  - [x] 🟩 1.1 `TaskModel`: `string? Recurrence`, `Guid? SeriesId`, `[NotMapped] IsRecurring`. No `OnModelCreating` change.
+  - [x] 🟩 1.2 `AddRecurrence` migration via global dotnet-ef. Two nullable columns (Recurrence TEXT, SeriesId TEXT/Guid), no default - existing rows -> NULL = non-recurring.
+  - [x] 🟩 1.3 `Services/RecurrenceRule.cs` pure static helper: `TryParse` (validate subset, reject unsupported with a clear error), `Serialize` (canonical), `NextDeadline` (clock-free, preserves TimeOfDay, monthly clamps to month end). Freq enum Daily/Weekly/Monthly.
+  - [x] 🟩 1.4 `Create`: `CreateTaskRequest` gained `string? Recurrence = null`; validates (deadline required, rule valid) and stamps SeriesId; stores canonical form.
+  - [x] 🟩 1.5 `Update`: `recurrence` present-key (set validates + assigns SeriesId via `??=`; clear nulls both). Set respects a deadline set in the same PATCH.
+  - [x] 🟩 1.6 `Complete`: open->completed transition guard (no double-spawn); spawns next occurrence (carries fields + labels, same SeriesId), logs a completion comment; returns the completed task. Bulk untouched.
+  - [x] 🟩 1.7 Tests: `RecurrenceRuleTests` + `TasksControllerTests` recurrence cases. **190 backend tests pass** (was 143, +47).
+
+- [x] 🟩 **Step 2: MCP - recurrence on create/update + in the Task shape** `[sequential]` → depends on: Step 1
+  - [x] 🟩 2.1 `api-client.ts`: `Task` gained recurrence/seriesId/isRecurring; `createTask`/`updateTask` bodies gained `recurrence?`.
+  - [x] 🟩 2.2 `tools/tasks.ts`: shared `RECURRENCE_DESCRIPTION` (teaches the subset + examples + spawn-on-complete) on `create_task` + `update_task`; header + list_tasks Returns refreshed. No new tool.
+  - [x] 🟩 2.3 `api-client.test.ts`: recurrence wire-contract tests + updated the Task sample. Typecheck clean; **91 MCP tests pass** (was 87, +4).
+
+- [x] 🟩 **Step 3: Web UI - recurrence picker + recurring badge** `[sequential]` → depends on: Step 1 `[UI]`
+  - [x] 🟩 3.1 `api.ts`: Task gained recurrence/seriesId/isRecurring; create/update carry recurrence (update now surfaces the backend message). `format.ts`: `describeRecurrence`.
+  - [x] 🟩 3.2 `RecurrencePicker` (None / Daily+interval / Weekly+weekday chips / Monthly+day), seeds defaults from the deadline; wired into `AddTaskForm` (resets via key) + `EditTaskModal` (diff-aware, sends the deadline alongside a new recurrence). Disabled + hinted without a deadline.
+  - [x] 🟩 3.3 `RecurringBadge` (Repeat glyph + describeRecurrence tooltip) on `TaskCard`, the desktop row, and the detail page (with label).
+  - [x] 🟩 3.4 `TasksClient.handleComplete`: after a recurring completion, fetch and prepend only the new (unknown-id) occurrence so it shows immediately without disturbing the hide animation.
+  - [x] 🟩 3.5 **73 frontend tests pass** (was 61, +12: describeRecurrence + RecurrencePicker). Clean tsc + next build (verified against a clean tree). Palette/focus/contrast per UI-SPEC; weekday chips wrap in the narrow add-form column.
+
+- [x] 🟩 **Step 4: Docs + CHANGELOG** `[sequential]` → depends on: Steps 1-3
+  - [x] 🟩 4.1 `architecture.md`: Recurrence + SeriesId columns + isRecurring; Services/ folder + RecurrenceRule; recurrence on create/update + spawn-on-complete endpoint note; MCP prose + repo tree (RecurrencePicker/RecurringBadge). `engineering-guidelines.md`: pure-static-helper-in-Services precedent (not a DI service). `product-design.md`: tasks can recur + tool count 20->21 fix + recurrence in the MCP line.
+  - [x] 🟩 4.2 `CHANGELOG.md`: v2.14.0 section. `coverage.md`: counts (190/91/73) + RecurrenceRule + TasksController-recurrence + MCP + frontend checklists.
+
+- [x] 🟩 **Step 5: Deploy + smoke test** `[sequential]` → depends on: Step 4
+  - [x] 🟩 5.1 Phone reachable; baseline 25 tasks / 9 projects. Stash-deploy-pop (WIP untouched). Deploy exit 0, all 4 services fresh-restarted, migration ran. Post-migration 25/9 - zero data loss.
+  - [x] 🟩 5.2 Live curl all green: create recurring -> 201 (recurrence/seriesId/isRecurring); recurrence-without-deadline -> 400; FREQ=YEARLY -> 400; complete -> spawned occurrence (id 63) same seriesId, deadline +1 day, open, while the original stays completed; completion comment "Completed 2026-05-27, next occurrence due 2026-05-28." Smoke rows cleaned up (back to 25).
+  - [ ] 🟥 5.3 DEFERRED user spot-check (non-blocking): set a recurrence in the web add form, complete it, watch the next occurrence appear; in Claude, "make task N repeat every weekday".
+
+## Outcomes
+
+Built as planned, no scope drift. The biggest version of the program; all five steps landed cleanly. 190 backend / 91 MCP / 73 frontend tests pass; live smoke confirmed the full spawn-on-complete cycle on the phone with zero data loss.
+
+- **No new architecture.** The recurrence logic is a pure static `RecurrenceRule` helper under a new `Services/` folder - the same shape as `ComputeDueStatus`, NOT a DI service layer. Because it advances from the passed-in deadline (Todoist semantics) it never reads the clock, sidestepping the `DateTime.Now`/`UtcNow` deviation (#18). Recorded in engineering-guidelines.
+- **Spawn hook is the single `Complete` endpoint.** Both the web checkbox and MCP `set_task_completion` route through `PATCH /api/tasks/{id}/complete`; the spawn + completion-comment live there. An open->completed transition guard prevents double-spawning on re-completion. Bulk-complete deliberately does not spawn (documented limitation).
+- **Canonical storage.** Rules are validated and re-serialized on write (`freq=weekly;byday=fr,mo` -> `FREQ=WEEKLY;BYDAY=MO,FR`), so the column is always canonical and we never persist a rule the expander can't advance (unsupported grammar -> 400).
+- **Contract unchanged for `Complete`.** It still returns the completed task; the web `handleComplete` fetches and prepends only the new (unknown-id) occurrence so it appears instantly without disturbing the hide animation.
+- **Deferred (non-blocking):** Step 5.3 user spot-check, consistent with prior versions.
+- **Sets up the rest of the program:** v2.15.0 (advanced grammar) extends `RecurrenceRule` + the picker; v2.17.0 (habit tracking) reads the per-completion comments + the SeriesId history this lays down.

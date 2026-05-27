@@ -53,6 +53,13 @@ export interface Task {
   projectId: number | null;
   // Labels applied to this task. Always present (empty array if none).
   labels: Label[];
+  // Recurrence rule (RRULE-shaped) or null if the task does not repeat.
+  // Completing a recurring task spawns the next occurrence server-side.
+  recurrence: string | null;
+  // Links all occurrences of the same repeating task; null for one-offs.
+  seriesId: string | null;
+  // Server-computed convenience flag (recurrence != null). Read-only.
+  isRecurring: boolean;
   // Timestamped comments. Present on getTask (detail); absent on the list.
   comments?: Comment[];
 }
@@ -84,12 +91,13 @@ export async function createTask(
   deadline?: string,
   projectId?: number | null,
   priority?: number,
-  description?: string
+  description?: string,
+  recurrence?: string
 ): Promise<Task> {
   const res = await fetch(`${getApiUrl()}/api/tasks`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title, deadline: deadline ?? null, projectId: projectId ?? null, priority, description }),
+    body: JSON.stringify({ title, deadline: deadline ?? null, projectId: projectId ?? null, priority, description, recurrence }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
@@ -110,14 +118,25 @@ export async function deleteTask(id: number): Promise<void> {
 // Returns the updated task.
 export async function updateTask(
   id: number,
-  fields: { title?: string; deadline?: string | null; priority?: number; description?: string | null },
+  fields: {
+    title?: string;
+    deadline?: string | null;
+    priority?: number;
+    description?: string | null;
+    recurrence?: string | null;
+  },
 ): Promise<Task> {
   const res = await fetch(`${getApiUrl()}/api/tasks/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(fields),
   });
-  if (!res.ok) throw new Error(`Failed to update task ${id}.`);
+  if (!res.ok) {
+    // Surface the backend's message (e.g. "A recurring task needs a deadline")
+    // so the edit modal can show why a recurrence change was rejected.
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.message ?? `Failed to update task ${id}.`);
+  }
   return res.json();
 }
 

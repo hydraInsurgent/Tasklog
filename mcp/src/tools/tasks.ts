@@ -14,12 +14,29 @@
  * into a query string on GET /api/tasks. Filters AND across dimensions and
  * OR within projectIds and labelIds arrays - matches the web UI's filter
  * panel semantics.
+ *
+ * Recurrence (v2.14.0): create_task and update_task accept an RRULE-shaped
+ * `recurrence` string (see RECURRENCE_DESCRIPTION); tasks carry recurrence /
+ * seriesId / isRecurring. No new tool - completing a recurring task via
+ * set_task_completion spawns the next occurrence server-side.
  */
 
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as api from '../api-client.js';
 import { runTool } from './result.js';
+
+// Shared across create_task and update_task. Teaches the supported RRULE subset
+// (RFC 5545-shaped) so the LLM can turn "every weekday" / "monthly on the 1st"
+// into a rule string. The backend rejects anything outside this subset with a 400.
+const RECURRENCE_DESCRIPTION =
+  'Optional recurrence rule, RRULE-shaped. Supported forms: "FREQ=DAILY" (every ' +
+  'day), "FREQ=DAILY;INTERVAL=N" (every N days), "FREQ=WEEKLY;BYDAY=MO,WE,FR" ' +
+  '(those weekdays; codes SU MO TU WE TH FR SA), "FREQ=MONTHLY;BYMONTHDAY=15" ' +
+  '(that day each month). Requires a deadline - the rule advances from it. ' +
+  'Completing a recurring task automatically creates the next occurrence with its ' +
+  'deadline advanced per the rule. (Nth-weekday like "3rd Thursday", end ' +
+  'conditions, and "every other week" are not supported yet.)';
 
 export function registerTaskTools(server: McpServer): void {
   server.registerTool(
@@ -39,7 +56,8 @@ export function registerTaskTools(server: McpServer): void {
         'deadline (ISO date or null), dueStatus ("overdue" | "today" | ' +
         '"this_week" | "later" | "none", computed server-side from the ' +
         'deadline), priority (1-4, 1=P1 urgent .. 4=P4 none), isCompleted, ' +
-        'completedAt, projectId, project, labels[].',
+        'completedAt, projectId, project, labels[], recurrence (RRULE string or ' +
+        'null) and isRecurring.',
       inputSchema: {
         projectIds: z
           .array(z.number().int().positive())
@@ -194,15 +212,20 @@ export function registerTaskTools(server: McpServer): void {
           .max(2000)
           .optional()
           .describe('Optional free-text notes/context for the task (up to 2000 chars).'),
+        recurrence: z
+          .string()
+          .optional()
+          .describe(RECURRENCE_DESCRIPTION + ' Omit for a one-off task.'),
       },
     },
-    async ({ title, deadline, projectId, priority, description }) =>
+    async ({ title, deadline, projectId, priority, description, recurrence }) =>
       runTool(
         'create_task',
-        () => api.createTask({ title, deadline, projectId, priority, description }),
+        () => api.createTask({ title, deadline, projectId, priority, description, recurrence }),
         (t) =>
           `Created task #${t.id}: "${t.title}"` +
           (t.deadline ? ` (due ${t.deadline})` : '') +
+          (t.recurrence ? ` repeating (${t.recurrence})` : '') +
           (t.projectId ? ` in project ${t.projectId}` : ' in Inbox'),
       ),
   );
@@ -255,21 +278,31 @@ export function registerTaskTools(server: McpServer): void {
             'New free-text description (up to 2000 chars). Pass null (or an empty ' +
               'string) to clear it. Omit to leave it unchanged.',
           ),
+        recurrence: z
+          .string()
+          .nullable()
+          .optional()
+          .describe(
+            RECURRENCE_DESCRIPTION +
+              ' Pass null to stop the task repeating. Omit to leave it unchanged.',
+          ),
       },
     },
-    async ({ id, title, deadline, priority, description }) => {
+    async ({ id, title, deadline, priority, description, recurrence }) => {
       // Build the PATCH body preserving the keep/clear/set distinction:
-      // undefined = omit (keep), null = clear (deadline/description), value = set.
+      // undefined = omit (keep), null = clear (deadline/description/recurrence), value = set.
       const body: {
         title?: string;
         deadline?: string | null;
         priority?: number;
         description?: string | null;
+        recurrence?: string | null;
       } = {};
       if (title !== undefined) body.title = title;
       if (deadline !== undefined) body.deadline = deadline;
       if (priority !== undefined) body.priority = priority;
       if (description !== undefined) body.description = description;
+      if (recurrence !== undefined) body.recurrence = recurrence;
       return runTool('update_task', () => api.updateTask(id, body));
     },
   );
