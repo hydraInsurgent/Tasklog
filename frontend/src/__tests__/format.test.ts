@@ -128,4 +128,23 @@ describe('describeRecurrence', () => {
   it('falls back to "Repeats" for an unrecognised rule', () => {
     expect(describeRecurrence('FREQ=YEARLY')).toBe('Repeats')
   })
+
+  // v2.15.0 advanced forms
+  it('describes nth-weekday and last weekday', () => {
+    expect(describeRecurrence('FREQ=MONTHLY;BYDAY=3TH')).toBe('Monthly on the 3rd Thursday')
+    expect(describeRecurrence('FREQ=MONTHLY;BYDAY=-1FR')).toBe('Monthly on the last Friday')
+  })
+  it('describes last day and from-end day', () => {
+    expect(describeRecurrence('FREQ=MONTHLY;BYMONTHDAY=-1')).toBe('Monthly on the last day')
+    expect(describeRecurrence('FREQ=MONTHLY;BYMONTHDAY=-2')).toBe('Monthly on the 2nd-to-last day')
+  })
+  it('describes weekly/monthly intervals', () => {
+    expect(describeRecurrence('FREQ=WEEKLY;INTERVAL=2;BYDAY=MO')).toBe('Every 2 weeks on Mon')
+    expect(describeRecurrence('FREQ=MONTHLY;INTERVAL=3;BYMONTHDAY=1')).toBe('Every 3 months on the 1st')
+  })
+  it('appends end conditions', () => {
+    expect(describeRecurrence('FREQ=DAILY;COUNT=5')).toBe('Every day, for 5 times')
+    expect(describeRecurrence('FREQ=DAILY;COUNT=1')).toBe('Every day, for 1 time')
+    expect(describeRecurrence('FREQ=DAILY;UNTIL=20261231')).toBe('Every day, until 31 Dec 2026')
+  })
 })

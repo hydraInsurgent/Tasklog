@@ -104,12 +104,15 @@ export const PRIORITY_OPTIONS: { value: number; meta: PriorityMeta }[] = [
   { value: 4, meta: PRIORITY_META[4] },
 ];
 
-// Map RFC 5545 weekday codes to short day names, in week order (the recurrence
-// core only emits the codes below). Used by describeRecurrence.
+// Map RFC 5545 weekday codes to short and full day names, in week order.
 const WEEKDAY_NAMES: Record<string, string> = {
   SU: "Sun", MO: "Mon", TU: "Tue", WE: "Wed", TH: "Thu", FR: "Fri", SA: "Sat",
 };
+const WEEKDAY_FULL: Record<string, string> = {
+  SU: "Sunday", MO: "Monday", TU: "Tuesday", WE: "Wednesday", TH: "Thursday", FR: "Friday", SA: "Saturday",
+};
 const WEEKDAY_ORDER = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
+const ORDINAL_WORDS: Record<number, string> = { 1: "1st", 2: "2nd", 3: "3rd", 4: "4th" };
 
 // Ordinal suffix for a day-of-month (1st, 2nd, 3rd, 4th, ... 21st ...).
 function ordinal(n: number): string {
@@ -123,11 +126,21 @@ function ordinal(n: number): string {
   }
 }
 
+// Format an RRULE UNTIL value (YYYYMMDD or ISO) as a readable date, for labels.
+function formatUntil(raw: string): string {
+  const iso = /^\d{8}$/.test(raw)
+    ? `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`
+    : raw;
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? raw : formatDate(iso);
+}
+
 // Turn an RRULE-shaped recurrence string into a short human label for the
-// recurring badge ("Every day", "Every 3 days", "Weekly on Mon, Wed",
-// "Monthly on the 15th"). Mirrors the supported subset (see the backend
-// RecurrenceRule helper); falls back to "Repeats" for anything unrecognised
-// so the badge never shows a raw rule string.
+// recurring badge ("Every day", "Weekly on Mon, Wed", "Monthly on the 3rd
+// Thursday", "Every 2 weeks on Mon", appending "until 31 Dec 2026" / "for 5
+// times"). Mirrors the supported grammar (see the backend RecurrenceRule
+// helper); falls back to "Repeats" for anything unrecognised so the badge
+// never shows a raw rule string.
 export function describeRecurrence(rule: string | null): string {
   if (!rule) return "";
   const parts = new Map<string, string>();
@@ -138,21 +151,43 @@ export function describeRecurrence(rule: string | null): string {
   const freq = parts.get("FREQ")?.toUpperCase();
   const interval = Number(parts.get("INTERVAL") ?? "1");
 
+  let base: string;
   if (freq === "DAILY") {
-    return interval > 1 ? `Every ${interval} days` : "Every day";
-  }
-  if (freq === "WEEKLY") {
+    base = interval > 1 ? `Every ${interval} days` : "Every day";
+  } else if (freq === "WEEKLY") {
     const days = (parts.get("BYDAY") ?? "")
       .split(",")
       .map((d) => d.trim().toUpperCase())
       .filter((d) => WEEKDAY_NAMES[d])
       .sort((a, b) => WEEKDAY_ORDER.indexOf(a) - WEEKDAY_ORDER.indexOf(b))
       .map((d) => WEEKDAY_NAMES[d]);
-    return days.length > 0 ? `Weekly on ${days.join(", ")}` : "Weekly";
+    const lead = interval > 1 ? `Every ${interval} weeks` : "Weekly";
+    base = days.length > 0 ? `${lead} on ${days.join(", ")}` : lead;
+  } else if (freq === "MONTHLY") {
+    const lead = interval > 1 ? `Every ${interval} months` : "Monthly";
+    const byday = parts.get("BYDAY")?.toUpperCase();
+    if (byday) {
+      // Nth-weekday: e.g. "3TH" -> "3rd Thursday", "-1FR" -> "last Friday".
+      const code = byday.slice(-2);
+      const ord = Number(byday.slice(0, -2));
+      const dayName = WEEKDAY_FULL[code] ?? "day";
+      const which = ord === -1 ? "last" : ORDINAL_WORDS[ord] ?? `${ord}th`;
+      base = `${lead} on the ${which} ${dayName}`;
+    } else {
+      const day = Number(parts.get("BYMONTHDAY"));
+      if (day === -1) base = `${lead} on the last day`;
+      else if (day < 0) base = `${lead} on the ${ordinal(-day)}-to-last day`;
+      else if (day >= 1) base = `${lead} on the ${ordinal(day)}`;
+      else base = lead;
+    }
+  } else {
+    return "Repeats";
   }
-  if (freq === "MONTHLY") {
-    const day = Number(parts.get("BYMONTHDAY"));
-    return day >= 1 ? `Monthly on the ${ordinal(day)}` : "Monthly";
-  }
-  return "Repeats";
+
+  // End condition suffix.
+  const until = parts.get("UNTIL");
+  const count = parts.get("COUNT");
+  if (until) base += `, until ${formatUntil(until)}`;
+  else if (count) base += `, for ${count} ${Number(count) === 1 ? "time" : "times"}`;
+  return base;
 }

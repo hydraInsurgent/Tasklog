@@ -1,6 +1,6 @@
 # Feature Implementation Plan: Advanced recurrence grammar
 
-**Overall Progress:** `50%`
+**Overall Progress:** `70%`
 
 **Tracking issue:** [#71](https://github.com/hydraInsurgent/Tasklog/issues/71)
 **Branch:** `feature/advanced-recurrence-grammar-#71`
@@ -63,10 +63,10 @@ Completing a recurring task whose end condition is reached: marks it done + logs
   - [x] 🟩 2.1 `RECURRENCE_DESCRIPTION` extended with the new forms + examples (every-other-Monday, last-day, 3rd-Thursday, every-2-months, UNTIL, COUNT). No api-client signature change.
   - [x] 🟩 2.2 `api-client.test.ts`: advanced-rule-string wire-contract case. Typecheck clean; **92 MCP tests pass** (was 91).
 
-- [ ] 🟥 **Step 3: Web UI - picker + labels for the new forms** `[sequential]` → depends on: Step 1 `[UI]`
-  - [ ] 🟥 3.1 `format.ts` `describeRecurrence`: new labels ("Monthly on the 3rd Thursday", "Monthly on the last day", "Every 2 weeks on Mon", append "until 31 Dec 2026" / "for 5 times").
-  - [ ] 🟥 3.2 `RecurrencePicker`: monthly sub-choice (day-of-month | nth-weekday with ordinal+weekday dropdowns | last day); weekly + monthly interval input ("every N weeks/months"); a shared "Ends" control (never | on date | after N times) appending `UNTIL`/`COUNT`. `parseRule` reads the new parts back so editing shows the right controls.
-  - [ ] 🟥 3.3 Frontend tests green; clean tsc + next build. `describeRecurrence` + the new picker controls unit-tested.
+- [x] 🟩 **Step 3: Web UI - picker + labels for the new forms** `[sequential]` → depends on: Step 1 `[UI]`
+  - [x] 🟩 3.1 `describeRecurrence`: nth-weekday / last-day / from-end-day / weekly+monthly interval labels + "until <date>" / "for N times" suffixes.
+  - [x] 🟩 3.2 `RecurrencePicker` rewritten on a single config object: monthly day-of-month | nth-weekday (ordinal+weekday dropdowns) | last-day; weekly+monthly interval inputs; shared Ends control (never | on date->UNTIL | after N->COUNT). `parseRule` reads all parts back; canonical part order matches the backend Serialize.
+  - [x] 🟩 3.3 **81 frontend tests pass** (was 73, +8). Clean tsc + next build (verified against a clean tree).
 
 - [ ] 🟥 **Step 4: Docs + CHANGELOG** `[sequential]` → depends on: Steps 1-3
   - [ ] 🟥 4.1 `architecture.md`: widen the recurrence grammar note + the spawn-on-complete end-condition behavior. `product-design.md`: recurrence line gains the advanced forms + end conditions. (engineering-guidelines: no new pattern - skip unless something emerges.)
