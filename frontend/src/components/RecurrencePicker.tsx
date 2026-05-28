@@ -56,7 +56,7 @@ const ORDINALS = [
 ];
 
 const SELECT_CLASS =
-  "w-full px-3 py-2 border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-shadow duration-150 cursor-pointer bg-white disabled:opacity-50 disabled:cursor-not-allowed";
+  "w-full px-3 py-2 border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-shadow duration-150 cursor-pointer bg-surface disabled:opacity-50 disabled:cursor-not-allowed";
 const NUM_CLASS =
   "w-16 px-2 py-1 border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent";
 
@@ -220,7 +220,7 @@ export default function RecurrencePicker({ value, onChange, deadline, disabled }
                   key={d.code} type="button" onClick={() => toggleWeekday(d.code)} disabled={disabled}
                   aria-pressed={active} aria-label={d.full}
                   className={`w-9 h-9 rounded-full text-sm font-medium focus:outline-none focus:ring-2 focus:ring-accent transition-colors duration-150 cursor-pointer ${
-                    active ? "bg-primary text-white" : "bg-white text-zinc-600 border border-border hover:bg-surface-raised"
+                    active ? "bg-primary text-white" : "bg-surface text-zinc-600 border border-border hover:bg-surface-raised"
                   }`}
                 >
                   {d.short}

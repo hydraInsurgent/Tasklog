@@ -1,6 +1,6 @@
 # Feature Implementation Plan: UI uplift (tokens + chip sheet + board views)
 
-**Overall Progress:** `15%`
+**Overall Progress:** `40%`
 
 **Tracking issue:** [#73](https://github.com/hydraInsurgent/Tasklog/issues/73)
 **Branch:** `feature/chip-task-sheet-#73`
@@ -56,11 +56,11 @@ Design tokens, component specs, mockups, and accessibility rules: [UI-SPEC-P73-c
   - [x] 🟩 1.4 Ported `PickerSheet.tsx` (popover/bottom-sheet, portal, focus mgmt, flip, scroll-lock) + `useKeyboardHeight.ts` into `src/hooks/`. NOTE: their `animate-in`/`zoom-in-95` classes need `tw-animate-css` (not wired yet) - inert for now since unused until Stage B; wire or swap to CSS transition in Stage B.
   - [x] 🟩 1.5 tsc clean; 127 jest tests pass; new ports lint-clean except the pre-existing-pattern `set-state-in-effect` rule (non-gating, matches existing code). Visual smoke is the user's pause-point (`npm run dev`).
 
-- [ ] 🟥 **Step 2 [UI]: Stage B - chip-driven TaskSheet (create + edit) + calendar picker** `[sequential]` → depends on: Step 1
-  - [ ] 🟥 2.1 Port + adapt Business's `DueDatePicker` (quick chips Today/Tomorrow/Next week/No date + month grid; adapt to our `deadline` ISO + midnight=date-only model; drop Business's recurrence-in-picker coupling - we keep our own `RecurrencePicker`).
-  - [ ] 🟥 2.2 Build `TaskSheet` (modal ≥640 / keyboard-aware bottom-sheet <640) for BOTH create and edit. Title = existing `QuickAddInput`; chip row for due/priority/project/label/recurrence (each opening a picker in a `PickerSheet`); keep the "Track as a daily habit" checkbox. Reuse: the v2.15.0 quick-add parse on submit, label resolve/create, the `EditTaskModal` diff-on-save, `PRIORITY_OPTIONS`/`labelColor`.
-  - [ ] 🟥 2.3 Wire in: replace the inline `AddTaskForm` (bottom of `TasksClient`) + `EditTaskModal`. The "+ Add Task" buttons (`TasksClient` header + `ProjectLayout` mobile header) open the sheet for create (instead of scroll-to-input); `setEditingTask(task)` opens it for edit.
-  - [ ] 🟥 2.4 Verify: create flow (incl. quick-add tokens + habit) and edit flow (diff/clear/set) both work; tsc/jest/lint green; `npm run dev` smoke on desktop + a narrow viewport.
+- [x] 🟩 **Step 2 [UI]: Stage B - chip-driven TaskSheet (create + edit) + calendar picker** `[sequential]` → depends on: Step 1
+  - [x] 🟩 2.1 `DueDatePicker` (new, `pickers/`): quick chips (reuse `resolvePreset`) + month grid + optional time. Due-date only (dropped Business's cron coupling). Also `pickers/_shared.ts`, `PriorityPicker`, `ProjectPicker`, `LabelPicker` (multi-select + create-on-Enter).
+  - [x] 🟩 2.2 `TaskSheet` (modal / keyboard-aware bottom-sheet) for create + edit. Title = `QuickAddInput`; chip row (due/priority/project/label/recurrence) each opening a `PickerSheet` picker (recurrence wraps the existing `RecurrencePicker`); habit checkbox. Reuses quick-add parse on create + `EditTaskModal`'s diff-on-save on edit.
+  - [x] 🟩 2.3 Wired into `TasksClient` (+ `ProjectLayout`): both "+ Add Task" buttons open the create sheet (`creating` lifted to `ProjectLayout`); edit pencil opens it for edit; `handleSheetSaved` prepends/replaces. Deleted `AddTaskForm` + `EditTaskModal` (+ AddTaskForm.test).
+  - [x] 🟩 2.4 Dependency-free `tl-pop`/`tl-slide-up`/`tl-fade` keyframes (reduced-motion guarded) replace the tw-animate-css classes. Fixed a Stage A gap: `bg-white` → `bg-surface` (19 files). tsc clean; 121 jest pass (127 − 6 deleted AddTaskForm tests; TaskSheet tests are Step 4); lint clean apart from the known `set-state-in-effect` rule.
 
 - [ ] 🟥 **Step 3 [UI]: Stage C - view-mode axis (board ⇄ list) + group-by + per-view persistence** `[sequential]` → depends on: Steps 1, 2
   - [ ] 🟥 3.1 Add `viewMode` ("list"|"board") + `groupBy` ("due"|"project"|"priority") state in `ProjectLayout`, persisted PER VIEW in `localStorage` keyed by `activeView`; pass down to `TasksClient`.

@@ -57,7 +57,7 @@ export default function ColorPicker({ selectedIndex, onSelect, onClose }: Props)
       ref={ref}
       role="dialog"
       aria-label="Pick a label color"
-      className="absolute z-50 top-full mt-1 left-0 bg-white border border-border rounded-lg shadow-lg p-3"
+      className="absolute z-50 top-full mt-1 left-0 bg-surface border border-border rounded-lg shadow-lg p-3"
     >
       {/* 5x2 grid of color circles - 36px each for comfortable tap targets */}
       <div className="grid grid-cols-5 gap-2">

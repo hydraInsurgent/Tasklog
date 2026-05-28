@@ -50,3 +50,26 @@ body {
   font-size: 1rem;
   line-height: 1.6;
 }
+
+/* Entrance animations for overlays (sheet, pickers). Dependency-free - replaces
+   tw-animate-css's animate-in/zoom-in-95/slide-in-from-bottom, so we don't pull in
+   a new package for three keyframes. Durations stay in the 150-200ms UX band and
+   are disabled under prefers-reduced-motion. (#73) */
+@keyframes tl-pop {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes tl-slide-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+@keyframes tl-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.tl-pop      { animation: tl-pop 150ms ease-out; }
+.tl-slide-up { animation: tl-slide-up 200ms ease-out; }
+.tl-fade     { animation: tl-fade 150ms ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .tl-pop, .tl-slide-up, .tl-fade { animation: none; }
+}

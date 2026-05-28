@@ -260,7 +260,7 @@ function EditProjectModal({
       onClick={onCancel}
     >
       <div
-        className="bg-white rounded-lg p-6 w-full max-w-sm mx-4 shadow-lg"
+        className="bg-surface rounded-lg p-6 w-full max-w-sm mx-4 shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
         <h2
@@ -321,7 +321,7 @@ function DeleteProjectDialog({
       onClick={onCancel}
     >
       <div
-        className="bg-white rounded-lg p-6 w-full max-w-sm mx-4 shadow-lg"
+        className="bg-surface rounded-lg p-6 w-full max-w-sm mx-4 shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
         <h2

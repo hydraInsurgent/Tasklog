@@ -81,7 +81,7 @@ export default async function TaskDetailPage({ params }: PageProps) {
       </Link>
 
       {/* Task detail card */}
-      <div className="bg-white border border-border rounded-lg overflow-hidden">
+      <div className="bg-surface border border-border rounded-lg overflow-hidden">
         <div className="px-6 py-5 border-b border-border">
           <h1
             className="text-xl font-semibold text-text-primary"

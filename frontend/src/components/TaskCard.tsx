@@ -186,7 +186,7 @@ export default function TaskCard({
         {menuOpen && (
           <div
             role="menu"
-            className="absolute right-0 top-full mt-1 w-32 bg-white border border-border rounded-md shadow-md z-10"
+            className="absolute right-0 top-full mt-1 w-32 bg-surface border border-border rounded-md shadow-md z-10"
           >
             <button
               role="menuitem"

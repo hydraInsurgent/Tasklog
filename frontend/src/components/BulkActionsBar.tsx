@@ -70,7 +70,7 @@ export default function BulkActionsBar({
       ref={barRef}
       role="region"
       aria-label="Bulk actions"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-white shadow-[0_-2px_8px_rgba(0,0,0,0.06)]"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface shadow-[0_-2px_8px_rgba(0,0,0,0.06)]"
     >
       <div className="mx-auto max-w-5xl px-4 py-3 flex flex-wrap items-center gap-2">
         <span className="text-sm font-medium text-text-primary mr-1">
@@ -111,7 +111,7 @@ export default function BulkActionsBar({
           {openMenu === "project" && (
             <div
               role="menu"
-              className="absolute left-0 bottom-full mb-1 w-48 max-h-64 overflow-y-auto bg-white border border-border rounded-md shadow-md py-1"
+              className="absolute left-0 bottom-full mb-1 w-48 max-h-64 overflow-y-auto bg-surface border border-border rounded-md shadow-md py-1"
             >
               <button
                 role="menuitem"
@@ -180,7 +180,7 @@ export default function BulkActionsBar({
           {openMenu === "priority" && (
             <div
               role="menu"
-              className="absolute left-0 bottom-full mb-1 w-40 bg-white border border-border rounded-md shadow-md py-1"
+              className="absolute left-0 bottom-full mb-1 w-40 bg-surface border border-border rounded-md shadow-md py-1"
             >
               {PRIORITY_OPTIONS.map(({ value, meta }) => (
                 <button

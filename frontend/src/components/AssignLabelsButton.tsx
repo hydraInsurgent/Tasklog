@@ -89,7 +89,7 @@ export default function AssignLabelsButton({ taskId, currentLabels, allLabels }:
           disabled={saving}
           defaultValue=""
           aria-label="Add label"
-          className="text-sm px-2 py-1 border border-border rounded-md text-zinc-600 focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer bg-white transition-shadow duration-150"
+          className="text-sm px-2 py-1 border border-border rounded-md text-zinc-600 focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer bg-surface transition-shadow duration-150"
         >
           <option value="" disabled>
             Add label...

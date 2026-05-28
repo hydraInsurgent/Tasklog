@@ -135,7 +135,7 @@ export default function HabitsClient() {
           <span>Loading habits...</span>
         </div>
       ) : habits.length === 0 ? (
-        <div className="bg-white border border-border rounded-lg py-16 px-6 text-center">
+        <div className="bg-surface border border-border rounded-lg py-16 px-6 text-center">
           <Flame size={28} className="mx-auto text-zinc-300" aria-hidden="true" />
           <p className="mt-3 text-sm text-text-muted">
             No habits yet. Tick &ldquo;Track as a daily habit&rdquo; when adding or editing a task.

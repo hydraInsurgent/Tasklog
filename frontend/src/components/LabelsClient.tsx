@@ -194,7 +194,7 @@ export default function LabelsClient() {
       )}
 
       {/* Labels panel */}
-      <div className="bg-white border border-border rounded-lg overflow-hidden">
+      <div className="bg-surface border border-border rounded-lg overflow-hidden">
         <div className="px-6 py-4 border-b border-border">
           <h1
             className="text-lg font-semibold text-text-primary"
@@ -318,7 +318,7 @@ export default function LabelsClient() {
               {labels.map((label) => (
                 <div
                   key={label.id}
-                  className="flex items-center gap-3 px-4 py-4 bg-white"
+                  className="flex items-center gap-3 px-4 py-4 bg-surface"
                 >
                   {/* Color swatch */}
                   <div className="relative shrink-0">
@@ -393,7 +393,7 @@ export default function LabelsClient() {
       </div>
 
       {/* Create label form */}
-      <div className="bg-white border border-border rounded-lg px-6 py-4">
+      <div className="bg-surface border border-border rounded-lg px-6 py-4">
         <p
           className="text-sm font-medium text-text-primary mb-3"
           style={{ fontFamily: "var(--font-space-grotesk), sans-serif" }}

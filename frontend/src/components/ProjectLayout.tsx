@@ -21,6 +21,9 @@ export default function ProjectLayout() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [activeView, setActiveView] = useState<"all" | "inbox" | number>("all");
+  // Whether the create-task sheet is open. Held here (not in TasksClient) so the
+  // mobile "+ Add Task" button in this header can open the same sheet.
+  const [creating, setCreating] = useState(false);
   const [filterState, setFilterState] = useState<FilterState>(() => {
     // Restore filter state from sessionStorage so filters persist across
     // navigation (e.g. going to /labels and coming back).
@@ -135,7 +138,7 @@ export default function ProjectLayout() {
   return (
     <div className="flex min-h-screen -mx-4 -my-8">
       {/* Desktop sidebar - hidden on mobile */}
-      <aside className="hidden md:flex md:flex-col md:w-56 bg-white border-r border-border shrink-0">
+      <aside className="hidden md:flex md:flex-col md:w-56 bg-surface border-r border-border shrink-0">
         {loadingProjects ? (
           <div className="px-4 py-6 text-sm text-text-muted">Loading...</div>
         ) : (
@@ -150,16 +153,13 @@ export default function ProjectLayout() {
           <button
             onClick={() => setDrawerOpen(true)}
             aria-label="Open navigation"
-            className="flex items-center justify-center p-3 text-zinc-600 hover:text-text-primary border border-border rounded-md bg-white cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1"
+            className="flex items-center justify-center p-3 text-zinc-600 hover:text-text-primary border border-border rounded-md bg-surface cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1"
           >
             <Menu size={20} aria-hidden="true" />
           </button>
           <button
             type="button"
-            onClick={() => {
-              const el = document.getElementById("task-title") as HTMLInputElement | null;
-              if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); el.focus(); }
-            }}
+            onClick={() => setCreating(true)}
             className="flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-medium rounded-md hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 transition-colors duration-150 cursor-pointer"
           >
             <Plus size={16} aria-hidden="true" />
@@ -177,7 +177,7 @@ export default function ProjectLayout() {
           </div>
         )}
 
-        <TasksClient activeView={activeView} projects={projects} filterState={filterState} onFilterChange={setFilterState} />
+        <TasksClient activeView={activeView} projects={projects} filterState={filterState} onFilterChange={setFilterState} creating={creating} onCreatingChange={setCreating} />
       </div>
 
       {/* Mobile drawer backdrop */}
@@ -191,7 +191,7 @@ export default function ProjectLayout() {
 
       {/* Mobile drawer panel */}
       <div
-        className={`fixed inset-y-0 left-0 z-50 w-56 bg-white border-r border-border flex flex-col md:hidden transition-transform duration-200 ${
+        className={`fixed inset-y-0 left-0 z-50 w-56 bg-surface border-r border-border flex flex-col md:hidden transition-transform duration-200 ${
           drawerOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >

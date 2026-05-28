@@ -149,7 +149,7 @@ export default function FilterPanel({
       ref={panelRef}
       role="dialog"
       aria-label="Filter tasks"
-      className="absolute right-0 top-full mt-1 w-72 bg-white border border-border rounded-lg shadow-lg z-40 overflow-hidden"
+      className="absolute right-0 top-full mt-1 w-72 bg-surface border border-border rounded-lg shadow-lg z-40 overflow-hidden"
     >
         {/* Header */}
         <div className="px-4 py-3 border-b border-border-muted flex items-center justify-between">

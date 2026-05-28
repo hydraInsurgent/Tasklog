@@ -35,7 +35,7 @@ export default function RootLayout({
         className={`${spaceGrotesk.variable} ${dmSans.variable} antialiased min-h-screen bg-surface-raised`}
       >
         {/* Site header */}
-        <header className="border-b border-border bg-white">
+        <header className="border-b border-border bg-surface">
           <div className="max-w-6xl mx-auto px-4 py-4">
             <a
               href="/"

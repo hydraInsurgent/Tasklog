@@ -203,7 +203,7 @@ export default function PickerSheet({ open, triggerRef, title, onClose, children
         role="dialog"
         aria-labelledby="picker-sheet-title"
         style={{ position: "fixed", top: pos.top, left: pos.left, width: pos.width, maxHeight: `${pos.maxH}px` }}
-        className="z-[9999] overflow-y-auto overscroll-contain bg-surface border border-border rounded-lg shadow-xl animate-in fade-in zoom-in-95 duration-150"
+        className="z-[9999] overflow-y-auto overscroll-contain bg-surface border border-border rounded-lg shadow-xl tl-pop"
       >
         {header}
         <div className="px-4 py-3">{children}</div>
@@ -217,7 +217,7 @@ export default function PickerSheet({ open, triggerRef, title, onClose, children
   return createPortal(
     <>
       <div
-        className="fixed inset-0 bg-black/50 z-[9998] animate-in fade-in duration-150"
+        className="fixed inset-0 bg-black/50 z-[9998] tl-fade"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -225,7 +225,7 @@ export default function PickerSheet({ open, triggerRef, title, onClose, children
         ref={panelRef}
         role="dialog"
         aria-labelledby="picker-sheet-title"
-        className="fixed inset-x-0 bottom-0 z-[9999] max-h-[85vh] overflow-y-auto overscroll-contain bg-surface border-t border-border rounded-t-2xl shadow-xl animate-in slide-in-from-bottom duration-200 pb-[env(safe-area-inset-bottom,0)]"
+        className="fixed inset-x-0 bottom-0 z-[9999] max-h-[85vh] overflow-y-auto overscroll-contain bg-surface border-t border-border rounded-t-2xl shadow-xl tl-slide-up pb-[env(safe-area-inset-bottom,0)]"
       >
         {/* Drag handle - decorative affordance (not yet swipe-to-dismiss). */}
         <div className="flex justify-center pt-2 pb-1">

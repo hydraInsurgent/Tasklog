@@ -4,11 +4,10 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { usePolling } from "@/hooks/usePolling";
 import Link from "next/link";
 import { Trash2, CheckCircle, XCircle, Loader2, MoreHorizontal, Plus, Pencil, ListChecks } from "lucide-react";
-import { getTasks, createTask, deleteTask, completeTask, getLabels, setTaskLabels, updateTask, bulkTasks, BulkOperation, Task, Project, Label } from "@/lib/api";
+import { getTasks, deleteTask, completeTask, getLabels, updateTask, bulkTasks, BulkOperation, Task, Project, Label } from "@/lib/api";
 import { formatDate, formatDeadline, deadlineColorClass, projectName, labelColor } from "@/lib/format";
-import AddTaskForm from "./AddTaskForm";
 import TaskCard from "./TaskCard";
-import EditTaskModal from "./EditTaskModal";
+import TaskSheet from "./TaskSheet";
 import DeadlinePopover from "./DeadlinePopover";
 import BulkActionsBar from "./BulkActionsBar";
 import PriorityDot from "./PriorityDot";
@@ -28,9 +27,13 @@ interface Props {
   filterState: FilterState;
   // Called when the user applies new filters from the panel.
   onFilterChange: (fs: FilterState) => void;
+  // Whether the create-task sheet is open. Lifted to ProjectLayout so its mobile
+  // "+ Add Task" button (outside this component) can open the same sheet.
+  creating: boolean;
+  onCreatingChange: (creating: boolean) => void;
 }
 
-export default function TasksClient({ activeView, projects, filterState, onFilterChange }: Props) {
+export default function TasksClient({ activeView, projects, filterState, onFilterChange, creating, onCreatingChange }: Props) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [allLabels, setAllLabels] = useState<Label[]>([]);
   const [loading, setLoading] = useState(true);
@@ -167,31 +170,18 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
     }
   }
 
-  // Called by AddTaskForm on submit. Updates local state so no full reload is needed.
-  // When viewing a specific project, new tasks are assigned to that project automatically.
-  async function handleAdd(title: string, deadline?: string, projectId?: number | null, labelIds?: number[], priority?: number, description?: string, recurrence?: string, isHabit?: boolean) {
-    // If the caller didn't pass a projectId but we're viewing a specific project,
-    // default to that project. Inbox / All views default to null (Inbox).
-    const resolvedProjectId =
-      projectId !== undefined ? projectId : typeof activeView === "number" ? activeView : null;
-    let task = await createTask(title, deadline, resolvedProjectId, priority, description, recurrence, isHabit);
-
-    // Apply labels immediately after creation if any were selected.
-    // setTaskLabels returns the updated task with labels populated.
-    if (labelIds && labelIds.length > 0) {
-      task = await setTaskLabels(task.id, labelIds);
-    }
-
-    setTasks((prev) => [task, ...prev]);
-    showFeedback("success", "Task created.");
-  }
-
-  // Called by EditTaskModal after a successful save with the canonical task.
-  // Replace it in local state so the list reflects the edit without a reload.
-  function handleSaved(updated: Task) {
-    setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+  // Called by TaskSheet after a successful create OR edit, with the canonical task.
+  // New tasks (id not yet in the list) are prepended; edits replace in place. The
+  // sheet handles the API calls itself; this just reconciles local state + closes.
+  function handleSheetSaved(task: Task) {
+    setTasks((prev) => {
+      const exists = prev.some((t) => t.id === task.id);
+      return exists ? prev.map((t) => (t.id === task.id ? task : t)) : [task, ...prev];
+    });
+    const wasEdit = editingTask !== null;
     setEditingTask(null);
-    showFeedback("success", "Task updated.");
+    onCreatingChange(false);
+    showFeedback("success", wasEdit ? "Task updated." : "Task created.");
   }
 
   // Quick deadline change from the popover (desktop rows + mobile cards).
@@ -370,7 +360,7 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
       )}
 
       {/* Task list panel */}
-      <div className="bg-white border border-border rounded-lg">
+      <div className="bg-surface border border-border rounded-lg">
         <div className="px-6 py-4 border-b border-border flex items-center justify-between">
           <h1
             className="text-lg font-semibold text-text-primary"
@@ -387,10 +377,7 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => {
-                const el = document.getElementById("task-title") as HTMLInputElement | null;
-                if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); el.focus(); }
-              }}
+              onClick={() => onCreatingChange(true)}
               className="hidden md:flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-medium rounded-md hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 transition-colors duration-150 cursor-pointer"
             >
               <Plus size={16} aria-hidden="true" />
@@ -702,22 +689,18 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
         )}
       </div>
 
-      {/* Add task form - pass projects and labels for dropdowns, pre-select the active project */}
-      <AddTaskForm
-        onAdd={handleAdd}
-        projects={projects}
-        defaultProjectId={typeof activeView === "number" ? activeView : null}
-        allLabels={allLabels}
-      />
-
-      {/* Edit modal - rendered only when a task is being edited */}
-      {editingTask && (
-        <EditTaskModal
-          task={editingTask}
+      {/* Chip-driven sheet for both create (creating) and edit (editingTask). */}
+      {(creating || editingTask) && (
+        <TaskSheet
+          task={editingTask ?? undefined}
           projects={projects}
           allLabels={allLabels}
-          onSaved={handleSaved}
-          onClose={() => setEditingTask(null)}
+          defaultProjectId={typeof activeView === "number" ? activeView : null}
+          onSaved={handleSheetSaved}
+          onClose={() => {
+            setEditingTask(null);
+            onCreatingChange(false);
+          }}
         />
       )}
 

@@ -25,7 +25,7 @@ export default function HabitCard({ habit, onToggle, pending }: Props) {
       : `${currentStreak} day${currentStreak === 1 ? "" : "s"}`;
 
   return (
-    <div className="bg-white border border-border rounded-lg p-5 flex flex-col gap-4">
+    <div className="bg-surface border border-border rounded-lg p-5 flex flex-col gap-4">
       {/* Title + streak */}
       <div className="flex items-start justify-between gap-3">
         <h2 className="text-base font-semibold text-text-primary min-w-0 break-words">

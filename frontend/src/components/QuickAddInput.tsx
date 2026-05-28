@@ -181,7 +181,7 @@ export default function QuickAddInput({ value, onChange, projects, labels, disab
         <ul
           role="listbox"
           aria-label={suggest.symbol === "#" ? "Project suggestions" : "Label suggestions"}
-          className="absolute z-20 top-full mt-1 w-56 bg-white border border-border rounded-md shadow-md max-h-44 overflow-y-auto"
+          className="absolute z-20 top-full mt-1 w-56 bg-surface border border-border rounded-md shadow-md max-h-44 overflow-y-auto"
         >
           {suggest.items.map((name, i) => (
             <li key={name} role="option" aria-selected={i === active}>
