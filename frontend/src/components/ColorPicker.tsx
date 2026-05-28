@@ -57,7 +57,7 @@ export default function ColorPicker({ selectedIndex, onSelect, onClose }: Props)
       ref={ref}
       role="dialog"
       aria-label="Pick a label color"
-      className="absolute z-50 top-full mt-1 left-0 bg-white border border-zinc-200 rounded-lg shadow-lg p-3"
+      className="absolute z-50 top-full mt-1 left-0 bg-white border border-border rounded-lg shadow-lg p-3"
     >
       {/* 5x2 grid of color circles - 36px each for comfortable tap targets */}
       <div className="grid grid-cols-5 gap-2">
@@ -70,7 +70,7 @@ export default function ColorPicker({ selectedIndex, onSelect, onClose }: Props)
             }}
             aria-label={`Select ${COLOR_NAMES[index]}`}
             aria-pressed={index === selectedIndex}
-            className="w-9 h-9 rounded-full cursor-pointer transition-transform duration-100 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600"
+            className="w-9 h-9 rounded-full cursor-pointer transition-transform duration-100 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent"
             style={{
               backgroundColor: hex,
               // Multi-layer box-shadow creates the selected ring: color border > white gap > color outer ring.

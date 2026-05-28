@@ -37,7 +37,7 @@ export default function DeadlinePopover({ onPick, onClose }: Props) {
       ref={ref}
       role="menu"
       aria-label="Set deadline"
-      className="absolute left-0 top-full mt-1 w-40 bg-white border border-zinc-200 rounded-md shadow-lg z-30 overflow-hidden"
+      className="absolute left-0 top-full mt-1 w-40 bg-white border border-border rounded-md shadow-lg z-30 overflow-hidden"
     >
       {DEADLINE_PRESETS.map((preset) => (
         <button
@@ -47,7 +47,7 @@ export default function DeadlinePopover({ onPick, onClose }: Props) {
             onPick(resolvePreset(preset.value as DeadlinePreset));
             onClose();
           }}
-          className="block w-full text-left px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50 focus:outline-none focus:bg-zinc-50 cursor-pointer transition-colors duration-150"
+          className="block w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-surface-raised focus:outline-none focus:bg-surface-raised cursor-pointer transition-colors duration-150"
         >
           {preset.label}
         </button>

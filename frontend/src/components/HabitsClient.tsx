@@ -119,25 +119,25 @@ export default function HabitsClient() {
 
       <div>
         <h1
-          className="text-lg font-semibold text-zinc-900"
+          className="text-lg font-semibold text-text-primary"
           style={{ fontFamily: "var(--font-space-grotesk), sans-serif" }}
         >
           Habits
         </h1>
-        <p className="mt-1 text-sm text-zinc-500">
+        <p className="mt-1 text-sm text-text-muted">
           Check in each day to build a streak. Mark any task a habit from its edit dialog.
         </p>
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center gap-2 py-16 text-zinc-400">
+        <div className="flex items-center justify-center gap-2 py-16 text-text-muted">
           <Loader2 size={20} className="animate-spin" aria-hidden="true" />
           <span>Loading habits...</span>
         </div>
       ) : habits.length === 0 ? (
-        <div className="bg-white border border-zinc-200 rounded-lg py-16 px-6 text-center">
+        <div className="bg-white border border-border rounded-lg py-16 px-6 text-center">
           <Flame size={28} className="mx-auto text-zinc-300" aria-hidden="true" />
-          <p className="mt-3 text-sm text-zinc-500">
+          <p className="mt-3 text-sm text-text-muted">
             No habits yet. Tick &ldquo;Track as a daily habit&rdquo; when adding or editing a task.
           </p>
         </div>

@@ -1,6 +1,6 @@
 # Feature Implementation Plan: UI uplift (tokens + chip sheet + board views)
 
-**Overall Progress:** `0%`
+**Overall Progress:** `15%`
 
 **Tracking issue:** [#73](https://github.com/hydraInsurgent/Tasklog/issues/73)
 **Branch:** `feature/chip-task-sheet-#73`
@@ -49,12 +49,12 @@ Design tokens, component specs, mockups, and accessibility rules: [UI-SPEC-P73-c
 
 <!-- All sequential: each stage builds on the prior. Every step is [UI]. -->
 
-- [ ] 🟥 **Step 1 [UI]: Stage A - token foundation + primitives** `[sequential]` → depends on: nothing (foundation)
-  - [ ] 🟥 1.1 Add the semantic color tokens to `frontend/src/app/globals.css` `@theme` (literal block in UI-SPEC sec 1): bg/surface/surface-raised/text-primary/text-muted/border/border-muted/accent/accent-hover/success(+bg)/warning(+bg)/danger(+bg). Light only; update the `body` base colors to use them. Dark mode deferred (names semantic for a later `.dark` drop-in).
-  - [ ] 🟥 1.2 Incrementally swap hardcoded `zinc-*`/`blue-600`/`green`/`red`/`amber` classes (~486 across ~25 files) to token utilities (`bg-surface`, `text-text-muted`, `border-border`, `text-accent`, `bg-danger-bg`, ...). Apply the contrast guard: muted body text on `surface` not `bg`; zinc-600 for captions on the gray bg. (Closes part of #4.)
-  - [ ] 🟥 1.3 Port `Chip.tsx` from Business (token-mapped): pill, 44px target, focus ring, empty/has-value/active states.
-  - [ ] 🟥 1.4 Port `PickerSheet.tsx` (responsive popover ≥640 / bottom-sheet <640, portal, focus trap, flip-above, scroll-lock, return-focus-to-trigger) + `useKeyboardHeight.ts` (visualViewport) into `src/hooks/`.
-  - [ ] 🟥 1.5 Verify: `npx tsc --noEmit` clean, `npx jest` green, lint clean on new/changed files; visual smoke (`npm run dev`) - colors unchanged-looking, no regressions.
+- [x] 🟩 **Step 1 [UI]: Stage A - token foundation + primitives** `[sequential]` → depends on: nothing (foundation)
+  - [x] 🟩 1.1 Added the semantic color tokens to `globals.css` `@theme` (+ `--color-primary`/`--color-primary-hover` for the dark button, synced into the UI-SPEC). `body` uses the tokens. Light only.
+  - [x] 🟩 1.2 Swapped ~470 of ~486 color classes to token utilities across 24 files (neutrals, accent, primary button, focus rings unified to `ring-accent`, destructive reds → `danger`). DELIBERATELY left literal: success/error feedback banners (green-700/red-700 on -50 tints are AA-correct; tokenizing onto the tint would fail AA), `text-zinc-300` light placeholders, `text-zinc-600` AA-safe muted, the `bg-blue-100` quick-add tint. Closes part of #4 (focus-ring unification + contrast guard).
+  - [x] 🟩 1.3 Ported `Chip.tsx` (already token-named in Business; verbatim + cursor-pointer).
+  - [x] 🟩 1.4 Ported `PickerSheet.tsx` (popover/bottom-sheet, portal, focus mgmt, flip, scroll-lock) + `useKeyboardHeight.ts` into `src/hooks/`. NOTE: their `animate-in`/`zoom-in-95` classes need `tw-animate-css` (not wired yet) - inert for now since unused until Stage B; wire or swap to CSS transition in Stage B.
+  - [x] 🟩 1.5 tsc clean; 127 jest tests pass; new ports lint-clean except the pre-existing-pattern `set-state-in-effect` rule (non-gating, matches existing code). Visual smoke is the user's pause-point (`npm run dev`).
 
 - [ ] 🟥 **Step 2 [UI]: Stage B - chip-driven TaskSheet (create + edit) + calendar picker** `[sequential]` → depends on: Step 1
   - [ ] 🟥 2.1 Port + adapt Business's `DueDatePicker` (quick chips Today/Tomorrow/Next week/No date + month grid; adapt to our `deadline` ISO + midnight=date-only model; drop Business's recurrence-in-picker coupling - we keep our own `RecurrencePicker`).

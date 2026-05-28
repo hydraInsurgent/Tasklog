@@ -66,7 +66,7 @@ export default function AssignLabelsButton({ taskId, currentLabels, allLabels }:
     <div className="flex flex-col items-end gap-2">
       {/* Spinner shown while a request is in flight */}
       {saving && (
-        <Loader2 size={14} className="animate-spin text-zinc-400" aria-hidden="true" />
+        <Loader2 size={14} className="animate-spin text-text-muted" aria-hidden="true" />
       )}
 
       {/* Chips for currently assigned labels */}
@@ -89,7 +89,7 @@ export default function AssignLabelsButton({ taskId, currentLabels, allLabels }:
           disabled={saving}
           defaultValue=""
           aria-label="Add label"
-          className="text-sm px-2 py-1 border border-zinc-200 rounded-md text-zinc-600 focus:outline-none focus:ring-2 focus:ring-blue-600 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer bg-white transition-shadow duration-150"
+          className="text-sm px-2 py-1 border border-border rounded-md text-zinc-600 focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer bg-white transition-shadow duration-150"
         >
           <option value="" disabled>
             Add label...
@@ -104,12 +104,12 @@ export default function AssignLabelsButton({ taskId, currentLabels, allLabels }:
 
       {/* No labels exist at all - guide the user */}
       {allLabels.length === 0 && (
-        <span className="text-sm text-zinc-400">No labels yet</span>
+        <span className="text-sm text-text-muted">No labels yet</span>
       )}
 
       {/* Inline error */}
       {error && (
-        <p className="text-xs text-red-500" role="alert">
+        <p className="text-xs text-danger" role="alert">
           {error}
         </p>
       )}

@@ -25,10 +25,10 @@ export default function HabitCard({ habit, onToggle, pending }: Props) {
       : `${currentStreak} day${currentStreak === 1 ? "" : "s"}`;
 
   return (
-    <div className="bg-white border border-zinc-200 rounded-lg p-5 flex flex-col gap-4">
+    <div className="bg-white border border-border rounded-lg p-5 flex flex-col gap-4">
       {/* Title + streak */}
       <div className="flex items-start justify-between gap-3">
-        <h2 className="text-base font-semibold text-zinc-900 min-w-0 break-words">
+        <h2 className="text-base font-semibold text-text-primary min-w-0 break-words">
           {task.title}
         </h2>
         <div
@@ -42,7 +42,7 @@ export default function HabitCard({ habit, onToggle, pending }: Props) {
           />
           <span
             className={`text-sm font-medium tabular-nums ${
-              currentStreak > 0 ? "text-zinc-900" : "text-zinc-400"
+              currentStreak > 0 ? "text-text-primary" : "text-text-muted"
             }`}
           >
             {streakLabel}
@@ -58,11 +58,11 @@ export default function HabitCard({ habit, onToggle, pending }: Props) {
             <div key={day.date} className="flex flex-col items-center gap-1">
               <span
                 className={`w-5 h-5 rounded-full ${
-                  day.done ? "bg-zinc-900" : "bg-zinc-200"
-                } ${day.isToday ? "ring-2 ring-blue-600 ring-offset-1" : ""}`}
+                  day.done ? "bg-primary" : "bg-border"
+                } ${day.isToday ? "ring-2 ring-accent ring-offset-1" : ""}`}
                 aria-label={`${day.date}${day.done ? " (done)" : ""}`}
               />
-              <span className="text-[10px] text-zinc-400 leading-none">{weekday}</span>
+              <span className="text-[10px] text-text-muted leading-none">{weekday}</span>
             </div>
           );
         })}
@@ -77,7 +77,7 @@ export default function HabitCard({ habit, onToggle, pending }: Props) {
         className={`flex items-center justify-center gap-2 w-full px-4 py-2 min-h-[44px] text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 cursor-pointer ${
           doneToday
             ? "bg-green-600 text-white hover:bg-green-700 focus:ring-green-600"
-            : "bg-zinc-900 text-white hover:bg-zinc-700 focus:ring-zinc-900"
+            : "bg-primary text-white hover:bg-primary-hover focus:ring-accent"
         }`}
       >
         {pending ? (

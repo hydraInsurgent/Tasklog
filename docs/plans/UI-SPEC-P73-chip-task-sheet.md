@@ -33,7 +33,9 @@ across 25 files) to **semantic CSS-variable tokens** in our existing Tailwind v4
 | `--color-text-muted` | `#71717A` | zinc-500 | captions, placeholders, secondary |
 | `--color-border` | `#E4E4E7` | zinc-200 | input/card borders, dividers |
 | `--color-border-muted` | `#F4F4F5` | zinc-100 | subtle inner dividers |
-| `--color-accent` | `#2563EB` | blue-600 | links, focus rings, active chip, primary action |
+| `--color-primary` | `#18181B` | zinc-900 | dark primary button bg (distinct from text-primary for dark-mode divergence) |
+| `--color-primary-hover` | `#27272A` | zinc-800 | primary button hover |
+| `--color-accent` | `#2563EB` | blue-600 | links, focus rings, active chip |
 | `--color-accent-hover` | `#1D4ED8` | blue-700 | hover on accent |
 | `--color-success` | `#16A34A` | green-600 | done/saved (icon + text) |
 | `--color-success-bg` | `#F0FDF4` | green-50 | success tint |
@@ -67,6 +69,8 @@ Our `frontend/src/app/globals.css` already has a fonts-only `@theme`. Extend it:
   --color-text-muted: #71717a;
   --color-border: #e4e4e7;
   --color-border-muted: #f4f4f5;
+  --color-primary: #18181b;
+  --color-primary-hover: #27272a;
   --color-accent: #2563eb;
   --color-accent-hover: #1d4ed8;
   --color-success: #16a34a;

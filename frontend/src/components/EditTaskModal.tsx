@@ -174,9 +174,9 @@ export default function EditTaskModal({ task, projects, allLabels, onSaved, onCl
         className="w-full max-w-md bg-white rounded-lg shadow-xl overflow-hidden max-h-[90vh] flex flex-col"
       >
         {/* Header */}
-        <div className="px-5 py-3 border-b border-zinc-100 flex items-center justify-between">
+        <div className="px-5 py-3 border-b border-border-muted flex items-center justify-between">
           <h2
-            className="text-base font-semibold text-zinc-900"
+            className="text-base font-semibold text-text-primary"
             style={{ fontFamily: "var(--font-space-grotesk), sans-serif" }}
           >
             Edit task
@@ -184,7 +184,7 @@ export default function EditTaskModal({ task, projects, allLabels, onSaved, onCl
           <button
             onClick={onClose}
             aria-label="Close edit dialog"
-            className="flex items-center justify-center w-8 h-8 text-zinc-400 hover:text-zinc-700 focus:outline-none focus:ring-2 focus:ring-blue-600 rounded cursor-pointer transition-colors duration-150"
+            className="flex items-center justify-center w-8 h-8 text-text-muted hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-accent rounded cursor-pointer transition-colors duration-150"
           >
             <X size={16} aria-hidden="true" />
           </button>
@@ -194,7 +194,7 @@ export default function EditTaskModal({ task, projects, allLabels, onSaved, onCl
           <div className="px-5 py-4 space-y-4 overflow-y-auto">
             {/* Title */}
             <div>
-              <label htmlFor="edit-title" className="block text-sm font-medium text-zinc-700 mb-1">
+              <label htmlFor="edit-title" className="block text-sm font-medium text-text-primary mb-1">
                 Title
               </label>
               <input
@@ -204,13 +204,13 @@ export default function EditTaskModal({ task, projects, allLabels, onSaved, onCl
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 disabled={saving}
-                className="w-full px-3 py-2 border border-zinc-200 rounded-md text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-shadow duration-150"
+                className="w-full px-3 py-2 border border-border rounded-md text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-shadow duration-150"
               />
             </div>
 
             {/* Deadline (clearable - empty input = no deadline) */}
             <div>
-              <label htmlFor="edit-deadline" className="block text-sm font-medium text-zinc-700 mb-1">
+              <label htmlFor="edit-deadline" className="block text-sm font-medium text-text-primary mb-1">
                 Deadline
               </label>
               <div className="flex items-center gap-2">
@@ -220,7 +220,7 @@ export default function EditTaskModal({ task, projects, allLabels, onSaved, onCl
                   value={deadline}
                   onChange={(e) => setDeadline(e.target.value)}
                   disabled={saving}
-                  className="flex-1 px-3 py-2 border border-zinc-200 rounded-md text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-shadow duration-150 cursor-pointer"
+                  className="flex-1 px-3 py-2 border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-shadow duration-150 cursor-pointer"
                 />
                 {/* Optional time; blank = date-only. Disabled without a date. */}
                 <input
@@ -229,7 +229,7 @@ export default function EditTaskModal({ task, projects, allLabels, onSaved, onCl
                   onChange={(e) => setDeadlineTime(e.target.value)}
                   aria-label="Deadline time (optional)"
                   disabled={saving || !deadline}
-                  className="w-28 px-2 py-2 border border-zinc-200 rounded-md text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-shadow duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-28 px-2 py-2 border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-shadow duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 />
                 {deadline && (
                   <button
@@ -239,7 +239,7 @@ export default function EditTaskModal({ task, projects, allLabels, onSaved, onCl
                       setDeadlineTime("");
                     }}
                     disabled={saving}
-                    className="text-sm text-zinc-500 hover:text-zinc-900 focus:outline-none focus:underline cursor-pointer"
+                    className="text-sm text-text-muted hover:text-text-primary focus:outline-none focus:underline cursor-pointer"
                   >
                     Clear
                   </button>
@@ -258,7 +258,7 @@ export default function EditTaskModal({ task, projects, allLabels, onSaved, onCl
             {/* Project */}
             {projects.length > 0 && (
               <div>
-                <label htmlFor="edit-project" className="block text-sm font-medium text-zinc-700 mb-1">
+                <label htmlFor="edit-project" className="block text-sm font-medium text-text-primary mb-1">
                   Project
                 </label>
                 <select
@@ -266,7 +266,7 @@ export default function EditTaskModal({ task, projects, allLabels, onSaved, onCl
                   value={projectId}
                   onChange={(e) => setProjectId(e.target.value)}
                   disabled={saving}
-                  className="w-full px-3 py-2 border border-zinc-200 rounded-md text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-shadow duration-150 cursor-pointer bg-white"
+                  className="w-full px-3 py-2 border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-shadow duration-150 cursor-pointer bg-white"
                 >
                   <option value="inbox">Inbox</option>
                   {projects.map((p) => (
@@ -280,7 +280,7 @@ export default function EditTaskModal({ task, projects, allLabels, onSaved, onCl
 
             {/* Priority */}
             <div>
-              <label htmlFor="edit-priority" className="block text-sm font-medium text-zinc-700 mb-1">
+              <label htmlFor="edit-priority" className="block text-sm font-medium text-text-primary mb-1">
                 Priority
               </label>
               <select
@@ -288,7 +288,7 @@ export default function EditTaskModal({ task, projects, allLabels, onSaved, onCl
                 value={String(priority)}
                 onChange={(e) => setPriority(parseInt(e.target.value, 10))}
                 disabled={saving}
-                className="w-full px-3 py-2 border border-zinc-200 rounded-md text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-shadow duration-150 cursor-pointer bg-white"
+                className="w-full px-3 py-2 border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-shadow duration-150 cursor-pointer bg-white"
               >
                 {PRIORITY_OPTIONS.map(({ value, meta }) => (
                   <option key={value} value={String(value)}>
@@ -300,7 +300,7 @@ export default function EditTaskModal({ task, projects, allLabels, onSaved, onCl
 
             {/* Description */}
             <div>
-              <label htmlFor="edit-description" className="block text-sm font-medium text-zinc-700 mb-1">
+              <label htmlFor="edit-description" className="block text-sm font-medium text-text-primary mb-1">
                 Description
               </label>
               <textarea
@@ -311,20 +311,20 @@ export default function EditTaskModal({ task, projects, allLabels, onSaved, onCl
                 rows={3}
                 maxLength={2000}
                 placeholder="Notes, context, a link..."
-                className="w-full px-3 py-2 border border-zinc-200 rounded-md text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-shadow duration-150 resize-y"
+                className="w-full px-3 py-2 border border-border rounded-md text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-shadow duration-150 resize-y"
               />
             </div>
 
             {/* Habit toggle: track this task on the Habits view with a streak. */}
             <div>
-              <label htmlFor="edit-is-habit" className="inline-flex items-center gap-2 text-sm text-zinc-700 cursor-pointer">
+              <label htmlFor="edit-is-habit" className="inline-flex items-center gap-2 text-sm text-text-primary cursor-pointer">
                 <input
                   id="edit-is-habit"
                   type="checkbox"
                   checked={isHabit}
                   onChange={(e) => setIsHabit(e.target.checked)}
                   disabled={saving}
-                  className="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:ring-offset-1 cursor-pointer"
+                  className="h-4 w-4 rounded border-border text-text-primary focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 cursor-pointer"
                 />
                 Track as a daily habit
               </label>
@@ -333,7 +333,7 @@ export default function EditTaskModal({ task, projects, allLabels, onSaved, onCl
             {/* Labels - toggle chips for the existing labels */}
             {allLabels.length > 0 && (
               <div>
-                <p className="block text-sm font-medium text-zinc-700 mb-1.5">Labels</p>
+                <p className="block text-sm font-medium text-text-primary mb-1.5">Labels</p>
                 <div className="flex flex-wrap gap-1.5">
                   {allLabels.map((label) => {
                     const active = labelIds.includes(label.id);
@@ -345,7 +345,7 @@ export default function EditTaskModal({ task, projects, allLabels, onSaved, onCl
                         onClick={() => toggleLabel(label.id)}
                         aria-pressed={active}
                         disabled={saving}
-                        className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer min-h-[32px]"
+                        className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer min-h-[32px]"
                         style={
                           active
                             ? { backgroundColor: color, borderColor: color, color: "#fff" }
@@ -362,26 +362,26 @@ export default function EditTaskModal({ task, projects, allLabels, onSaved, onCl
             )}
 
             {error && (
-              <p className="text-sm text-red-500" role="alert">
+              <p className="text-sm text-danger" role="alert">
                 {error}
               </p>
             )}
           </div>
 
           {/* Footer */}
-          <div className="px-5 py-3 border-t border-zinc-100 flex items-center justify-end gap-2">
+          <div className="px-5 py-3 border-t border-border-muted flex items-center justify-end gap-2">
             <button
               type="button"
               onClick={onClose}
               disabled={saving}
-              className="px-4 py-2 min-h-[40px] text-sm text-zinc-600 hover:text-zinc-900 focus:outline-none focus:underline disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors duration-150"
+              className="px-4 py-2 min-h-[40px] text-sm text-zinc-600 hover:text-text-primary focus:outline-none focus:underline disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors duration-150"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="flex items-center justify-center gap-2 px-4 py-2 min-h-[40px] bg-zinc-900 text-white text-sm font-medium rounded-md hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 cursor-pointer"
+              className="flex items-center justify-center gap-2 px-4 py-2 min-h-[40px] bg-primary text-white text-sm font-medium rounded-md hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 cursor-pointer"
             >
               {saving && <Loader2 size={14} className="animate-spin" aria-hidden="true" />}
               {saving ? "Saving..." : "Save"}

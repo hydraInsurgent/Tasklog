@@ -277,10 +277,10 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
   return (
     <form
       onSubmit={handleSubmit}
-      className="bg-white border border-zinc-200 rounded-lg p-6"
+      className="bg-white border border-border rounded-lg p-6"
     >
       <h2
-        className="text-base font-semibold text-zinc-900 mb-4"
+        className="text-base font-semibold text-text-primary mb-4"
         style={{ fontFamily: "var(--font-space-grotesk), sans-serif" }}
       >
         Add a task
@@ -292,7 +292,7 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
           {/* Visible label required by UX rules (form-labels). */}
           <label
             htmlFor="task-title"
-            className="block text-sm font-medium text-zinc-700 mb-1"
+            className="block text-sm font-medium text-text-primary mb-1"
           >
             Title
           </label>
@@ -309,7 +309,7 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
           />
           {/* Inline error placed directly below the field (error-placement rule). */}
           {error && (
-            <p className="mt-1 text-sm text-red-500" role="alert">
+            <p className="mt-1 text-sm text-danger" role="alert">
               {error}
             </p>
           )}
@@ -319,7 +319,7 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
         <div className="sm:w-44">
           <label
             htmlFor="task-deadline"
-            className="block text-sm font-medium text-zinc-700 mb-1"
+            className="block text-sm font-medium text-text-primary mb-1"
           >
             Deadline (optional)
           </label>
@@ -329,7 +329,7 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
               type="date"
               value={deadline}
               onChange={(e) => setDeadline(e.target.value)}
-              className="flex-1 min-w-0 px-3 py-2 border border-zinc-200 rounded-md text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-shadow duration-150 cursor-pointer"
+              className="flex-1 min-w-0 px-3 py-2 border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-shadow duration-150 cursor-pointer"
               disabled={loading}
             />
             {/* Optional time. Only meaningful with a date; blank = date-only. */}
@@ -339,7 +339,7 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
               onChange={(e) => setDeadlineTime(e.target.value)}
               aria-label="Deadline time (optional)"
               disabled={loading || !deadline}
-              className="w-28 px-2 py-2 border border-zinc-200 rounded-md text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-shadow duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-28 px-2 py-2 border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-shadow duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
         </div>
@@ -349,7 +349,7 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
           <div className="sm:w-44">
             <label
               htmlFor="task-project"
-              className="block text-sm font-medium text-zinc-700 mb-1"
+              className="block text-sm font-medium text-text-primary mb-1"
             >
               Project (optional)
             </label>
@@ -358,7 +358,7 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
               value={selectedProjectId}
               onChange={(e) => setSelectedProjectId(e.target.value)}
               disabled={loading}
-              className="w-full px-3 py-2 border border-zinc-200 rounded-md text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-shadow duration-150 cursor-pointer bg-white"
+              className="w-full px-3 py-2 border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-shadow duration-150 cursor-pointer bg-white"
             >
               <option value="inbox">Inbox</option>
               {projects.map((p) => (
@@ -374,7 +374,7 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
         <div className="sm:w-32">
           <label
             htmlFor="task-priority"
-            className="block text-sm font-medium text-zinc-700 mb-1"
+            className="block text-sm font-medium text-text-primary mb-1"
           >
             Priority
           </label>
@@ -383,7 +383,7 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
             value={String(priority)}
             onChange={(e) => setPriority(parseInt(e.target.value, 10))}
             disabled={loading}
-            className="w-full px-3 py-2 border border-zinc-200 rounded-md text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-shadow duration-150 cursor-pointer bg-white"
+            className="w-full px-3 py-2 border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-shadow duration-150 cursor-pointer bg-white"
           >
             {PRIORITY_OPTIONS.map(({ value, meta }) => (
               <option key={value} value={String(value)}>
@@ -411,7 +411,7 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
           <div className="sm:w-56">
             <label
               htmlFor="task-labels"
-              className="block text-sm font-medium text-zinc-700 mb-1"
+              className="block text-sm font-medium text-text-primary mb-1"
             >
               Labels (optional)
             </label>
@@ -447,7 +447,7 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
                 placeholder="Type to search..."
                 disabled={loading}
                 autoComplete="off"
-                className="w-full px-3 py-2 border border-zinc-200 rounded-md text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-shadow duration-150"
+                className="w-full px-3 py-2 border border-border rounded-md text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-shadow duration-150"
               />
 
               {/* Suggestion dropdown */}
@@ -456,7 +456,7 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
                   ref={suggestionsRef}
                   role="listbox"
                   aria-label="Label suggestions"
-                  className="absolute z-20 top-full mt-1 w-full bg-white border border-zinc-200 rounded-md shadow-md max-h-40 overflow-y-auto"
+                  className="absolute z-20 top-full mt-1 w-full bg-white border border-border rounded-md shadow-md max-h-40 overflow-y-auto"
                 >
                   {labelSuggestions.map((label) => (
                     <li key={label.id} role="option" aria-selected="false">
@@ -467,7 +467,7 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
                           e.preventDefault();
                           selectLabel(label);
                         }}
-                        className="flex items-center gap-2 w-full px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50 focus:outline-none focus:bg-zinc-50 cursor-pointer transition-colors duration-150"
+                        className="flex items-center gap-2 w-full px-3 py-2 text-sm text-text-primary hover:bg-surface-raised focus:outline-none focus:bg-surface-raised cursor-pointer transition-colors duration-150"
                       >
                         {/* Small color swatch */}
                         <span
@@ -486,7 +486,7 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
             {/* Inline error for label creation failures. Separate from the title
                 error so the two don't overwrite each other. Auto-clears after 3s. */}
             {labelError && (
-              <p className="mt-1 text-xs text-red-500" role="alert">
+              <p className="mt-1 text-xs text-danger" role="alert">
                 {labelError}
               </p>
             )}
@@ -495,13 +495,13 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
 
         {/* Submit button: disabled while the request is in flight (disable-during-async rule). */}
         <div className="sm:self-end">
-          <label className="block text-sm font-medium text-zinc-700 mb-1 invisible">
+          <label className="block text-sm font-medium text-text-primary mb-1 invisible">
             &nbsp;
           </label>
           <button
             type="submit"
             disabled={loading}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 min-h-[44px] bg-zinc-900 text-white text-sm font-medium rounded-md hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 cursor-pointer"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 min-h-[44px] bg-primary text-white text-sm font-medium rounded-md hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 cursor-pointer"
           >
             <Plus size={16} aria-hidden="true" />
             {loading ? "Adding..." : "Add Task"}
@@ -511,7 +511,7 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
 
       {/* Description: optional multiline notes, full width below the inline fields. */}
       <div className="mt-3">
-        <label htmlFor="task-description" className="block text-sm font-medium text-zinc-700 mb-1">
+        <label htmlFor="task-description" className="block text-sm font-medium text-text-primary mb-1">
           Description (optional)
         </label>
         <textarea
@@ -522,21 +522,21 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
           rows={2}
           maxLength={2000}
           placeholder="Notes, context, a link..."
-          className="w-full px-3 py-2 border border-zinc-200 rounded-md text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-shadow duration-150 resize-y"
+          className="w-full px-3 py-2 border border-border rounded-md text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-shadow duration-150 resize-y"
         />
       </div>
 
       {/* Habit toggle: marks the task as a daily habit so it shows on the Habits
           view with a streak. A plain checkbox keeps it out of the inline field row. */}
       <div className="mt-3">
-        <label htmlFor="task-is-habit" className="inline-flex items-center gap-2 text-sm text-zinc-700 cursor-pointer">
+        <label htmlFor="task-is-habit" className="inline-flex items-center gap-2 text-sm text-text-primary cursor-pointer">
           <input
             id="task-is-habit"
             type="checkbox"
             checked={isHabit}
             onChange={(e) => setIsHabit(e.target.checked)}
             disabled={loading}
-            className="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:ring-offset-1 cursor-pointer"
+            className="h-4 w-4 rounded border-border text-text-primary focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 cursor-pointer"
           />
           Track as a daily habit
         </label>

@@ -10,7 +10,7 @@ export default function HabitsPage() {
     <div className="max-w-4xl space-y-6">
       <Link
         href="/"
-        className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-900 focus:outline-none focus:underline transition-colors duration-150"
+        className="inline-flex items-center gap-1.5 text-sm text-text-muted hover:text-text-primary focus:outline-none focus:underline transition-colors duration-150"
       >
         <ArrowLeft size={16} aria-hidden="true" />
         Back to tasks

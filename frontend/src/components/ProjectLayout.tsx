@@ -135,9 +135,9 @@ export default function ProjectLayout() {
   return (
     <div className="flex min-h-screen -mx-4 -my-8">
       {/* Desktop sidebar - hidden on mobile */}
-      <aside className="hidden md:flex md:flex-col md:w-56 bg-white border-r border-zinc-200 shrink-0">
+      <aside className="hidden md:flex md:flex-col md:w-56 bg-white border-r border-border shrink-0">
         {loadingProjects ? (
-          <div className="px-4 py-6 text-sm text-zinc-400">Loading...</div>
+          <div className="px-4 py-6 text-sm text-text-muted">Loading...</div>
         ) : (
           <ProjectSidebar {...sidebarProps} />
         )}
@@ -150,7 +150,7 @@ export default function ProjectLayout() {
           <button
             onClick={() => setDrawerOpen(true)}
             aria-label="Open navigation"
-            className="flex items-center justify-center p-3 text-zinc-600 hover:text-zinc-900 border border-zinc-200 rounded-md bg-white cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-1"
+            className="flex items-center justify-center p-3 text-zinc-600 hover:text-text-primary border border-border rounded-md bg-white cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1"
           >
             <Menu size={20} aria-hidden="true" />
           </button>
@@ -160,7 +160,7 @@ export default function ProjectLayout() {
               const el = document.getElementById("task-title") as HTMLInputElement | null;
               if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); el.focus(); }
             }}
-            className="flex items-center gap-2 px-4 py-2 bg-zinc-900 text-white text-sm font-medium rounded-md hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:ring-offset-2 transition-colors duration-150 cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-medium rounded-md hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 transition-colors duration-150 cursor-pointer"
           >
             <Plus size={16} aria-hidden="true" />
             Add Task
@@ -191,23 +191,23 @@ export default function ProjectLayout() {
 
       {/* Mobile drawer panel */}
       <div
-        className={`fixed inset-y-0 left-0 z-50 w-56 bg-white border-r border-zinc-200 flex flex-col md:hidden transition-transform duration-200 ${
+        className={`fixed inset-y-0 left-0 z-50 w-56 bg-white border-r border-border flex flex-col md:hidden transition-transform duration-200 ${
           drawerOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         {/* Drawer header with close button */}
-        <div className="flex items-center justify-end px-3 py-3 border-b border-zinc-200">
+        <div className="flex items-center justify-end px-3 py-3 border-b border-border">
           <button
             onClick={() => setDrawerOpen(false)}
             aria-label="Close navigation"
-            className="flex items-center justify-center p-2 text-zinc-600 hover:text-zinc-900 cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-1 rounded"
+            className="flex items-center justify-center p-2 text-zinc-600 hover:text-text-primary cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 rounded"
           >
             <X size={20} aria-hidden="true" />
           </button>
         </div>
 
         {loadingProjects ? (
-          <div className="px-4 py-6 text-sm text-zinc-400">Loading...</div>
+          <div className="px-4 py-6 text-sm text-text-muted">Loading...</div>
         ) : (
           <ProjectSidebar {...sidebarProps} />
         )}

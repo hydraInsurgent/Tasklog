@@ -56,9 +56,9 @@ const ORDINALS = [
 ];
 
 const SELECT_CLASS =
-  "w-full px-3 py-2 border border-zinc-200 rounded-md text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-shadow duration-150 cursor-pointer bg-white disabled:opacity-50 disabled:cursor-not-allowed";
+  "w-full px-3 py-2 border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-shadow duration-150 cursor-pointer bg-white disabled:opacity-50 disabled:cursor-not-allowed";
 const NUM_CLASS =
-  "w-16 px-2 py-1 border border-zinc-200 rounded-md text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent";
+  "w-16 px-2 py-1 border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent";
 
 function defaults(deadline?: string): Cfg {
   const d = deadline ? new Date(deadline) : null;
@@ -167,7 +167,7 @@ export default function RecurrencePicker({ value, onChange, deadline, disabled }
 
   return (
     <div>
-      <label htmlFor="task-recurrence" className="block text-sm font-medium text-zinc-700 mb-1">
+      <label htmlFor="task-recurrence" className="block text-sm font-medium text-text-primary mb-1">
         Repeat (optional)
       </label>
       <select
@@ -184,12 +184,12 @@ export default function RecurrencePicker({ value, onChange, deadline, disabled }
       </select>
 
       {!hasDeadline && (
-        <p className="mt-1 text-xs text-zinc-500">Set a deadline to make this task repeat.</p>
+        <p className="mt-1 text-xs text-text-muted">Set a deadline to make this task repeat.</p>
       )}
 
       {/* Daily: interval. */}
       {hasDeadline && cfg.mode === "daily" && (
-        <div className="mt-2 flex items-center gap-2 text-sm text-zinc-700">
+        <div className="mt-2 flex items-center gap-2 text-sm text-text-primary">
           <span>Every</span>
           <input
             type="number" min={1} max={365} value={cfg.interval} disabled={disabled}
@@ -203,7 +203,7 @@ export default function RecurrencePicker({ value, onChange, deadline, disabled }
       {/* Weekly: interval + weekday chips. */}
       {hasDeadline && cfg.mode === "weekly" && (
         <div className="mt-2 space-y-2">
-          <div className="flex items-center gap-2 text-sm text-zinc-700">
+          <div className="flex items-center gap-2 text-sm text-text-primary">
             <span>Every</span>
             <input
               type="number" min={1} max={52} value={cfg.interval} disabled={disabled}
@@ -219,8 +219,8 @@ export default function RecurrencePicker({ value, onChange, deadline, disabled }
                 <button
                   key={d.code} type="button" onClick={() => toggleWeekday(d.code)} disabled={disabled}
                   aria-pressed={active} aria-label={d.full}
-                  className={`w-9 h-9 rounded-full text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-600 transition-colors duration-150 cursor-pointer ${
-                    active ? "bg-zinc-900 text-white" : "bg-white text-zinc-600 border border-zinc-200 hover:bg-zinc-50"
+                  className={`w-9 h-9 rounded-full text-sm font-medium focus:outline-none focus:ring-2 focus:ring-accent transition-colors duration-150 cursor-pointer ${
+                    active ? "bg-primary text-white" : "bg-white text-zinc-600 border border-border hover:bg-surface-raised"
                   }`}
                 >
                   {d.short}
@@ -234,7 +234,7 @@ export default function RecurrencePicker({ value, onChange, deadline, disabled }
       {/* Monthly: interval + day-of-month | nth-weekday | last-day. */}
       {hasDeadline && cfg.mode === "monthly" && (
         <div className="mt-2 space-y-2">
-          <div className="flex items-center gap-2 text-sm text-zinc-700">
+          <div className="flex items-center gap-2 text-sm text-text-primary">
             <span>Every</span>
             <input
               type="number" min={1} max={24} value={cfg.interval} disabled={disabled}
@@ -253,7 +253,7 @@ export default function RecurrencePicker({ value, onChange, deadline, disabled }
             <option value="lastDay">On the last day</option>
           </select>
           {cfg.monthlyKind === "day" && (
-            <div className="flex items-center gap-2 text-sm text-zinc-700">
+            <div className="flex items-center gap-2 text-sm text-text-primary">
               <span>Day</span>
               <input
                 type="number" min={1} max={31} value={cfg.monthDay} disabled={disabled}
@@ -303,7 +303,7 @@ export default function RecurrencePicker({ value, onChange, deadline, disabled }
             />
           )}
           {cfg.endKind === "afterN" && (
-            <div className="flex items-center gap-2 text-sm text-zinc-700">
+            <div className="flex items-center gap-2 text-sm text-text-primary">
               <span>After</span>
               <input
                 type="number" min={1} max={999} value={cfg.endCount} disabled={disabled}

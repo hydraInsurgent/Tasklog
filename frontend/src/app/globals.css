@@ -1,17 +1,51 @@
 @import "tailwindcss";
 
-/* Design token: custom fonts from next/font/google.
-   --font-space-grotesk and --font-dm-sans are injected by layout.tsx.
-   Defining them in @theme makes `font-heading` and `font-body` Tailwind utilities. */
+/* Design tokens (#73).
+   Fonts: --font-space-grotesk / --font-dm-sans are injected by layout.tsx;
+   defining them in @theme makes `font-heading` / `font-body` Tailwind utilities.
+
+   Colors: semantic CSS-variable tokens promoted from the previously-hardcoded
+   zinc-*/blue-600 usage (see docs/plans/UI-SPEC-P73-chip-task-sheet.md). Names are
+   semantic (surface / text-primary / accent ...), so a future `.dark` block is a
+   drop-in - dark mode itself is deliberately out of scope for now (light only).
+   Use the token utilities (bg-surface, text-text-muted, border-border, text-accent,
+   bg-danger-bg, ...) instead of hardcoding hex/zinc classes. */
 @theme {
   --font-heading: var(--font-space-grotesk), sans-serif;
   --font-body: var(--font-dm-sans), sans-serif;
+
+  /* Neutrals (zinc family) */
+  --color-bg: #fafafa;             /* zinc-50  - page background */
+  --color-surface: #ffffff;        /* white    - cards, sheet, panels */
+  --color-surface-raised: #f4f4f5; /* zinc-100 - chips, picker rows, hover, board columns */
+  --color-text-primary: #18181b;   /* zinc-900 - body + headings */
+  --color-text-muted: #71717a;     /* zinc-500 - captions, placeholders, secondary */
+  --color-border: #e4e4e7;         /* zinc-200 - input/card borders, dividers */
+  --color-border-muted: #f4f4f5;   /* zinc-100 - subtle inner dividers */
+
+  /* Primary action (the dark button) - distinct from text-primary so it can
+     diverge in a future dark theme. */
+  --color-primary: #18181b;        /* zinc-900 */
+  --color-primary-hover: #27272a;  /* zinc-800 */
+
+  /* Accent (links, focus rings, active chip). Blue-600 (not blue-500) for WCAG AA
+     as text/link on white. */
+  --color-accent: #2563eb;         /* blue-600 */
+  --color-accent-hover: #1d4ed8;   /* blue-700 */
+
+  /* Semantic (text variants are AA-safe on white; -bg are soft tints for the board). */
+  --color-success: #16a34a;        /* green-600 */
+  --color-success-bg: #f0fdf4;     /* green-50  */
+  --color-warning: #ca8a04;        /* yellow-600 */
+  --color-warning-bg: #fefce8;     /* yellow-50  */
+  --color-danger: #dc2626;         /* red-600 */
+  --color-danger-bg: #fef2f2;      /* red-50  */
 }
 
 /* Base styles */
 body {
-  background-color: #fafafa; /* zinc-50 */
-  color: #18181b;            /* zinc-900 */
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
   font-family: var(--font-dm-sans), system-ui, sans-serif;
   font-size: 1rem;
   line-height: 1.6;

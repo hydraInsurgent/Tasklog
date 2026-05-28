@@ -149,12 +149,12 @@ export default function FilterPanel({
       ref={panelRef}
       role="dialog"
       aria-label="Filter tasks"
-      className="absolute right-0 top-full mt-1 w-72 bg-white border border-zinc-200 rounded-lg shadow-lg z-40 overflow-hidden"
+      className="absolute right-0 top-full mt-1 w-72 bg-white border border-border rounded-lg shadow-lg z-40 overflow-hidden"
     >
         {/* Header */}
-        <div className="px-4 py-3 border-b border-zinc-100 flex items-center justify-between">
+        <div className="px-4 py-3 border-b border-border-muted flex items-center justify-between">
           <span
-            className="text-sm font-semibold text-zinc-900"
+            className="text-sm font-semibold text-text-primary"
             style={{ fontFamily: "var(--font-space-grotesk), sans-serif" }}
           >
             Filter tasks
@@ -162,7 +162,7 @@ export default function FilterPanel({
           <button
             onClick={onClose}
             aria-label="Close filter panel"
-            className="flex items-center justify-center w-6 h-6 text-zinc-400 hover:text-zinc-700 focus:outline-none focus:ring-2 focus:ring-blue-600 rounded cursor-pointer transition-colors duration-150"
+            className="flex items-center justify-center w-6 h-6 text-text-muted hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-accent rounded cursor-pointer transition-colors duration-150"
           >
             <X size={14} aria-hidden="true" />
           </button>
@@ -171,7 +171,7 @@ export default function FilterPanel({
         <div className="px-4 py-3 space-y-4 max-h-64 overflow-y-auto">
           {/* Text search section */}
           <section>
-            <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-2">
+            <p className="text-xs font-medium text-text-muted uppercase tracking-wide mb-2">
               Search
             </p>
             <input
@@ -183,14 +183,14 @@ export default function FilterPanel({
               }}
               placeholder="Search by title..."
               aria-label="Search tasks by title"
-              className="w-full px-2.5 py-1.5 text-sm border border-zinc-300 rounded-md text-zinc-700 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition-colors duration-150"
+              className="w-full px-2.5 py-1.5 text-sm border border-border rounded-md text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-colors duration-150"
             />
           </section>
 
           {/* Labels section */}
           {allLabels.length > 0 && (
             <section>
-              <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-2">
+              <p className="text-xs font-medium text-text-muted uppercase tracking-wide mb-2">
                 Labels
               </p>
               <div className="flex flex-wrap gap-1.5">
@@ -202,7 +202,7 @@ export default function FilterPanel({
                       key={label.id}
                       onClick={() => toggleLabel(label.id)}
                       aria-pressed={active}
-                      className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer min-h-[32px]"
+                      className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer min-h-[32px]"
                       style={
                         active
                           ? { backgroundColor: color, borderColor: color, color: "#fff" }
@@ -221,7 +221,7 @@ export default function FilterPanel({
           {/* Projects section */}
           {allProjects.length > 0 && (
             <section>
-              <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-2">
+              <p className="text-xs font-medium text-text-muted uppercase tracking-wide mb-2">
                 Project
               </p>
               <div className="space-y-1">
@@ -230,15 +230,15 @@ export default function FilterPanel({
                   return (
                     <label
                       key={project.id}
-                      className="flex items-center gap-2 px-1 py-1 rounded cursor-pointer hover:bg-zinc-50 transition-colors duration-150"
+                      className="flex items-center gap-2 px-1 py-1 rounded cursor-pointer hover:bg-surface-raised transition-colors duration-150"
                     >
                       <input
                         type="checkbox"
                         checked={active}
                         onChange={() => toggleProject(project.id)}
-                        className="w-4 h-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-600 cursor-pointer"
+                        className="w-4 h-4 rounded border-border text-accent focus:ring-accent cursor-pointer"
                       />
-                      <span className="text-sm text-zinc-700">{project.name}</span>
+                      <span className="text-sm text-text-primary">{project.name}</span>
                     </label>
                   );
                 })}
@@ -248,14 +248,14 @@ export default function FilterPanel({
 
           {/* Date section */}
           <section>
-            <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-2">
+            <p className="text-xs font-medium text-text-muted uppercase tracking-wide mb-2">
               Date
             </p>
             <div className="space-y-1">
               {DATE_OPTIONS.map((opt) => (
                 <label
                   key={opt.value}
-                  className="flex items-center gap-2 px-1 py-1 rounded cursor-pointer hover:bg-zinc-50 transition-colors duration-150"
+                  className="flex items-center gap-2 px-1 py-1 rounded cursor-pointer hover:bg-surface-raised transition-colors duration-150"
                 >
                   <input
                     type="radio"
@@ -263,9 +263,9 @@ export default function FilterPanel({
                     value={opt.value}
                     checked={draft.dateFilter === opt.value}
                     onChange={() => setDraft((prev) => ({ ...prev, dateFilter: opt.value }))}
-                    className="w-4 h-4 border-zinc-300 text-blue-600 focus:ring-blue-600 cursor-pointer"
+                    className="w-4 h-4 border-border text-accent focus:ring-accent cursor-pointer"
                   />
-                  <span className="text-sm text-zinc-700">{opt.label}</span>
+                  <span className="text-sm text-text-primary">{opt.label}</span>
                 </label>
               ))}
             </div>
@@ -273,7 +273,7 @@ export default function FilterPanel({
 
           {/* Priority section - toggle chips, OR semantics (matches labels) */}
           <section>
-            <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-2">
+            <p className="text-xs font-medium text-text-muted uppercase tracking-wide mb-2">
               Priority
             </p>
             <div className="flex flex-wrap gap-1.5">
@@ -286,7 +286,7 @@ export default function FilterPanel({
                     key={value}
                     onClick={() => togglePriority(value)}
                     aria-pressed={active}
-                    className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer min-h-[32px]"
+                    className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer min-h-[32px]"
                     style={
                       active
                         ? { backgroundColor: color, borderColor: color, color: "#fff" }
@@ -303,16 +303,16 @@ export default function FilterPanel({
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-3 border-t border-zinc-100 flex items-center justify-between gap-2">
+        <div className="px-4 py-3 border-t border-border-muted flex items-center justify-between gap-2">
           <button
             onClick={handleClear}
-            className="text-sm text-zinc-500 hover:text-zinc-900 focus:outline-none focus:underline transition-colors duration-150 cursor-pointer"
+            className="text-sm text-text-muted hover:text-text-primary focus:outline-none focus:underline transition-colors duration-150 cursor-pointer"
           >
             Clear filters
           </button>
           <button
             onClick={handleApply}
-            className="px-4 py-2 min-h-[36px] bg-zinc-900 text-white text-sm font-medium rounded-md hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:ring-offset-2 transition-colors duration-150 cursor-pointer"
+            className="px-4 py-2 min-h-[36px] bg-primary text-white text-sm font-medium rounded-md hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 transition-colors duration-150 cursor-pointer"
           >
             Apply
           </button>

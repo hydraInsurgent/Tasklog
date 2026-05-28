@@ -194,10 +194,10 @@ export default function LabelsClient() {
       )}
 
       {/* Labels panel */}
-      <div className="bg-white border border-zinc-200 rounded-lg overflow-hidden">
-        <div className="px-6 py-4 border-b border-zinc-200">
+      <div className="bg-white border border-border rounded-lg overflow-hidden">
+        <div className="px-6 py-4 border-b border-border">
           <h1
-            className="text-lg font-semibold text-zinc-900"
+            className="text-lg font-semibold text-text-primary"
             style={{ fontFamily: "var(--font-space-grotesk), sans-serif" }}
           >
             Labels
@@ -206,12 +206,12 @@ export default function LabelsClient() {
 
         {loading ? (
           // Loading state spinner.
-          <div className="flex items-center justify-center gap-2 py-16 text-zinc-400">
+          <div className="flex items-center justify-center gap-2 py-16 text-text-muted">
             <Loader2 size={20} className="animate-spin" aria-hidden="true" />
             <span>Loading labels...</span>
           </div>
         ) : labels.length === 0 ? (
-          <p className="py-16 text-center text-zinc-400 text-sm">
+          <p className="py-16 text-center text-text-muted text-sm">
             No labels yet. Add one below.
           </p>
         ) : (
@@ -220,11 +220,11 @@ export default function LabelsClient() {
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-zinc-100 text-left">
+                  <tr className="border-b border-border-muted text-left">
                     <th className="pl-6 pr-2 py-3 w-12">
                       <span className="sr-only">Color</span>
                     </th>
-                    <th className="px-4 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">
+                    <th className="px-4 py-3 text-xs font-medium text-text-muted uppercase tracking-wide">
                       Label
                     </th>
                     <th className="px-6 py-3 w-24">
@@ -232,11 +232,11 @@ export default function LabelsClient() {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-100">
+                <tbody className="divide-y divide-border-muted">
                   {labels.map((label) => (
                     <tr
                       key={label.id}
-                      className="hover:bg-zinc-50 transition-colors duration-150"
+                      className="hover:bg-surface-raised transition-colors duration-150"
                     >
                       {/* Color swatch - clicking opens the color picker */}
                       <td className="pl-6 pr-2 py-4">
@@ -249,7 +249,7 @@ export default function LabelsClient() {
                             }
                             disabled={pendingIds.has(label.id)}
                             aria-label={`Change color for label: ${label.name}`}
-                            className="w-5 h-5 rounded-full cursor-pointer transition-transform duration-100 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-5 h-5 rounded-full cursor-pointer transition-transform duration-100 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
                             style={{ backgroundColor: labelColor(label.colorIndex) }}
                           />
                           {colorPickerId === label.id && (
@@ -276,12 +276,12 @@ export default function LabelsClient() {
                               if (e.key === "Escape") setEditingId(null);
                             }}
                             disabled={pendingIds.has(label.id)}
-                            className="w-full px-2 py-1 border border-zinc-300 rounded text-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full px-2 py-1 border border-border rounded text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                           />
                         ) : (
                           <button
                             onClick={() => startEdit(label)}
-                            className="text-left text-zinc-900 font-medium hover:text-blue-600 cursor-pointer focus:outline-none focus:underline transition-colors duration-150"
+                            className="text-left text-text-primary font-medium hover:text-accent cursor-pointer focus:outline-none focus:underline transition-colors duration-150"
                           >
                             {label.name}
                           </button>
@@ -294,7 +294,7 @@ export default function LabelsClient() {
                           onClick={() => handleDelete(label)}
                           disabled={pendingIds.has(label.id)}
                           aria-label={`Delete label: ${label.name}`}
-                          className="flex items-center justify-center min-w-[44px] min-h-[44px] text-zinc-400 hover:text-red-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors duration-150 cursor-pointer"
+                          className="flex items-center justify-center min-w-[44px] min-h-[44px] text-text-muted hover:text-danger focus:outline-none focus:ring-2 focus:ring-danger focus:ring-offset-1 rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors duration-150 cursor-pointer"
                         >
                           {pendingIds.has(label.id) ? (
                             <Loader2
@@ -314,7 +314,7 @@ export default function LabelsClient() {
             </div>
 
             {/* Mobile card list - shown below md: breakpoint */}
-            <div className="md:hidden divide-y divide-zinc-100">
+            <div className="md:hidden divide-y divide-border-muted">
               {labels.map((label) => (
                 <div
                   key={label.id}
@@ -330,7 +330,7 @@ export default function LabelsClient() {
                       }
                       disabled={pendingIds.has(label.id)}
                       aria-label={`Change color for label: ${label.name}`}
-                      className="w-5 h-5 rounded-full cursor-pointer transition-transform duration-100 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-5 h-5 rounded-full cursor-pointer transition-transform duration-100 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
                       style={{ backgroundColor: labelColor(label.colorIndex) }}
                     />
                     {colorPickerId === label.id && (
@@ -356,12 +356,12 @@ export default function LabelsClient() {
                           if (e.key === "Escape") setEditingId(null);
                         }}
                         disabled={pendingIds.has(label.id)}
-                        className="w-full px-2 py-1 border border-zinc-300 rounded text-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full px-2 py-1 border border-border rounded text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                       />
                     ) : (
                       <button
                         onClick={() => startEdit(label)}
-                        className="text-left text-zinc-900 font-medium hover:text-blue-600 cursor-pointer focus:outline-none focus:underline transition-colors duration-150 truncate w-full"
+                        className="text-left text-text-primary font-medium hover:text-accent cursor-pointer focus:outline-none focus:underline transition-colors duration-150 truncate w-full"
                       >
                         {label.name}
                       </button>
@@ -373,7 +373,7 @@ export default function LabelsClient() {
                     onClick={() => handleDelete(label)}
                     disabled={pendingIds.has(label.id)}
                     aria-label={`Delete label: ${label.name}`}
-                    className="shrink-0 flex items-center justify-center min-w-[44px] min-h-[44px] text-zinc-400 hover:text-red-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors duration-150 cursor-pointer"
+                    className="shrink-0 flex items-center justify-center min-w-[44px] min-h-[44px] text-text-muted hover:text-danger focus:outline-none focus:ring-2 focus:ring-danger focus:ring-offset-1 rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors duration-150 cursor-pointer"
                   >
                     {pendingIds.has(label.id) ? (
                       <Loader2
@@ -393,9 +393,9 @@ export default function LabelsClient() {
       </div>
 
       {/* Create label form */}
-      <div className="bg-white border border-zinc-200 rounded-lg px-6 py-4">
+      <div className="bg-white border border-border rounded-lg px-6 py-4">
         <p
-          className="text-sm font-medium text-zinc-700 mb-3"
+          className="text-sm font-medium text-text-primary mb-3"
           style={{ fontFamily: "var(--font-space-grotesk), sans-serif" }}
         >
           Add label
@@ -410,12 +410,12 @@ export default function LabelsClient() {
             }}
             placeholder="Label name"
             disabled={creating}
-            className="flex-1 px-3 py-2 border border-zinc-200 rounded-md text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-3 py-2 border border-border rounded-md text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
           />
           <button
             onClick={handleCreate}
             disabled={!newName.trim() || creating}
-            className="px-4 py-2 min-h-[44px] text-sm bg-zinc-900 text-white rounded-md hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-1 flex items-center gap-2"
+            className="px-4 py-2 min-h-[44px] text-sm bg-primary text-white rounded-md hover:bg-primary-hover disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 flex items-center gap-2"
           >
             {creating && (
               <Loader2 size={14} className="animate-spin" aria-hidden="true" />

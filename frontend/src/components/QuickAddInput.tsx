@@ -173,7 +173,7 @@ export default function QuickAddInput({ value, onChange, projects, labels, disab
         placeholder={placeholder}
         disabled={disabled}
         autoComplete="off"
-        className={`relative w-full whitespace-pre border-zinc-200 bg-transparent text-zinc-900 caret-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-shadow duration-150 ${METRICS}`}
+        className={`relative w-full whitespace-pre border-border bg-transparent text-text-primary caret-zinc-900 placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-shadow duration-150 ${METRICS}`}
       />
 
       {/* #/@ autosuggest dropdown. */}
@@ -181,7 +181,7 @@ export default function QuickAddInput({ value, onChange, projects, labels, disab
         <ul
           role="listbox"
           aria-label={suggest.symbol === "#" ? "Project suggestions" : "Label suggestions"}
-          className="absolute z-20 top-full mt-1 w-56 bg-white border border-zinc-200 rounded-md shadow-md max-h-44 overflow-y-auto"
+          className="absolute z-20 top-full mt-1 w-56 bg-white border border-border rounded-md shadow-md max-h-44 overflow-y-auto"
         >
           {suggest.items.map((name, i) => (
             <li key={name} role="option" aria-selected={i === active}>
@@ -193,11 +193,11 @@ export default function QuickAddInput({ value, onChange, projects, labels, disab
                   applySuggestion(name);
                 }}
                 onMouseEnter={() => setActive(i)}
-                className={`flex items-center gap-2 w-full px-3 py-2 text-sm text-zinc-700 focus:outline-none cursor-pointer transition-colors duration-150 ${
-                  i === active ? "bg-zinc-100" : "hover:bg-zinc-50"
+                className={`flex items-center gap-2 w-full px-3 py-2 text-sm text-text-primary focus:outline-none cursor-pointer transition-colors duration-150 ${
+                  i === active ? "bg-surface-raised" : "hover:bg-surface-raised"
                 }`}
               >
-                <span className="text-zinc-400">{suggest.symbol}</span>
+                <span className="text-text-muted">{suggest.symbol}</span>
                 {name}
               </button>
             </li>
@@ -212,14 +212,14 @@ export default function QuickAddInput({ value, onChange, projects, labels, disab
         <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Recognized from the title">
           {tokens.map((tok, i) => (
             <li key={`${tok.start}-${i}`}>
-              <span className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full bg-zinc-100 text-xs text-zinc-700">
-                <span className="text-zinc-400">{TYPE_LABEL[tok.type]}</span>
+              <span className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full bg-surface-raised text-xs text-text-primary">
+                <span className="text-text-muted">{TYPE_LABEL[tok.type]}</span>
                 <span className="font-medium">{tok.text}</span>
                 <button
                   type="button"
                   onClick={() => removeToken(tok)}
                   aria-label={`Remove ${TYPE_LABEL[tok.type]} ${tok.text}`}
-                  className="flex items-center justify-center w-4 h-4 rounded-full text-zinc-400 hover:text-zinc-700 hover:bg-zinc-200 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer"
+                  className="flex items-center justify-center w-4 h-4 rounded-full text-text-muted hover:text-text-primary hover:bg-border focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer"
                 >
                   <X size={11} aria-hidden="true" />
                 </button>
