@@ -24,8 +24,8 @@ describe('AddTaskForm', () => {
     await userEvent.click(screen.getByRole('button', { name: /add task/i }))
 
     await waitFor(() => {
-      // 5th arg priority (default P4 = 4); 6th description (none); 7th recurrence (none).
-      expect(onAdd).toHaveBeenCalledWith('Buy milk', undefined, 1, undefined, 4, undefined, undefined)
+      // 5th arg priority (default P4 = 4); 6th description (none); 7th recurrence (none); 8th isHabit (false).
+      expect(onAdd).toHaveBeenCalledWith('Buy milk', undefined, 1, undefined, 4, undefined, undefined, false)
     })
   })
 
@@ -37,8 +37,8 @@ describe('AddTaskForm', () => {
     await userEvent.click(screen.getByRole('button', { name: /add task/i }))
 
     await waitFor(() => {
-      // #Work -> projectId 1, p1 -> priority 1, tokens stripped from the title.
-      expect(onAdd).toHaveBeenCalledWith('Email Mark', undefined, 1, undefined, 1, undefined, undefined)
+      // #Work -> projectId 1, p1 -> priority 1, tokens stripped from the title; 8th isHabit (false).
+      expect(onAdd).toHaveBeenCalledWith('Email Mark', undefined, 1, undefined, 1, undefined, undefined, false)
     })
   })
 

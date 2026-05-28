@@ -52,6 +52,8 @@ export default function EditTaskModal({ task, projects, allLabels, onSaved, onCl
   const [description, setDescription] = useState(task.description ?? "");
   // Recurrence rule (RRULE-shaped) or null. Cleared if the deadline is removed.
   const [recurrence, setRecurrence] = useState<string | null>(task.recurrence);
+  // Whether the task is tracked as a daily habit. Toggling off keeps past check-ins.
+  const [isHabit, setIsHabit] = useState(task.isHabit);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -108,20 +110,21 @@ export default function EditTaskModal({ task, projects, allLabels, onSaved, onCl
     // Recurrence needs a deadline to anchor from; clearing the deadline also clears it.
     const newRecurrence = newDeadline ? recurrence : null;
     const recurrenceChanged = newRecurrence !== (task.recurrence ?? null);
+    const isHabitChanged = isHabit !== task.isHabit;
     const projectChanged = projectId !== origProjectId;
     const labelsChanged =
       origLabelIds.length !== newLabelIds.length ||
       origLabelIds.some((id, i) => id !== newLabelIds[i]);
 
-    if (!titleChanged && !deadlineChanged && !priorityChanged && !descriptionChanged && !recurrenceChanged && !projectChanged && !labelsChanged) {
+    if (!titleChanged && !deadlineChanged && !priorityChanged && !descriptionChanged && !recurrenceChanged && !isHabitChanged && !projectChanged && !labelsChanged) {
       onClose(); // nothing to do
       return;
     }
 
     setSaving(true);
     try {
-      if (titleChanged || deadlineChanged || priorityChanged || descriptionChanged || recurrenceChanged) {
-        const body: { title?: string; deadline?: string | null; priority?: number; description?: string | null; recurrence?: string | null } = {};
+      if (titleChanged || deadlineChanged || priorityChanged || descriptionChanged || recurrenceChanged || isHabitChanged) {
+        const body: { title?: string; deadline?: string | null; priority?: number; description?: string | null; recurrence?: string | null; isHabit?: boolean } = {};
         if (titleChanged) body.title = trimmed;
         // Send the deadline whenever the recurrence is being set, so the backend
         // sees the anchor in the same PATCH (it processes deadline before recurrence).
@@ -129,6 +132,7 @@ export default function EditTaskModal({ task, projects, allLabels, onSaved, onCl
         if (priorityChanged) body.priority = priority;
         if (descriptionChanged) body.description = newDescription;
         if (recurrenceChanged) body.recurrence = newRecurrence;
+        if (isHabitChanged) body.isHabit = isHabit;
         await updateTask(task.id, body);
       }
       if (projectChanged) {
@@ -309,6 +313,21 @@ export default function EditTaskModal({ task, projects, allLabels, onSaved, onCl
                 placeholder="Notes, context, a link..."
                 className="w-full px-3 py-2 border border-zinc-200 rounded-md text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-shadow duration-150 resize-y"
               />
+            </div>
+
+            {/* Habit toggle: track this task on the Habits view with a streak. */}
+            <div>
+              <label htmlFor="edit-is-habit" className="inline-flex items-center gap-2 text-sm text-zinc-700 cursor-pointer">
+                <input
+                  id="edit-is-habit"
+                  type="checkbox"
+                  checked={isHabit}
+                  onChange={(e) => setIsHabit(e.target.checked)}
+                  disabled={saving}
+                  className="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:ring-offset-1 cursor-pointer"
+                />
+                Track as a daily habit
+              </label>
             </div>
 
             {/* Labels - toggle chips for the existing labels */}

@@ -11,6 +11,7 @@ namespace Tasklog.Api.Data
         public DbSet<Project> Projects => Set<Project>();
         public DbSet<Label> Labels => Set<Label>();
         public DbSet<TaskComment> Comments => Set<TaskComment>();
+        public DbSet<CheckIn> CheckIns => Set<CheckIn>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -33,6 +34,18 @@ namespace Tasklog.Api.Data
                 .WithMany(t => t.Comments)
                 .HasForeignKey(c => c.TaskId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            // A task's habit check-ins cascade-delete with the task. The unique index on
+            // (TaskId, CheckInDate) enforces one check-in per habit per day, so "done today"
+            // is idempotent at the database level.
+            modelBuilder.Entity<CheckIn>()
+                .HasOne(c => c.Task)
+                .WithMany(t => t.CheckIns)
+                .HasForeignKey(c => c.TaskId)
+                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<CheckIn>()
+                .HasIndex(c => new { c.TaskId, c.CheckInDate })
+                .IsUnique();
         }
     }
 }

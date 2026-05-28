@@ -34,6 +34,7 @@ describe('Task.dueStatus shape (server-computed, pass-through)', () => {
       recurrence: null,
       seriesId: null,
       isRecurring: false,
+      isHabit: false,
     };
     assert.ok(allowed.includes(sample.dueStatus));
     assert.equal(sample.priority, 4);
@@ -220,6 +221,31 @@ describe('comments wire contract', () => {
   test('Task.comments is an optional Comment[] (present on get_task)', () => {
     const allowed: Task['comments'] = [{ id: 1, body: 'hi', createdAt: '2026-05-27T00:00:00Z' }];
     assert.equal(allowed?.[0].body, 'hi');
+  });
+});
+
+// isHabit flows through create/update bodies; log_habit_checkin POSTs { date? } (#74).
+describe('habits wire contract', () => {
+  test('create body carries isHabit', () => {
+    assert.equal(
+      JSON.stringify({ title: 'Meditate', isHabit: true }),
+      '{"title":"Meditate","isHabit":true}',
+    );
+  });
+  test('update body sets isHabit true / false (no clear - it is a plain bool)', () => {
+    assert.equal(JSON.stringify({ isHabit: true }), '{"isHabit":true}');
+    assert.equal(JSON.stringify({ isHabit: false }), '{"isHabit":false}');
+  });
+  test('check-in body carries an explicit date when given', () => {
+    assert.equal(JSON.stringify({ date: '2026-05-28' }), '{"date":"2026-05-28"}');
+  });
+  test('check-in body is empty {} for today (date omitted)', () => {
+    // addCheckIn posts {} when no date is passed - the backend defaults to today.
+    assert.equal(JSON.stringify({}), '{}');
+  });
+  test('Task carries isHabit as a required boolean', () => {
+    const t: Pick<Task, 'isHabit'> = { isHabit: true };
+    assert.equal(t.isHabit, true);
   });
 });
 

@@ -53,7 +53,12 @@ I wanted a task system I understood completely - one where the data, the workflo
 - Set a priority (P1-P4) per task, shown as a colored dot and filterable
 - Checkbox completion with a clean animation - done tasks step aside, not deleted
 - Show/hide completed tasks and undo completion at any time
-- Task detail page with full status and completion history
+- Task detail page with full status, comments, and completion history
+
+**Repeat and build habits**
+- Recurring tasks with Todoist-level rules - daily, every N days, weekly on chosen weekdays, monthly on a day-of-month or the "3rd Thursday" / "last day", every-other-week intervals, and end conditions (until a date or for N times). Completing one spawns the next occurrence automatically
+- Natural-language quick-add - type "Email Mark friday #Work @urgent p1 every week" and the date, repeat, project, label, and priority are parsed inline as you type
+- Daily habits - flag any task a habit and check it in each day from the Habits view; see your current streak and a last-7-days dot row
 
 **Works everywhere**
 - Clean table on desktop, card view on mobile
@@ -63,7 +68,7 @@ I wanted a task system I understood completely - one where the data, the workflo
 
 **Talk to your tasks via Claude (v2.10)**
 - Tasklog can be plugged into claude.ai as a custom connector (Model Context Protocol server)
-- Text Claude on web or mobile to add, complete, list, organize tasks - no app switch
+- Text Claude on web or mobile to add, complete, list, organize tasks, set recurrence, and check in habits - no app switch
 - Tasks created via Claude appear instantly in your Tasklog UI
 - OAuth 2.1 with GitHub upstream gates access; only your username is allowed
 - The Tasklog API itself stays LAN-only; only one tightly-scoped MCP endpoint is exposed

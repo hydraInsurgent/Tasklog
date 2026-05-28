@@ -1,6 +1,6 @@
 # Test Coverage
 
-**Last updated:** 2026-05-27 (#72 - natural-language quick-add: quickAdd parser + QuickAddInput, v2.15.0)
+**Last updated:** 2026-05-28 (#74 - habit tracking: HabitStreak + CheckIns/Habits controllers + IsHabit + Habits view, v2.16.0)
 
 ---
 
@@ -23,7 +23,11 @@
 | TasksController (description) | 100% | 100% | +9 tests for description on create/update (#67) |
 | CommentsController | 100% | 100% | +10 tests for task comments (add/list/delete + GetById-includes) (#69) |
 | RecurrenceRule | 100% | 100% | #70 core tests + #71 advanced (nth-weekday, last/from-end day, weekly/monthly INTERVAL>1, UNTIL/COUNT round-trip, ShouldSpawn truth table) |
-| TasksController (recurrence) | 100% | 100% | #70 spawn tests + #71 end-condition gate (COUNT stops at Nth, UNTIL stops past date, series-complete comment, nth-weekday spawn) - 216 backend tests total |
+| TasksController (recurrence) | 100% | 100% | #70 spawn tests + #71 end-condition gate (COUNT stops at Nth, UNTIL stops past date, series-complete comment, nth-weekday spawn) |
+| HabitStreak | 100% | 100% | +9 tests (#74): empty=0, today-only=1, consecutive run, yesterday-grace, gap breaks, last-done-2-days-ago=0, ignores time + unordered, dedupes |
+| CheckInsController | 100% | 100% | +8 tests (#74): create 201, idempotent same-day 200, explicit date, unknown task 404, delete 204, delete-missing 404, list newest-first, list unknown 404 |
+| HabitsController | 100% | 100% | +5 tests (#74): only IsHabit tasks, not-done-today streak 0, done-today streak 1, consecutive run, empty |
+| TasksController (isHabit) | 100% | 100% | +7 tests (#74): create default false / true, update set/unset/omit, non-boolean -> 400 - 245 backend tests total |
 | ProjectsController | 100% | 100% | All methods and branches covered |
 | TasklogDbContext | 100% | 100% | |
 | Program.cs | 0% | - | Framework wiring - not a test target |
@@ -38,7 +42,7 @@
 | oauth/store.ts | 92.28% | 100% | 83.33% | Uncovered lines are TS interface declarations (no runtime code) |
 | oauth/token.ts | 99% | 87.18% | 100% | L22 + L65 (defensive content-type / grant_type checks not exercised) |
 | tools/result.ts | 100% | 100% | 100% | |
-| api-client.ts | ~80% | ~85% | 30% | `buildTaskQuery` covered by 13 tests; `update_task` PATCH body contract (keep/clear/set) covered by 5 tests (#59), both in api-client.test.ts. HTTP/timeout paths still integration territory |
+| api-client.ts | ~80% | ~85% | 30% | `buildTaskQuery` covered by 13 tests; `update_task` PATCH body contract (keep/clear/set) covered by 5 tests (#59); +5 habit wire-contract tests (#74). All in api-client.test.ts. HTTP/timeout paths still integration territory |
 | config.ts | 89.83% | 40% | 100% | Production-only validation branches not fired in tests |
 | oauth/authorize.ts | - | - | - | Not unit-tested; end-to-end smoke-tested via claude.ai connector |
 | oauth/github.ts | - | - | - | Same - integration territory (GitHub fetch + signed cookie + redirect chain) |
@@ -46,9 +50,9 @@
 | oauth/well-known.ts | - | - | - | Returns fixed JSON metadata |
 | server.ts | - | - | - | Hono mount order + request logger; covered by middleware tests + end-to-end smoke |
 
-**92 tests, 0 failures** (was 91; +1 in api-client.test.ts for the advanced recurrence rule strings, #71). Run with: `npm test --prefix mcp` (auto-rebuilds better-sqlite3 for host arch via pretest hook if needed). Note: a fresh `npm install` on the host installs better-sqlite3 without the native binary - run `npm rebuild better-sqlite3` once after install if the OAuth store/token tests fail with `ERR_DLOPEN_FAILED`.
+**97 tests, 0 failures** (was 92; +5 in api-client.test.ts for the habit wire contract - isHabit on create/update, check-in body, Task.isHabit, #74). Run with: `npm test --prefix mcp` (auto-rebuilds better-sqlite3 for host arch via pretest hook if needed). Note: a fresh `npm install` on the host installs better-sqlite3 without the native binary - run `npm rebuild better-sqlite3` once after install if the OAuth store/token tests fail with `ERR_DLOPEN_FAILED`.
 
-### Next.js Frontend - last run 2026-05-27 (118 tests; +37 for quick-add: quickAdd parser + QuickAddInput + AddTaskForm integration, #72)
+### Next.js Frontend - last run 2026-05-28 (127 tests; +9 for habits: HabitCard render/toggle + format.lastNDays, #74)
 
 | Component | Statements | Branches | Lines | Uncovered |
 |---|---|---|---|---|
@@ -58,11 +62,13 @@
 | deadlinePresets.ts | 95.23% | 87.5% | 100% | L41 (one unreachable preset branch); pure resolver, 10 tests (#59) |
 | TaskCard.tsx | ~80% | ~88% | ~80% | deadline popover open + edit wiring exercised via TasksClient; +3 tests for selection-mode checkbox (#63) |
 | BulkActionsBar.tsx | 0% | 0% | 0% | New (#63). Integration candidate; the bar is presentational (buttons + a reused DeadlinePopover) and is exercised via the live smoke + manual UI |
-| format.ts | ~88% | ~85% | ~88% | +4 tests for priorityMeta / PRIORITY_OPTIONS (#64) |
+| format.ts | ~88% | ~85% | ~88% | +4 tests for priorityMeta / PRIORITY_OPTIONS (#64); +3 for lastNDays habit-dot model (#74) |
 | PriorityDot.tsx | covered | - | - | Rendered + asserted via TaskCard tests (dot for P1, none for P4) (#64) |
 | AddTaskForm.tsx | 45.09% | 40.74% | 49.45% | Project dropdown + label autocomplete render paths (grew since v2.4; not a regression) |
 | DeadlinePopover.tsx | 10.52% | 0% | 11.76% | Behavior covered indirectly: `resolvePreset` is unit-tested; the popover is a thin button list. Direct render test is an integration candidate |
-| EditTaskModal.tsx | 0% | 0% | 0% | Integration test candidate (fan-out PATCH + getTask flow); the diffing logic is the thing worth covering if it grows |
+| EditTaskModal.tsx | 0% | 0% | 0% | Integration test candidate (fan-out PATCH + getTask flow); the diffing logic is the thing worth covering if it grows. Gained the isHabit diff (#74) |
+| HabitCard.tsx | covered | - | - | +6 tests (#74): title + streak count, "No streak yet", 7-dot row, mark/done labels + aria-pressed, onToggle fires, disabled while pending |
+| HabitsClient.tsx | 0% | 0% | 0% | Integration test candidate (fetch + poll + optimistic check-in toggle); HabitCard carries the rendered behaviour |
 | ProjectLayout.tsx | 0% | 0% | 0% | Integration test candidate |
 | ProjectSidebar.tsx | 0% | 0% | 0% | Integration test candidate |
 | TasksClient.tsx | 0% | 0% | 0% | Integration test candidate |
@@ -214,6 +220,30 @@
 - [x] 🟩 Update - set assigns SeriesId; set-without-deadline 400; clear nulls rule+SeriesId; invalid rule 400
 - [x] 🟩 (#71) Complete - COUNT=2 stops at the 2nd occurrence; UNTIL stops once past; series-complete comment logged; monthly nth-weekday spawn advances to the 3rd Thursday
 
+### HabitStreak helper (#74, pure - injected today)
+- [x] 🟩 empty -> 0; today-only -> 1; consecutive run ending today -> N
+- [x] 🟩 not done today but yesterday-run survives via grace
+- [x] 🟩 gap breaks the streak; last done 2 days ago -> 0; yesterday-only -> 1
+- [x] 🟩 ignores time component + unordered input; duplicate days don't inflate
+
+### CheckInsController (#74)
+- [x] 🟩 Create - new day -> 201 + adds a row
+- [x] 🟩 Create - same day twice is idempotent (200, no duplicate)
+- [x] 🟩 Create - explicit date uses that day; unknown task -> 404
+- [x] 🟩 Delete - removes today's check-in (204); no check-in -> 404
+- [x] 🟩 GetForTask - lists newest-first; unknown task -> 404
+
+### HabitsController GET /api/habits (#74)
+- [x] 🟩 returns only IsHabit tasks
+- [x] 🟩 not checked in today -> streak 0, doneToday false
+- [x] 🟩 checked in today -> streak 1, doneToday true, one recent check-in
+- [x] 🟩 counts a consecutive run; no habits -> empty
+
+### TasksController - isHabit (#74)
+- [x] 🟩 Create - defaults isHabit false; sets true when provided
+- [x] 🟩 Update - sets true / unsets false / omitted leaves unchanged
+- [x] 🟩 Update - non-boolean isHabit -> 400
+
 ### ProjectsController
 - [x] 🟩 GetAll - returns projects ordered alphabetically
 - [x] 🟩 Create - returns 201 with created project on valid name
@@ -306,6 +336,14 @@
 - [x] 🟩 parseQuickAdd - bare multi-weekday ("friday and saturday") -> FREQ=WEEKLY;BYDAY=FR,SA;UNTIL=<last>, anchored on the soonest; "every ..." stays ongoing; single weekday stays one-off
 - [x] 🟩 AddTaskForm - quick-add tokens parse on submit (#Work + p1 -> project/priority, cleaned title)
 - [x] 🟩 QuickAddInput - tint span for a known #project (none for unknown); #/@ autosuggest; arrow-key nav + Enter select; Repeat chip for a recurrence; remove (unlink) a chip
+
+### HabitCard + format.lastNDays (habits, #74)
+- [x] 🟩 HabitCard - renders title + streak count ("5 days"); "No streak yet" at 0
+- [x] 🟩 HabitCard - renders a 7-day dot row
+- [x] 🟩 HabitCard - "Mark done today" when not done; "Done today" + aria-pressed when done
+- [x] 🟩 HabitCard - onToggle fires with the habit on click; disabled while pending
+- [x] 🟩 lastNDays - returns N days oldest-first ending today (isToday on the last)
+- [x] 🟩 lastNDays - marks a day done when a check-in falls on it (ignoring time); ignores out-of-window check-ins
 
 ### deadlinePresets (resolvePreset, injected `now`)
 - [x] 🟩 today - returns today's local date
@@ -400,6 +438,7 @@ its own subprocess, so in-memory DBs are isolated across files.
 - [x] 🟩 comments - add_task_comment body; Task.comments optional Comment[] type (#69)
 - [x] 🟩 recurrence - create/update bodies carry recurrence; update null clears; Task carries recurrence/seriesId/isRecurring (#70)
 - [x] 🟩 recurrence - advanced rule strings (3TH, BYMONTHDAY=-1, INTERVAL=2, UNTIL, COUNT) pass through verbatim (#71)
+- [x] 🟩 habits - create body carries isHabit; update sets true/false; check-in body carries an explicit date / is {} for today; Task.isHabit required bool (#74)
 
 ### Not covered (and why)
 - `tools/tasks.ts`, `tools/projects.ts`, `tools/labels.ts` - thin api-client wrappers; behavior is exercised through `runTool` tests + the end-to-end smoke run with claude.ai.

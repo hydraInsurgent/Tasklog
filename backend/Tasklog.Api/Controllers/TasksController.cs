@@ -220,7 +220,8 @@ namespace Tasklog.Api.Controllers
                 ProjectId = request.ProjectId,
                 Priority = priority,
                 Recurrence = recurrence,
-                SeriesId = seriesId
+                SeriesId = seriesId,
+                IsHabit = request.IsHabit ?? false
             };
 
             _context.Tasks.Add(task);
@@ -330,6 +331,14 @@ namespace Tasklog.Api.Controllers
                 {
                     return BadRequest(new { message = "Recurrence must be an RRULE string or null." });
                 }
+            }
+
+            // isHabit: present + bool toggles whether the task is a habit. Absent leaves it.
+            if (body.TryGetProperty("isHabit", out var habitEl))
+            {
+                if (habitEl.ValueKind != JsonValueKind.True && habitEl.ValueKind != JsonValueKind.False)
+                    return BadRequest(new { message = "isHabit must be a boolean." });
+                task.IsHabit = habitEl.GetBoolean();
             }
 
             await _context.SaveChangesAsync();
@@ -668,7 +677,7 @@ namespace Tasklog.Api.Controllers
     // Request body shape for task creation. Priority is optional (defaults to 4 = none);
     // Description is optional free text (null/blank = none); Recurrence is an optional
     // RRULE-shaped string (requires a Deadline to anchor the repeat).
-    public record CreateTaskRequest(string Title, DateTime? Deadline, int? ProjectId, int? Priority = null, string? Description = null, string? Recurrence = null);
+    public record CreateTaskRequest(string Title, DateTime? Deadline, int? ProjectId, int? Priority = null, string? Description = null, string? Recurrence = null, bool? IsHabit = null);
 
     // Request body shape for toggling task completion.
     public record CompleteTaskRequest(bool IsCompleted);

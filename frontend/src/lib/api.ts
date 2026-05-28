@@ -60,6 +60,8 @@ export interface Task {
   seriesId: string | null;
   // Server-computed convenience flag (recurrence != null). Read-only.
   isRecurring: boolean;
+  // Whether this task is tracked as a daily habit (shown on the Habits view with a streak).
+  isHabit: boolean;
   // Timestamped comments. Present on getTask (detail); absent on the list.
   comments?: Comment[];
 }
@@ -69,6 +71,25 @@ export interface Comment {
   id: number;
   body: string;
   createdAt: string;
+}
+
+// A single daily check-in on a habit. checkInDate is date-only (local midnight).
+export interface CheckIn {
+  id: number;
+  checkInDate: string; // ISO date string
+  createdAt: string;
+  taskId: number;
+}
+
+// The /api/habits response: a habit task plus its computed check-in stats.
+export interface Habit {
+  task: Task;
+  // Consecutive days checked in, counting back from today (grace through yesterday).
+  currentStreak: number;
+  // Whether today's check-in is already logged.
+  doneToday: boolean;
+  // Recent check-in dates (newest first), enough for the last-7-days dot row.
+  recentCheckIns: string[]; // ISO date strings
 }
 
 // GET /api/tasks - fetch all tasks ordered by creation date (newest first).
@@ -92,12 +113,13 @@ export async function createTask(
   projectId?: number | null,
   priority?: number,
   description?: string,
-  recurrence?: string
+  recurrence?: string,
+  isHabit?: boolean
 ): Promise<Task> {
   const res = await fetch(`${getApiUrl()}/api/tasks`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title, deadline: deadline ?? null, projectId: projectId ?? null, priority, description, recurrence }),
+    body: JSON.stringify({ title, deadline: deadline ?? null, projectId: projectId ?? null, priority, description, recurrence, isHabit }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
@@ -124,6 +146,7 @@ export async function updateTask(
     priority?: number;
     description?: string | null;
     recurrence?: string | null;
+    isHabit?: boolean;
   },
 ): Promise<Task> {
   const res = await fetch(`${getApiUrl()}/api/tasks/${id}`, {
@@ -198,6 +221,34 @@ export async function deleteComment(taskId: number, commentId: number): Promise<
     method: "DELETE",
   });
   if (!res.ok) throw new Error("Failed to delete comment.");
+}
+
+// GET /api/habits - fetch habit tasks, each with its streak, doneToday, and recent check-ins.
+export async function getHabits(): Promise<Habit[]> {
+  const res = await fetch(`${getApiUrl()}/api/habits`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Failed to fetch habits.");
+  return res.json();
+}
+
+// POST /api/tasks/:id/checkins - mark a habit done for a day (default today).
+// Idempotent: a second call for the same day returns the existing check-in.
+export async function addCheckIn(taskId: number, date?: string): Promise<CheckIn> {
+  const res = await fetch(`${getApiUrl()}/api/tasks/${taskId}/checkins`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(date ? { date } : {}),
+  });
+  if (!res.ok) throw new Error(`Failed to check in habit ${taskId}.`);
+  return res.json();
+}
+
+// DELETE /api/tasks/:id/checkins?date=yyyy-MM-dd - undo a check-in (default today).
+export async function removeCheckIn(taskId: number, date?: string): Promise<void> {
+  const qs = date ? `?date=${date}` : "";
+  const res = await fetch(`${getApiUrl()}/api/tasks/${taskId}/checkins${qs}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(`Failed to undo check-in for habit ${taskId}.`);
 }
 
 // GET /api/projects - fetch all projects.

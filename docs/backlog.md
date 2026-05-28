@@ -22,7 +22,8 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| _none_ | | | |
+| [P74-habit-tracking.md](plans/P74-habit-tracking.md) | #74 | feature/habit-tracking-#74 | In Progress |
+| P73-chip-task-sheet.md (pending) | #73 | feature/chip-task-sheet-#73 | Parked (UI uplift, resume later) |
 
 ---
 

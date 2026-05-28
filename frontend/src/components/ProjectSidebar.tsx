@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Pencil, Trash2, Plus, Tag } from "lucide-react";
+import { Pencil, Trash2, Plus, Tag, Flame } from "lucide-react";
 import { Project } from "@/lib/api";
 
 interface Props {
@@ -161,6 +161,17 @@ export default function ProjectSidebar({
         >
           <Tag size={16} aria-hidden="true" />
           Labels
+        </Link>
+
+        {/* Habits link */}
+        <Link
+          href="/habits"
+          className={`flex items-center gap-2 w-full text-left text-sm px-4 py-2 transition-colors duration-150 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-600 ${
+            pathname === "/habits" ? activeNavClass : inactiveNavClass
+          }`}
+        >
+          <Flame size={16} aria-hidden="true" />
+          Habits
         </Link>
 
         <hr className="my-3 border-zinc-200" />

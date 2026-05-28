@@ -761,6 +761,93 @@ public class TasksControllerTests
         result.Should().BeOfType<BadRequestObjectResult>();
     }
 
+    // --- IsHabit (create + update) ---
+
+    [Fact]
+    public async Task Create_DefaultsIsHabitToFalse_WhenOmitted()
+    {
+        using var context = CreateContext();
+        var controller = new TasksController(context);
+
+        var result = await controller.Create(new CreateTaskRequest("Plain task", null, null));
+
+        var created = result.Should().BeOfType<CreatedAtActionResult>().Subject.Value.Should().BeOfType<TaskModel>().Subject;
+        created.IsHabit.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Create_SetsIsHabit_WhenTrue()
+    {
+        using var context = CreateContext();
+        var controller = new TasksController(context);
+
+        var result = await controller.Create(new CreateTaskRequest("Meditate", null, null, IsHabit: true));
+
+        var created = result.Should().BeOfType<CreatedAtActionResult>().Subject.Value.Should().BeOfType<TaskModel>().Subject;
+        created.IsHabit.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Update_SetsIsHabitTrue()
+    {
+        using var context = CreateContext();
+        var task = new TaskModel { Title = "T", CreatedAt = DateTime.Now, IsHabit = false };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.Update(task.Id, Json("{\"isHabit\": true}"));
+
+        var updated = result.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeOfType<TaskModel>().Subject;
+        updated.IsHabit.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Update_UnsetsIsHabitFalse()
+    {
+        using var context = CreateContext();
+        var task = new TaskModel { Title = "T", CreatedAt = DateTime.Now, IsHabit = true };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.Update(task.Id, Json("{\"isHabit\": false}"));
+
+        var updated = result.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeOfType<TaskModel>().Subject;
+        updated.IsHabit.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Update_OmittedIsHabit_LeavesItUnchanged()
+    {
+        using var context = CreateContext();
+        var task = new TaskModel { Title = "T", CreatedAt = DateTime.Now, IsHabit = true };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.Update(task.Id, Json("{\"title\": \"renamed\"}"));
+
+        var updated = result.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeOfType<TaskModel>().Subject;
+        updated.IsHabit.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("{\"isHabit\": \"yes\"}")]
+    [InlineData("{\"isHabit\": 1}")]
+    public async Task Update_NonBooleanIsHabit_Returns400(string json)
+    {
+        using var context = CreateContext();
+        var task = new TaskModel { Title = "T", CreatedAt = DateTime.Now };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.Update(task.Id, Json(json));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
     [Fact]
     public async Task GetAll_PrioritiesFilter_ReturnsMatchingTasks()
     {
