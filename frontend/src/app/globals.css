@@ -5,7 +5,7 @@
    defining them in @theme makes `font-heading` / `font-body` Tailwind utilities.
 
    Colors: semantic CSS-variable tokens promoted from the previously-hardcoded
-   zinc-*/blue-600 usage (see docs/plans/UI-SPEC-P73-chip-task-sheet.md). Names are
+   zinc and blue-600 usage (see docs/plans/UI-SPEC-P73-chip-task-sheet.md). Names are
    semantic (surface / text-primary / accent ...), so a future `.dark` block is a
    drop-in - dark mode itself is deliberately out of scope for now (light only).
    Use the token utilities (bg-surface, text-text-muted, border-border, text-accent,
