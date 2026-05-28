@@ -13,6 +13,10 @@ interface Props {
   disabled?: boolean;
   id?: string;
   placeholder?: string;
+  // Whether to render the "captured" chips row below the input. Off inside the
+  // TaskSheet, where the sheet's own chips (Due/Priority/Project/Label/Repeat)
+  // already reflect the parsed tokens, so the row would be redundant (#73).
+  showCapturedChips?: boolean;
 }
 
 // Subtle highlighter tints behind recognized tokens, by type (zinc-palette friendly).
@@ -43,7 +47,7 @@ interface Suggest {
   items: string[];
 }
 
-export default function QuickAddInput({ value, onChange, projects, labels, disabled, id, placeholder }: Props) {
+export default function QuickAddInput({ value, onChange, projects, labels, disabled, id, placeholder, showCapturedChips = true }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
   const [suggest, setSuggest] = useState<Suggest | null>(null);
@@ -207,8 +211,10 @@ export default function QuickAddInput({ value, onChange, projects, labels, disab
       </div>
 
       {/* "Captured" chips: what the title parsed into, each removable (unlink). Doubles
-          as a confirmation that e.g. a repeat was recognized, not just a due date. */}
-      {tokens.length > 0 && (
+          as a confirmation that e.g. a repeat was recognized, not just a due date.
+          Suppressed inside the TaskSheet (showCapturedChips=false) where the sheet's
+          own field chips already show the captured values. */}
+      {showCapturedChips && tokens.length > 0 && (
         <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Recognized from the title">
           {tokens.map((tok, i) => (
             <li key={`${tok.start}-${i}`}>

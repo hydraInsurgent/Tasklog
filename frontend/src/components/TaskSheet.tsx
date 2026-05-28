@@ -98,6 +98,31 @@ export default function TaskSheet({ task, projects, allLabels, defaultProjectId,
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose, openPicker]);
 
+  // Live-fill the chips from quick-add tokens in the title (create only). Typing
+  // "friday #Work @urgent p1" reflects straight into the Due / Project / Label /
+  // Priority chips, so the user sees the capture there (no separate chips row). Only
+  // a dimension whose token is present is set, so manual chip edits to other fields
+  // survive; on submit the tokens are stripped from the title (cleanedTitle). Labels
+  // resolve against existing ones here (autosuggest only offers existing labels);
+  // brand-new @names are created on submit.
+  useEffect(() => {
+    if (isEdit || !title.trim()) return;
+    const parsed = parseQuickAdd(title, projects);
+    if (parsed.deadline) setDeadline(parsed.deadline);
+    if (parsed.priority) setPriority(parsed.priority);
+    if (parsed.recurrence) setRecurrence(parsed.recurrence);
+    if (parsed.projectName) {
+      const match = projects.find((p) => p.name.toLowerCase() === parsed.projectName!.toLowerCase());
+      if (match) setProjectId(match.id);
+    }
+    if (parsed.labelNames && parsed.labelNames.length > 0) {
+      const ids = parsed.labelNames
+        .map((n) => labels.find((l) => l.name.toLowerCase() === n.toLowerCase())?.id)
+        .filter((x): x is number => x !== undefined);
+      if (ids.length > 0) setSelectedLabelIds((prev) => Array.from(new Set([...prev, ...ids])));
+    }
+  }, [title, isEdit, projects, labels]);
+
   // --- Label helpers ---
   async function resolveOrCreateLabel(name: string): Promise<Label | null> {
     const existing = labels.find((l) => l.name.toLowerCase() === name.toLowerCase());
@@ -314,6 +339,7 @@ export default function TaskSheet({ task, projects, allLabels, defaultProjectId,
                 labels={labels}
                 disabled={saving}
                 placeholder={isEdit ? "Task title" : 'e.g. "Email Mark friday #Work @urgent p1"'}
+                showCapturedChips={false}
               />
               {error && (
                 <p className="mt-1 text-sm text-danger" role="alert">
