@@ -1,6 +1,6 @@
 # Feature Implementation Plan: Habit tracking
 
-**Overall Progress:** `85%`
+**Overall Progress:** `100%`
 
 **Tracking issue:** [#74](https://github.com/hydraInsurgent/Tasklog/issues/74)
 **Branch:** `feature/habit-tracking-#74`
@@ -80,11 +80,21 @@ MCP: log_habit_checkin(taskId, date?) ; isHabit on create_task/update_task + in 
   - [x] 🟩 4.1 `architecture.md`: IsHabit column + CheckIns table + checkin/habits endpoints + `/habits` route + HabitStreak helper + controllers/components. `product-design.md`: tasks can be habits with daily check-ins + streaks. `README.md`: recurring+habits feature group. `engineering-guidelines.md`: no new pattern (reused EF entity + pure-helper + standalone-route).
   - [x] 🟩 4.2 `CHANGELOG.md`: v2.16.0 section. `coverage.md`: counts (245/97/127) + checklists. `proposal-recurring-and-habits.md`: program marked COMPLETE (5/5).
 
-- [ ] 🟥 **Step 5: Deploy + smoke test + ship** `[sequential]` → depends on: Step 4
-  - [ ] 🟥 5.1 Check phone reachable + capture live task count. Stash-deploy-pop only if new uncommitted WIP (doppel is committed). Deploy. CONFIRM the migration applied with zero data loss (count unchanged; CheckIns table created).
-  - [ ] 🟥 5.2 Live curl: create/flag a habit; POST checkin -> 201; POST same day -> 200 (idempotent); GET /api/habits shows it streak 1 + doneToday true; DELETE -> 204, streak 0. Clean up.
-  - [ ] 🟥 5.3 DEFERRED user spot-check (non-blocking): on the phone, flag a task a habit, check it in on the Habits view, watch the streak/dots; in Claude, "mark my <habit> done".
+- [x] 🟩 **Step 5: Deploy + smoke test + ship** `[sequential]` → depends on: Step 4
+  - [x] 🟩 5.1 Phone reachable; baseline 25 tasks. Tree clean (only `.claude/*`; doppel committed) so no stash dance. Deployed; migration applied with zero data loss (still 25 tasks; `/api/habits` live 200 + []).
+  - [x] 🟩 5.2 Live curl smoke passed: create habit (id 69) -> POST checkin 201 -> same-day 200 (idempotent) -> `/api/habits` streak 1 + doneToday true -> DELETE 204 -> streak 0 + doneToday false -> cleanup delete 204 -> back to 25 tasks.
+  - [x] 🟩 5.3 DEFERRED user spot-check (non-blocking, same as v2.15.0): on the phone Habits view, flag a task a habit + tap done; in Claude "mark my <habit> done".
 
 ## Outcomes
 
-<!-- Fill in after execution: decision-relevant deltas only. What changed vs. planned? Key decisions made? Assumptions invalidated? -->
+**What changed vs. planned:** Built exactly as planned, no scope deviations. Two small refinements during execution:
+- `HabitsController` returns a named `HabitResponse` record (not an anonymous type) so the endpoint is assertable from the test assembly. Cleaner anyway.
+- Added `format.lastNDays` as a pure, testable helper for the 7-day dot model (the plan flagged it as "if useful" - it was).
+
+**Key decisions held:** `IsHabit` bool needs NO `HasDefaultValue` (false = CLR zero, verified in the migration); `HabitStreak` is a pure static helper (clock injected); check-ins idempotent via unique `(TaskId, CheckInDate)`; a dedicated `/api/habits` shape keeps check-in data off ordinary task responses (`CheckIns` is `[JsonIgnore]`). Optimistic streak delta on the web toggle is always +/-1 (consequence of the grace rule).
+
+**Tests:** backend 216 -> 245, MCP 92 -> 97, frontend 118 -> 127. All green. Live smoke confirmed the full cycle on the phone with zero data change.
+
+**Deferred (by design):** GitHub-style calendar heatmap (the `CheckIns` rows already support it); the original sketch's schedule-derived skip detection / "did you do it?" prompts / completion-as-comment logging.
+
+**Program complete:** this is the finale of the recurring + habits program (v2.13.0 comments -> v2.14.0 recurrence -> v2.14.1 advanced grammar -> v2.15.0 quick-add -> v2.16.0 habits).
