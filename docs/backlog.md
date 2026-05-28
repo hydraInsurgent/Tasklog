@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| P73-chip-task-sheet.md (pending) | #73 | feature/chip-task-sheet-#73 | Planning (UI uplift: tokens + chip sheet + board views) |
+| [P73-chip-task-sheet.md](plans/P73-chip-task-sheet.md) | #73 | feature/chip-task-sheet-#73 | In Progress |
 
 ---
 
