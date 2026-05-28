@@ -22,7 +22,6 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| [P74-habit-tracking.md](plans/P74-habit-tracking.md) | #74 | feature/habit-tracking-#74 | In Progress |
 | P73-chip-task-sheet.md (pending) | #73 | feature/chip-task-sheet-#73 | Parked (UI uplift, resume later) |
 
 ---
@@ -78,6 +77,7 @@ Recently completed work (keep last 10):
 
 | # | Title | Type | Closed |
 |---|-------|------|--------|
+| #74 | Habit tracking (IsHabit + daily check-ins + streaks) (v2.16.0) - completes the recurring+habits program | feature | 2026-05-28 |
 | #72 | Natural-language quick-add (Todoist-style title parsing) (v2.15.0) | feature | 2026-05-27 |
 | #71 | Advanced recurrence grammar (nth-weekday, end conditions, intervals) (v2.14.1) | feature | 2026-05-27 |
 | #70 | Recurrence core (recurring tasks) (v2.14.0) | feature | 2026-05-27 |
@@ -87,7 +87,6 @@ Recently completed work (keep last 10):
 | #66 | Agent ergonomics (bulk_set_priority + name resolution) (v2.10.7) | feature | 2026-05-27 |
 | #65 | list_tasks query completeness (createdAt filter, sort, limit) (v2.10.6) | feature | 2026-05-27 |
 | #64 | Task priority (Todoist P1-P4) (v2.10.5) | feature | 2026-05-27 |
-| #63 | Bulk task operations (complete, move-to-project, set-deadline) (v2.10.4) | feature | 2026-05-27 |
 
 ---
 
