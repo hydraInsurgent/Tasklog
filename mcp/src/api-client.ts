@@ -50,6 +50,8 @@ export interface Task {
   seriesId: string | null;
   // Convenience flag, server-computed: whether the task repeats. Read-only.
   isRecurring: boolean;
+  // Whether this task is tracked as a daily habit (gets check-ins + a streak).
+  isHabit: boolean;
   // Timestamped comments. Present on get_task (single task); absent on list_tasks.
   comments?: Comment[];
 }
@@ -58,6 +60,15 @@ export interface Comment {
   id: number;
   body: string;
   createdAt: string;
+}
+
+// A single daily check-in on a habit task. CheckInDate is date-only (local
+// midnight). One row per (task, day) - logging the same day twice is idempotent.
+export interface CheckIn {
+  id: number;
+  checkInDate: string;
+  createdAt: string;
+  taskId: number;
 }
 
 // ApiError carries the HTTP status and body so callers can decide whether to
@@ -183,6 +194,7 @@ export const createTask = (body: {
   priority?: number;
   description?: string;
   recurrence?: string;
+  isHabit?: boolean;
 }): Promise<Task> =>
   request('/api/tasks', { method: 'POST', body: JSON.stringify(body) });
 
@@ -201,6 +213,7 @@ export const updateTask = (
     priority?: number;
     description?: string | null;
     recurrence?: string | null;
+    isHabit?: boolean;
   },
 ): Promise<Task> =>
   request(`/api/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
@@ -236,6 +249,15 @@ export const addTaskComment = (taskId: number, body: string): Promise<Comment> =
   request(`/api/tasks/${taskId}/comments`, {
     method: 'POST',
     body: JSON.stringify({ body }),
+  });
+
+// Mark a habit done for a day (default today). Idempotent: logging the same day
+// twice returns the existing check-in rather than creating a duplicate. date is
+// an optional ISO date (yyyy-MM-dd); omit for today.
+export const addCheckIn = (taskId: number, date?: string): Promise<CheckIn> =>
+  request(`/api/tasks/${taskId}/checkins`, {
+    method: 'POST',
+    body: JSON.stringify(date ? { date } : {}),
   });
 
 // Bulk operations: one transactional POST applies one operation to many tasks.

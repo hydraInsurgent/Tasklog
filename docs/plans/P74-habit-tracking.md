@@ -1,6 +1,6 @@
 # Feature Implementation Plan: Habit tracking
 
-**Overall Progress:** `0%`
+**Overall Progress:** `85%`
 
 **Tracking issue:** [#74](https://github.com/hydraInsurgent/Tasklog/issues/74)
 **Branch:** `feature/habit-tracking-#74`
@@ -57,28 +57,28 @@ MCP: log_habit_checkin(taskId, date?) ; isHabit on create_task/update_task + in 
 
 ## Tasks
 
-- [ ] 🟥 **Step 1: Backend - IsHabit + CheckIns + streak + endpoints** `[sequential]` → depends on: nothing
-  - [ ] 🟥 1.1 `TaskModel`: add `bool IsHabit` (default false). `CheckIn` model (Id, TaskId, CheckInDate, CreatedAt, `[JsonIgnore] Task` back-nav). DbContext: `DbSet<CheckIn>`, cascade FK, `HasIndex(TaskId, CheckInDate).IsUnique()`. No `HasDefaultValue` needed for IsHabit (false = CLR zero).
-  - [ ] 🟥 1.2 `AddHabitsAndCheckIns` migration via global dotnet-ef (IsHabit column + CheckIns table + unique index); verify no surprise defaults.
-  - [ ] 🟥 1.3 `Services/HabitStreak.cs` pure helper: `CurrentStreak(IReadOnlyCollection<DateTime> dates, DateTime today)` - consecutive days back from today, grace through yesterday.
-  - [ ] 🟥 1.4 `CheckInsController` at `api/tasks/{taskId}/checkins`: POST (idempotent, 200 existing / 201 new, 404 task), DELETE today or `/{date}` (204 / 404).
-  - [ ] 🟥 1.5 `GET /api/habits` (a HabitsController or a TasksController action): habit tasks + recentCheckIns + currentStreak + doneToday. `Create`/`Update` accept `isHabit`.
-  - [ ] 🟥 1.6 Tests: `HabitStreakTests` (run / gap-breaks / today-grace / empty=0 / single-today=1) + `CheckInsControllerTests` (idempotent 200, new 201, delete 204, delete-missing 404, task 404, list) + `TasksControllerTests` (IsHabit on create + update set/unset) + Habits endpoint (only IsHabit, streak+doneToday). All backend tests green.
+- [x] 🟩 **Step 1: Backend - IsHabit + CheckIns + streak + endpoints** `[sequential]` → depends on: nothing
+  - [x] 🟩 1.1 `TaskModel`: add `bool IsHabit` (default false). `CheckIn` model (Id, TaskId, CheckInDate, CreatedAt, `[JsonIgnore] Task` back-nav). DbContext: `DbSet<CheckIn>`, cascade FK, `HasIndex(TaskId, CheckInDate).IsUnique()`. No `HasDefaultValue` needed for IsHabit (false = CLR zero).
+  - [x] 🟩 1.2 `AddHabitsAndCheckIns` migration via global dotnet-ef (IsHabit column + CheckIns table + unique index); verified clean defaults.
+  - [x] 🟩 1.3 `Services/HabitStreak.cs` pure helper: `CurrentStreak(IReadOnlyCollection<DateTime> dates, DateTime today)` - consecutive days back from today, grace through yesterday.
+  - [x] 🟩 1.4 `CheckInsController` at `api/tasks/{taskId}/checkins`: POST (idempotent, 200 existing / 201 new, 404 task), DELETE (`?date=` or today; 204 / 404), GET list.
+  - [x] 🟩 1.5 `HabitsController` `GET /api/habits` returns `HabitResponse` (task + recentCheckIns + currentStreak + doneToday). `Create`/`Update` accept `isHabit`.
+  - [x] 🟩 1.6 Tests: `HabitStreakTests` (9) + `CheckInsControllerTests` (8) + `TasksControllerTests` IsHabit (7) + `HabitsControllerTests` (5). All 245 backend tests green (216 → 245).
 
-- [ ] 🟥 **Step 2: MCP - check-in tool + isHabit** `[sequential]` → depends on: Step 1
-  - [ ] 🟥 2.1 `api-client.ts`: `Task.isHabit`; `createTask`/`updateTask` carry `isHabit`; `addCheckIn(taskId, date?)`.
-  - [ ] 🟥 2.2 `tools/tasks.ts`: `log_habit_checkin` tool (taskId + optional date; "mark a habit done"); `isHabit` param on `create_task`/`update_task`; refresh the header/tool-count comment.
-  - [ ] 🟥 2.3 `api-client.test.ts`: check-in wire contract + isHabit on create/update + Task shape. Typecheck clean; MCP tests green.
+- [x] 🟩 **Step 2: MCP - check-in tool + isHabit** `[sequential]` → depends on: Step 1
+  - [x] 🟩 2.1 `api-client.ts`: `Task.isHabit` + `CheckIn` interface; `createTask`/`updateTask` carry `isHabit`; `addCheckIn(taskId, date?)`.
+  - [x] 🟩 2.2 `tools/tasks.ts`: `log_habit_checkin` tool (taskId + optional date); `isHabit` param on `create_task`/`update_task`; header comment refreshed (13 → 14 tools, habits note).
+  - [x] 🟩 2.3 `api-client.test.ts`: check-in wire contract + isHabit on create/update + Task shape. Typecheck clean; 97 MCP tests green (92 → 97).
 
-- [ ] 🟥 **Step 3: Web UI - Habits view + check-ins + habit toggle** `[sequential]` → depends on: Step 1 `[UI]`
-  - [ ] 🟥 3.1 `api.ts`: `Task.isHabit`; create/update carry `isHabit`; `addCheckIn`/`removeCheckIn`; `getHabits()` (each: task + recentCheckIns + currentStreak + doneToday).
-  - [ ] 🟥 3.2 A "Habit" toggle on `AddTaskForm` + `EditTaskModal`.
-  - [ ] 🟥 3.3 New `/habits` route (server component fetches `getHabits`) + a "Habits" sidebar link in `ProjectSidebar` (mirror the `/labels` link). `HabitsClient` + `HabitCard`: title, streak (flame + count), last-7-days dot row, big done-today toggle (optimistic add/remove check-in, updates streak/dots).
-  - [ ] 🟥 3.4 Frontend tests green; clean tsc + next build. `HabitCard` (streak + 7 dots + done-today toggles) + `getHabits`/`addCheckIn` wire + the habit toggle, where practical.
+- [x] 🟩 **Step 3: Web UI - Habits view + check-ins + habit toggle** `[sequential]` → depends on: Step 1 `[UI]`
+  - [x] 🟩 3.1 `api.ts`: `Task.isHabit` + `CheckIn`/`Habit` types; create/update carry `isHabit`; `addCheckIn`/`removeCheckIn`; `getHabits()`.
+  - [x] 🟩 3.2 A "Track as a daily habit" checkbox on `AddTaskForm` + `EditTaskModal` (diffed on save).
+  - [x] 🟩 3.3 New `/habits` route (mirrors `/labels`) + a "Habits" sidebar link (Flame icon) in `ProjectSidebar`. `HabitsClient` (fetch + poll + optimistic toggle) + `HabitCard`: title, streak (flame + count), last-7-days dot row, big done-today toggle. `format.lastNDays` helper for the dots.
+  - [x] 🟩 3.4 127 frontend tests green (118 → 127: +6 HabitCard, +3 lastNDays); tsc clean; new files lint-clean.
 
-- [ ] 🟥 **Step 4: Docs + CHANGELOG** `[sequential]` → depends on: Steps 1-3
-  - [ ] 🟥 4.1 `architecture.md`: IsHabit column + CheckIns table + the checkin/habits endpoints + the new `/habits` view + HabitStreak helper. `product-design.md`: tasks can be habits with daily check-ins + streaks. `engineering-guidelines.md`: only if a new pattern emerges (none expected).
-  - [ ] 🟥 4.2 `CHANGELOG.md`: v2.16.0 section. `coverage.md`: counts + checklists. `proposal-recurring-and-habits.md`: mark habit-tracking (v2.16.0) shipped → program complete.
+- [x] 🟩 **Step 4: Docs + CHANGELOG** `[sequential]` → depends on: Steps 1-3
+  - [x] 🟩 4.1 `architecture.md`: IsHabit column + CheckIns table + checkin/habits endpoints + `/habits` route + HabitStreak helper + controllers/components. `product-design.md`: tasks can be habits with daily check-ins + streaks. `README.md`: recurring+habits feature group. `engineering-guidelines.md`: no new pattern (reused EF entity + pure-helper + standalone-route).
+  - [x] 🟩 4.2 `CHANGELOG.md`: v2.16.0 section. `coverage.md`: counts (245/97/127) + checklists. `proposal-recurring-and-habits.md`: program marked COMPLETE (5/5).
 
 - [ ] 🟥 **Step 5: Deploy + smoke test + ship** `[sequential]` → depends on: Step 4
   - [ ] 🟥 5.1 Check phone reachable + capture live task count. Stash-deploy-pop only if new uncommitted WIP (doppel is committed). Deploy. CONFIRM the migration applied with zero data loss (count unchanged; CheckIns table created).

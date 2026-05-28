@@ -2,6 +2,24 @@
 
 ---
 
+## v2.16.0 - Habit tracking
+*May 2026*
+
+### Added
+
+- Any task can now be tracked as a **daily habit** (#74). Tick "Track as a daily habit" when adding or editing a task, and it shows up on a new **Habits** view (sidebar link).
+- Each habit on the Habits view shows:
+  - a **current streak** - the number of consecutive days you've checked it in (counting back from today; not checking in *today* yet doesn't break the run until tomorrow)
+  - a **last-7-days dot row** - one filled dot per day you checked in
+  - a big **"Mark done today"** toggle - one tap logs today's check-in (tap again to undo). Checking in is idempotent: doing it twice in a day doesn't double-count.
+- Claude can check a habit in for you over the MCP connector: a new **`log_habit_checkin`** tool ("I meditated today", "mark my workout done"), and `create_task` / `update_task` accept an `isHabit` flag.
+
+Habits are decoupled from recurring tasks: a habit is an ongoing daily check-in, not a finish-once task. Check-ins are stored per day in a new table (a small database migration; existing tasks are untouched and default to not-a-habit). A GitHub-style calendar heatmap is a deliberate later addition - the check-in data already supports it.
+
+This is the finale of the recurring + habits program (v2.13.0 comments -> v2.14.0 recurrence -> v2.14.1 advanced grammar -> v2.15.0 quick-add -> v2.16.0 habits).
+
+---
+
 ## v2.15.0 - Natural-language quick-add
 *May 2026*
 

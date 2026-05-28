@@ -53,7 +53,7 @@ Tasklog/
 │       ├── Data/                  EF Core DbContext
 │       ├── Migrations/            EF Core schema migrations
 │       ├── Models/                Data model classes
-│       ├── Services/              Pure domain helpers (RecurrenceRule - parse/validate/advance RRULE, v2.14.0)
+│       ├── Services/              Pure domain helpers (RecurrenceRule - parse/validate/advance RRULE, v2.14.0; HabitStreak - consecutive-days streak from check-in dates, v2.16.0)
 │       ├── Properties/            Launch settings (ports)
 │       ├── Program.cs             App startup and service registration
 │       ├── appsettings.json       Config (connection string, logging)
@@ -66,7 +66,7 @@ Tasklog/
 │   │   ├── server.ts              Hono HTTP entry, middleware wiring
 │   │   ├── config.ts              Env var loading + production validation
 │   │   ├── api-client.ts          Typed client for the Tasklog .NET API
-│   │   ├── tools/                 21 MCP tools wrapping every API endpoint
+│   │   ├── tools/                 22 MCP tools wrapping every API endpoint
 │   │   │   ├── tasks.ts           13 task tools (list[+filters]/get/create/update/
 │   │   │   │                      delete/set-completion/assign-project/set-labels/add-comment +
 │   │   │   │                      bulk-set-completion/bulk-assign-to-project/bulk-set-deadline/bulk-set-priority)
@@ -108,7 +108,9 @@ Tasklog/
 │       │   ├── PriorityDot.tsx    Small colored priority dot (P1-P3) next to a task title (v2.10.5)
 │       │   ├── RecurrencePicker.tsx  Recurrence builder (none/daily/weekly/monthly + nth-weekday/interval/Ends) on the add/edit forms (Client Component, v2.14.0+)
 │       │   ├── RecurringBadge.tsx Repeat glyph + human label for recurring tasks (v2.14.0)
-│       │   └── QuickAddInput.tsx  Todoist-style quick-add title field: inline token highlight overlay + #/@ autosuggest + removable captured chips (Client Component, v2.15.0)
+│       │   ├── QuickAddInput.tsx  Todoist-style quick-add title field: inline token highlight overlay + #/@ autosuggest + removable captured chips (Client Component, v2.15.0)
+│       │   ├── HabitsClient.tsx   Habits view: fetch + poll habits, optimistic done-today toggle (Client Component, v2.16.0)
+│       │   └── HabitCard.tsx      One habit: streak (flame + count), last-7-days dot row, big done-today toggle (v2.16.0)
 │       │   (list is representative - other components: TaskCard, FilterPanel, LabelsClient, etc.)
 │       └── lib/
 │           ├── api.ts             Typed API call functions (used by both server and client)
@@ -139,14 +141,17 @@ Tasklog/
 HTTP request
     │
     ▼
-TasksController          Handles routing, validation, HTTP response codes.
-ProjectsController       No business logic beyond input checking.
+Controllers              Tasks / Projects / Labels / Comments / CheckIns / Habits.
+                         Handle routing, validation, HTTP response codes; no business
+                         logic beyond input checking (pure helpers like RecurrenceRule
+                         and HabitStreak live in Services/).
     │
     ▼
 TasklogDbContext         EF Core context. Direct DbSet access - no repository layer.
     │
     ▼
-TasklogDatabase.db       SQLite file. Two tables: Tasks, Projects.
+TasklogDatabase.db       SQLite file. Tables: Tasks, Projects, Labels, LabelTaskModel,
+                         Comments, CheckIns.
 ```
 
 ### Data model
@@ -169,6 +174,7 @@ Tasks
   Priority    INTEGER  not null  default 4  (Todoist P1-P4: 1=urgent .. 4=none; existing rows migrated to 4) (v2.10.5)
   Recurrence  TEXT     nullable  (RRULE-shaped rule; null = does not repeat. v2.14.0: daily/every-N/weekly-on-weekdays/monthly-on-day. v2.14.1 adds nth-weekday "BYDAY=3TH", last/from-end "BYMONTHDAY=-1", weekly/monthly INTERVAL>1, and end conditions UNTIL/COUNT)
   SeriesId    TEXT     nullable  (Guid linking all occurrences of a repeating task; null for one-offs) (v2.14.0)
+  IsHabit     INTEGER  not null  default 0  (boolean: 1 = tracked as a daily habit. Existing rows migrate to 0 = false, the CLR zero, so NO HasDefaultValue is needed - contrast Priority's non-zero default) (v2.16.0)
 
   (response-only) isRecurring  bool  Recurrence != null. NOT a column; [NotMapped] getter on TaskModel. (v2.14.0)
   (response-only) dueStatus  string  computed from Deadline vs now. A timed deadline goes
@@ -192,6 +198,13 @@ Comments  (v2.13.0)
   Body        TEXT     not null  (free text, <= 2000 chars)
   CreatedAt   TEXT     not null  (ISO 8601 datetime string)
   TaskId      INTEGER  not null  foreign key -> Tasks.Id  (cascade delete)
+
+CheckIns  (v2.16.0 - one per habit per day)
+  Id          INTEGER  primary key, autoincrement
+  CheckInDate TEXT     not null  (date-only, local midnight - the day the habit was done)
+  CreatedAt   TEXT     not null  (ISO 8601 datetime string)
+  TaskId      INTEGER  not null  foreign key -> Tasks.Id  (cascade delete)
+  UNIQUE (TaskId, CheckInDate)   (makes "done today" idempotent - one row per habit per day)
 ```
 
 ### API endpoints
@@ -203,8 +216,8 @@ Comments  (v2.13.0)
 | GET | `/api/tasks/{taskId}/comments` | List a task's comments, newest first. 404 if task missing |
 | POST | `/api/tasks/{taskId}/comments` | Add a comment. Body: `{ body }` (non-empty, <= 2000). 201 with the created comment; 400 bad body; 404 task missing |
 | DELETE | `/api/tasks/{taskId}/comments/{id}` | Delete a comment under that task. 204; 404 if not found |
-| POST | `/api/tasks` | Create task. Body: `{ title, deadline?, projectId?, priority?, description?, recurrence? }`. priority is 1-4 (default 4 = none); description <= 2000 chars (blank → null); `recurrence` is an RRULE-shaped rule that requires a deadline and stamps a SeriesId (400 if no deadline / unsupported rule). 400 if out of range |
-| PATCH | `/api/tasks/{id}` | Partial update of title, deadline, priority, description, and/or recurrence. JSON body, present-key detection: omit=keep, `deadline: null`/`description: null`/blank/`recurrence: null`=clear, value=set. Setting recurrence requires the task to have a deadline (possibly set in the same PATCH) and assigns a SeriesId; clearing it nulls Recurrence + SeriesId. priority must be 1-4 (no clear - P4 is none); description <= 2000. 400 on empty title / bad date / bad priority / too-long description / unsupported recurrence. Returns the updated task |
+| POST | `/api/tasks` | Create task. Body: `{ title, deadline?, projectId?, priority?, description?, recurrence?, isHabit? }`. priority is 1-4 (default 4 = none); description <= 2000 chars (blank → null); `recurrence` is an RRULE-shaped rule that requires a deadline and stamps a SeriesId (400 if no deadline / unsupported rule); `isHabit` defaults false. 400 if out of range |
+| PATCH | `/api/tasks/{id}` | Partial update of title, deadline, priority, description, recurrence, and/or isHabit. JSON body, present-key detection: omit=keep, `deadline: null`/`description: null`/blank/`recurrence: null`=clear, value=set. Setting recurrence requires the task to have a deadline (possibly set in the same PATCH) and assigns a SeriesId; clearing it nulls Recurrence + SeriesId. `isHabit` (bool) toggles habit tracking - turning it off keeps any past check-ins. priority must be 1-4 (no clear - P4 is none); description <= 2000. 400 on empty title / bad date / bad priority / too-long description / unsupported recurrence / non-boolean isHabit. Returns the updated task |
 | DELETE | `/api/tasks/{id}` | Delete task. 204 on success, 404 if not found |
 | PATCH | `/api/tasks/{id}/complete` | Mark task complete or incomplete. Body: `{ isCompleted: bool }`. Returns the (completed) task. For a recurring task, completing it also spawns the next occurrence (deadline advanced per the rule; title/project/labels/priority/description/recurrence carried under the same SeriesId) and logs a completion comment on the finished one - UNLESS an end condition is reached (v2.14.1: UNTIL date passed or COUNT occurrences exist), in which case the series stops and a "series complete" comment is logged instead. COUNT is evaluated by counting rows with the same SeriesId. Bulk-complete does not spawn |
 | PATCH | `/api/tasks/{id}/project` | Reassign task to a project or Inbox. Body: `{ projectId: int?, projectName?: string }`. projectName is resolved by name (case-insensitive, exact) and wins over projectId; 0/multiple matches → 400 |
@@ -218,6 +231,10 @@ Comments  (v2.13.0)
 | PATCH | `/api/labels/{id}` | Update label name and/or color. Body: `{ name, colorIndex }`. Returns updated label |
 | DELETE | `/api/labels/{id}` | Delete label. Unlinks from all tasks (does not delete tasks). 204 on success |
 | PATCH | `/api/tasks/{id}/labels` | Replace task's label set. Body: `{ labelIds?: int[], labelNames?: string[] }`. labelNames is resolved by name and wins over labelIds; 0/multiple matches → 400. Empty/absent both clear. Returns updated task |
+| GET | `/api/tasks/{taskId}/checkins` | List a habit's check-in dates, newest first. 404 if task missing (v2.16.0) |
+| POST | `/api/tasks/{taskId}/checkins` | Log a check-in. Body: `{ date? }` (default today, reduced to date-only). Idempotent: existing day → 200 with that check-in; new day → 201. 404 if task missing (v2.16.0) |
+| DELETE | `/api/tasks/{taskId}/checkins` | Undo a check-in. Query `?date=yyyy-MM-dd` (default today). 204 on success; 404 if there was no check-in that day (v2.16.0) |
+| GET | `/api/habits` | Habit dashboard: every task where `IsHabit`, each as `{ task, currentStreak, doneToday, recentCheckIns[] }` (last ~90 days of check-ins, newest-first; streak = consecutive days back from today, grace through yesterday). Ordered newest-created first (v2.16.0) |
 
 ### CORS
 
@@ -252,6 +269,12 @@ src/app/
     page.tsx           Server Component. Route: /tasks/:id
                        Fetches task and projects from API, renders detail card.
                        Returns 404 if task not found. Projects fallback to [] silently.
+
+  labels/
+    page.tsx           Server Component. Route: /labels. Renders <LabelsClient /> (client-fetched).
+
+  habits/
+    page.tsx           Server Component. Route: /habits. Renders <HabitsClient /> (client-fetched). (v2.16.0)
 ```
 
 ### Component responsibilities
@@ -349,6 +372,9 @@ getProjects()             GET /api/projects               Used by ProjectLayout 
 createProject(name)       POST /api/projects              Used by ProjectLayout
 renameProject(id, name)   PATCH /api/projects/:id         Used by ProjectLayout
 deleteProject(id)         DELETE /api/projects/:id        Used by ProjectLayout
+getHabits()               GET /api/habits                 Used by HabitsClient (v2.16.0)
+addCheckIn(id, date?)     POST /api/tasks/:id/checkins    Used by HabitsClient (done-today toggle) (v2.16.0)
+removeCheckIn(id, date?)  DELETE /api/tasks/:id/checkins  Used by HabitsClient (undo) (v2.16.0)
 ```
 
 **Known issue:** `getTask()` uses `NEXT_PUBLIC_API_URL` which resolves to `localhost`
@@ -397,7 +423,7 @@ POST /token                                     auth_code and refresh_token gran
 
 ### Tool layer
 
-21 MCP tools across three families (tasks: 13, projects: 4, labels: 4). The task family includes four bulk tools (`bulk_set_completion`, `bulk_assign_to_project`, `bulk_set_deadline`, `bulk_set_priority`) backed by the single `POST /api/tasks/bulk` endpoint, and `add_task_comment` (comments are read back via `get_task`). `assign_task_to_project` / `bulk_assign_to_project` / `set_task_labels` accept a name as an alternative to an id (resolved server-side). `create_task` and `update_task` accept an RRULE-shaped `recurrence` string (v2.14.0); completing a recurring task via `set_task_completion` spawns the next occurrence server-side, so no separate recurrence tool exists. Each tool is a thin wrapper around the corresponding Tasklog `/api` endpoint via `api-client.ts`. Input schemas use Zod and are inlined per tool. The `runTool()` helper in `result.ts` converts thrown `ApiError`s into MCP `isError: true` tool results (not JSON-RPC protocol errors), so the LLM can see and react to failures.
+22 MCP tools across three families (tasks: 14, projects: 4, labels: 4). The task family includes four bulk tools (`bulk_set_completion`, `bulk_assign_to_project`, `bulk_set_deadline`, `bulk_set_priority`) backed by the single `POST /api/tasks/bulk` endpoint, `add_task_comment` (comments are read back via `get_task`), and `log_habit_checkin` (mark a habit done for a day; idempotent; v2.16.0). `assign_task_to_project` / `bulk_assign_to_project` / `set_task_labels` accept a name as an alternative to an id (resolved server-side). `create_task` and `update_task` accept an RRULE-shaped `recurrence` string (v2.14.0) and an `isHabit` flag (v2.16.0); completing a recurring task via `set_task_completion` spawns the next occurrence server-side, so no separate recurrence tool exists. Each tool is a thin wrapper around the corresponding Tasklog `/api` endpoint via `api-client.ts`. Input schemas use Zod and are inlined per tool. The `runTool()` helper in `result.ts` converts thrown `ApiError`s into MCP `isError: true` tool results (not JSON-RPC protocol errors), so the LLM can see and react to failures.
 
 The `list_tasks` tool accepts an optional filter object (project, inbox, labels, deadline range, completion, title substring) that `api-client.ts` serializes into a query string on `GET /api/tasks`. Completion is a single `set_task_completion(id, isCompleted)` tool - the earlier `complete_task` / `uncomplete_task` split was consolidated in v2.10.1.
 

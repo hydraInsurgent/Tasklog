@@ -1,4 +1,4 @@
-import { deadlineColorClass, formatDate, formatDeadline, hasTimeComponent, projectName, priorityMeta, PRIORITY_OPTIONS, describeRecurrence } from '@/lib/format'
+import { deadlineColorClass, formatDate, formatDeadline, hasTimeComponent, projectName, priorityMeta, PRIORITY_OPTIONS, describeRecurrence, lastNDays } from '@/lib/format'
 
 describe('deadlineColorClass', () => {
   beforeEach(() => {
@@ -146,5 +146,32 @@ describe('describeRecurrence', () => {
     expect(describeRecurrence('FREQ=DAILY;COUNT=5')).toBe('Every day, for 5 times')
     expect(describeRecurrence('FREQ=DAILY;COUNT=1')).toBe('Every day, for 1 time')
     expect(describeRecurrence('FREQ=DAILY;UNTIL=20261231')).toBe('Every day, until 31 Dec 2026')
+  })
+})
+
+describe('lastNDays', () => {
+  // A fixed local "today" so the window is deterministic.
+  const today = new Date(2026, 4, 28) // 28 May 2026 (month is 0-based)
+
+  it('returns N days oldest-first ending today', () => {
+    const days = lastNDays([], 7, today)
+    expect(days).toHaveLength(7)
+    expect(days[0].date).toBe('2026-05-22')
+    expect(days[6].date).toBe('2026-05-28')
+    expect(days[6].isToday).toBe(true)
+    expect(days[0].isToday).toBe(false)
+  })
+
+  it('marks a day done when a check-in falls on it (ignoring the time component)', () => {
+    const days = lastNDays(['2026-05-28T00:00:00', '2026-05-26T09:30:00'], 7, today)
+    const byDate = Object.fromEntries(days.map((d) => [d.date, d.done]))
+    expect(byDate['2026-05-28']).toBe(true)
+    expect(byDate['2026-05-26']).toBe(true)
+    expect(byDate['2026-05-27']).toBe(false)
+  })
+
+  it('ignores check-ins outside the window', () => {
+    const days = lastNDays(['2026-05-01T00:00:00'], 7, today)
+    expect(days.every((d) => !d.done)).toBe(true)
   })
 })

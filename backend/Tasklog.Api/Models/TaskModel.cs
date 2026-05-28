@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace Tasklog.Api.Models
 {
@@ -43,6 +44,17 @@ namespace Tasklog.Api.Models
         // history (completed occurrences + the open one) can be queried by SeriesId.
         // Null for non-recurring tasks.
         public Guid? SeriesId { get; set; }
+
+        // Whether this task is a habit (tracked with daily check-ins on the Habits view).
+        // Defaults to false; false is the CLR zero, so the migration default 0 is correct
+        // and existing rows migrate to false without needing HasDefaultValue (unlike Priority).
+        public bool IsHabit { get; set; }
+
+        // Daily check-ins for this habit. [JsonIgnore] so they never bloat ordinary task
+        // responses - they are loaded + projected only by the /api/habits endpoint. The nav
+        // exists for the cascade FK and that query's .Include.
+        [JsonIgnore]
+        public ICollection<CheckIn> CheckIns { get; set; } = new List<CheckIn>();
 
         // Read-only convenience flag: whether this task repeats. [NotMapped] so EF ignores
         // it (it is derived from Recurrence) while System.Text.Json still serializes it,

@@ -12,7 +12,7 @@ import QuickAddInput from "./QuickAddInput";
 interface Props {
   // Called by the parent when the form submits. Parent handles the API call
   // and any feedback display, so this component stays focused on form state.
-  onAdd: (title: string, deadline?: string, projectId?: number | null, labelIds?: number[], priority?: number, description?: string, recurrence?: string) => Promise<void>;
+  onAdd: (title: string, deadline?: string, projectId?: number | null, labelIds?: number[], priority?: number, description?: string, recurrence?: string, isHabit?: boolean) => Promise<void>;
   // Projects list for the optional project dropdown. Omit to hide the dropdown.
   projects?: Project[];
   // Which project to pre-select (e.g. the current sidebar view). Null = Inbox.
@@ -32,6 +32,8 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
   const [description, setDescription] = useState("");
   // Optional recurrence rule (RRULE-shaped) or null for a one-off task.
   const [recurrence, setRecurrence] = useState<string | null>(null);
+  // Whether the new task is tracked as a daily habit (gets a streak + check-ins).
+  const [isHabit, setIsHabit] = useState(false);
   // Bumped on a successful add to remount RecurrencePicker (which owns its
   // sub-state after mount) so the picker resets along with the other fields.
   const [pickerKey, setPickerKey] = useState(0);
@@ -252,7 +254,7 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
       }
       const labelIds = labelObjs.length > 0 ? labelObjs.map((l) => l.id) : undefined;
 
-      await onAdd(finalTitle, finalDeadline, finalProjectId, labelIds, finalPriority, description.trim() || undefined, finalRecurrence);
+      await onAdd(finalTitle, finalDeadline, finalProjectId, labelIds, finalPriority, description.trim() || undefined, finalRecurrence, isHabit);
       // Clear the form on success.
       setTitle("");
       setDeadline("");
@@ -260,6 +262,7 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
       setPriority(4);
       setDescription("");
       setRecurrence(null);
+      setIsHabit(false);
       lastParsedRecurrence.current = undefined;
       setPickerKey((k) => k + 1);
       setSelectedLabels([]);
@@ -521,6 +524,22 @@ export default function AddTaskForm({ onAdd, projects, defaultProjectId, allLabe
           placeholder="Notes, context, a link..."
           className="w-full px-3 py-2 border border-zinc-200 rounded-md text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-shadow duration-150 resize-y"
         />
+      </div>
+
+      {/* Habit toggle: marks the task as a daily habit so it shows on the Habits
+          view with a streak. A plain checkbox keeps it out of the inline field row. */}
+      <div className="mt-3">
+        <label htmlFor="task-is-habit" className="inline-flex items-center gap-2 text-sm text-zinc-700 cursor-pointer">
+          <input
+            id="task-is-habit"
+            type="checkbox"
+            checked={isHabit}
+            onChange={(e) => setIsHabit(e.target.checked)}
+            disabled={loading}
+            className="h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:ring-offset-1 cursor-pointer"
+          />
+          Track as a daily habit
+        </label>
       </div>
     </form>
   );

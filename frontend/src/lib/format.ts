@@ -191,3 +191,30 @@ export function describeRecurrence(rule: string | null): string {
   else if (count) base += `, for ${count} ${Number(count) === 1 ? "time" : "times"}`;
   return base;
 }
+
+// A single day in a habit's recent-activity dot row.
+export interface HabitDay {
+  date: string;  // local "YYYY-MM-DD"
+  done: boolean; // a check-in exists for this day
+  isToday: boolean;
+}
+
+// Build the last-N-days dot model for a habit: one entry per calendar day from
+// (N-1) days ago through today (oldest first, so the row reads left-to-right into
+// today). A day is "done" if its date is among the check-in dates. Check-ins are
+// date-only; we compare on the local calendar day. Pure (today is injectable) so
+// it's testable without mocking the clock.
+export function lastNDays(
+  checkInDates: string[],
+  n: number,
+  today: Date = new Date(),
+): HabitDay[] {
+  const done = new Set(checkInDates.map((d) => d.slice(0, 10)));
+  const days: HabitDay[] = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    days.push({ date: key, done: done.has(key), isToday: i === 0 });
+  }
+  return days;
+}

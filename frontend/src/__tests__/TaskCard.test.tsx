@@ -20,6 +20,7 @@ const baseTask: Task = {
   recurrence: null,
   seriesId: null,
   isRecurring: false,
+  isHabit: false,
 }
 
 const projects: Project[] = [

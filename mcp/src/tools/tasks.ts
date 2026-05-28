@@ -1,10 +1,11 @@
 /**
  * MCP tools for task operations.
  *
- * Thirteen tools wrap the task-related Tasklog API endpoints: nine single-task
- * tools (incl. add_task_comment) plus four bulk tools (bulk_set_completion,
- * bulk_assign_to_project, bulk_set_deadline, bulk_set_priority) that apply one
- * operation to many tasks in a single transactional call. The completion toggle
+ * Fourteen tools wrap the task-related Tasklog API endpoints: ten single-task
+ * tools (incl. add_task_comment and log_habit_checkin) plus four bulk tools
+ * (bulk_set_completion, bulk_assign_to_project, bulk_set_deadline,
+ * bulk_set_priority) that apply one operation to many tasks in a single
+ * transactional call. The completion toggle
  * is a single tool
  * (set_task_completion) that takes a boolean - earlier versions split it into
  * separate complete_task and uncomplete_task tools, but the LLM picks the right
@@ -19,6 +20,11 @@
  * `recurrence` string (see RECURRENCE_DESCRIPTION); tasks carry recurrence /
  * seriesId / isRecurring. No new tool - completing a recurring task via
  * set_task_completion spawns the next occurrence server-side.
+ *
+ * Habits (v2.16.0): create_task and update_task accept an `isHabit` flag; tasks
+ * carry it in their shape. log_habit_checkin marks a habit done for a day
+ * (idempotent - one check-in per habit per day); the streak is computed
+ * server-side and surfaced on the web Habits view.
  */
 
 import { z } from 'zod';
@@ -220,12 +226,20 @@ export function registerTaskTools(server: McpServer): void {
           .string()
           .optional()
           .describe(RECURRENCE_DESCRIPTION + ' Omit for a one-off task.'),
+        isHabit: z
+          .boolean()
+          .optional()
+          .describe(
+            'When true, the task is tracked as a daily habit (it appears on the ' +
+              'Habits view with a streak and gets daily check-ins via ' +
+              'log_habit_checkin). Omit or false for an ordinary task.',
+          ),
       },
     },
-    async ({ title, deadline, projectId, priority, description, recurrence }) =>
+    async ({ title, deadline, projectId, priority, description, recurrence, isHabit }) =>
       runTool(
         'create_task',
-        () => api.createTask({ title, deadline, projectId, priority, description, recurrence }),
+        () => api.createTask({ title, deadline, projectId, priority, description, recurrence, isHabit }),
         (t) =>
           `Created task #${t.id}: "${t.title}"` +
           (t.deadline ? ` (due ${t.deadline})` : '') +
@@ -290,9 +304,16 @@ export function registerTaskTools(server: McpServer): void {
             RECURRENCE_DESCRIPTION +
               ' Pass null to stop the task repeating. Omit to leave it unchanged.',
           ),
+        isHabit: z
+          .boolean()
+          .optional()
+          .describe(
+            'true to track the task as a daily habit, false to stop tracking it ' +
+              'as one. Omit to leave it unchanged. (Past check-ins are kept.)',
+          ),
       },
     },
-    async ({ id, title, deadline, priority, description, recurrence }) => {
+    async ({ id, title, deadline, priority, description, recurrence, isHabit }) => {
       // Build the PATCH body preserving the keep/clear/set distinction:
       // undefined = omit (keep), null = clear (deadline/description/recurrence), value = set.
       const body: {
@@ -301,12 +322,14 @@ export function registerTaskTools(server: McpServer): void {
         priority?: number;
         description?: string | null;
         recurrence?: string | null;
+        isHabit?: boolean;
       } = {};
       if (title !== undefined) body.title = title;
       if (deadline !== undefined) body.deadline = deadline;
       if (priority !== undefined) body.priority = priority;
       if (description !== undefined) body.description = description;
       if (recurrence !== undefined) body.recurrence = recurrence;
+      if (isHabit !== undefined) body.isHabit = isHabit;
       return runTool('update_task', () => api.updateTask(id, body));
     },
   );
@@ -449,6 +472,35 @@ export function registerTaskTools(server: McpServer): void {
     },
     async ({ taskId, body }) =>
       runTool('add_task_comment', () => api.addTaskComment(taskId, body)),
+  );
+
+  server.registerTool(
+    'log_habit_checkin',
+    {
+      title: 'Log Habit Check-in',
+      description:
+        'Mark a habit task done for a day (default today). Use when the user says ' +
+        '"I meditated today", "mark my workout done", "log my reading". The task ' +
+        'should be a habit (isHabit=true) - that is what gives it a streak. ' +
+        'Idempotent: logging the same day twice does not create a duplicate. ' +
+        'Returns: the check-in { id, checkInDate, createdAt, taskId }.',
+      inputSchema: {
+        taskId: z.number().int().positive().describe('The habit task id to check in.'),
+        date: z
+          .string()
+          .optional()
+          .describe(
+            'Optional ISO 8601 date (e.g. "2026-05-28") to check in for a past day. ' +
+              'Omit for today.',
+          ),
+      },
+    },
+    async ({ taskId, date }) =>
+      runTool(
+        'log_habit_checkin',
+        () => api.addCheckIn(taskId, date),
+        (c) => `Checked in habit #${c.taskId} for ${c.checkInDate.slice(0, 10)}.`,
+      ),
   );
 
   // --- Bulk tools (act on many tasks in one transactional call) ---
