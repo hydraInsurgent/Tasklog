@@ -60,6 +60,15 @@ const ORDINAL_WORD: Record<string, number> = {
   first: 1, second: 2, third: 3, fourth: 4, last: -1,
 };
 
+// Priority words -> our P1-P4 scale (1 = urgent .. 4 = none). Todoist-style "!" syntax.
+const PRIORITY_WORD: Record<string, number> = {
+  urgent: 1, high: 2, medium: 3, med: 3, normal: 3, low: 4, none: 4,
+};
+// Matches a priority token, capturing one of: (1) bare "p1".."p4"; (2) the digit of
+// "!p1".."!p4" / "!1".."!4"; (3) a "!word" from PRIORITY_WORD. The "!" alternative is
+// listed so it claims the leading "!" before the bare-pN branch can match inside it.
+const PRIORITY_RE = /\bp([1-4])\b|!\s?(?:p?([1-4])\b|(urgent|high|medium|med|normal|low|none)\b)/gi;
+
 // --- date helpers ---
 
 function pad(n: number): string {
@@ -271,11 +280,22 @@ export function parseQuickAdd(
     }
   }
 
-  // 3. Priority pN (last one wins).
+  // 3. Priority (last one wins). Two syntaxes, both mapping to our P1-P4 scale:
+  //    - bare "p1".."p4"
+  //    - Todoist-style "!" word/number: "!urgent" (P1), "!high" (P2), "!medium"/"!med"
+  //      (P3), "!low"/"!none" (P4), and "!p1".."!p4" / "!1".."!4".
   let priority: number | undefined;
-  for (const m of [...work.matchAll(/\bp([1-4])\b/gi)]) {
+  for (const m of [...work.matchAll(PRIORITY_RE)]) {
     if (m.index === undefined) continue;
-    priority = parseInt(m[1], 10);
+    const val = m[1] // bare pN
+      ? parseInt(m[1], 10)
+      : m[2] // !pN or !N
+        ? parseInt(m[2], 10)
+        : m[3] // !word
+          ? PRIORITY_WORD[m[3].toLowerCase()]
+          : undefined;
+    if (val === undefined) continue;
+    priority = val; // last match wins
     tokens.push({ type: "priority", text: m[0], start: m.index, end: m.index + m[0].length });
   }
   if (priority !== undefined) {

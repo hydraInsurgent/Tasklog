@@ -21,6 +21,26 @@ describe('parseQuickAdd - tokens', () => {
     expect(r.recurrence).toBeUndefined()
   })
 
+  it('parses "!" priority words/numbers to the P1-P4 scale, stripping the token', () => {
+    expect(parse('email mark !urgent').priority).toBe(1)
+    expect(parse('email mark !high').priority).toBe(2)
+    expect(parse('email mark !medium').priority).toBe(3)
+    expect(parse('email mark !low').priority).toBe(4)
+    expect(parse('email mark !p1').priority).toBe(1)
+    expect(parse('email mark !3').priority).toBe(3)
+    // token is stripped from the cleaned title
+    expect(parse('email mark !urgent').cleanedTitle).toBe('email mark')
+    // bare pN still works; last priority wins
+    expect(parse('do thing p2').priority).toBe(2)
+    expect(parse('do thing p2 !urgent').priority).toBe(1)
+  })
+
+  it('does not treat a bare word as priority without "!"', () => {
+    const r = parse('send urgent email to high council')
+    expect(r.priority).toBeUndefined()
+    expect(r.cleanedTitle).toBe('send urgent email to high council')
+  })
+
   it('recognizes an unknown #project (created downstream) and strips it from the title', () => {
     const r = parse('plan #Holiday trip')
     expect(r.projectName).toBe('Holiday') // returned as-is; resolve-or-create happens on submit

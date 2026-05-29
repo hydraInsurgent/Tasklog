@@ -53,10 +53,13 @@ const TYPE_LABEL: Record<QuickAddTokenType, string> = {
 };
 
 interface Suggest {
-  symbol: "#" | "@";
+  symbol: "#" | "@" | "!";
   start: number; // index of the symbol in `value`
   items: string[];
 }
+
+// Fixed priority suggestions for the "!" trigger (map to P1-P4 in quickAdd.ts).
+const PRIORITY_SUGGESTIONS = ["urgent", "high", "medium", "low"];
 
 export default function QuickAddInput({ value, onChange, projects, labels, disabled, id, placeholder, showCapturedChips = true, highlight = true, ignoredKeys, onIgnoreToken, tapToDismiss = false }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -95,14 +98,15 @@ export default function QuickAddInput({ value, onChange, projects, labels, disab
     if (!highlight) return; // edit mode: literal title, no token autosuggest
     const caret = el.selectionStart ?? value.length;
     const before = value.slice(0, caret);
-    const m = before.match(/([#@])([\w-]*)$/);
+    const m = before.match(/([#@!])([\w-]*)$/);
     if (!m) {
       setSuggest(null);
       return;
     }
-    const symbol = m[1] as "#" | "@";
+    const symbol = m[1] as "#" | "@" | "!";
     const query = m[2].toLowerCase();
-    const pool = symbol === "#" ? projects.map((p) => p.name) : labels.map((l) => l.name);
+    const pool =
+      symbol === "#" ? projects.map((p) => p.name) : symbol === "@" ? labels.map((l) => l.name) : PRIORITY_SUGGESTIONS;
     const items = pool.filter((n) => n.toLowerCase().includes(query)).slice(0, 6);
     setSuggest(items.length > 0 ? { symbol, start: caret - m[0].length, items } : null);
     setActive(0);
@@ -231,11 +235,13 @@ export default function QuickAddInput({ value, onChange, projects, labels, disab
         className={`relative w-full whitespace-pre border-border bg-transparent text-text-primary caret-zinc-900 placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-shadow duration-150 ${METRICS}`}
       />
 
-      {/* #/@ autosuggest dropdown. */}
+      {/* #/@/! autosuggest dropdown. */}
       {suggest && (
         <ul
           role="listbox"
-          aria-label={suggest.symbol === "#" ? "Project suggestions" : "Label suggestions"}
+          aria-label={
+            suggest.symbol === "#" ? "Project suggestions" : suggest.symbol === "@" ? "Label suggestions" : "Priority suggestions"
+          }
           className="absolute z-20 top-full mt-1 w-56 bg-surface border border-border rounded-md shadow-md max-h-44 overflow-y-auto"
         >
           {suggest.items.map((name, i) => (
