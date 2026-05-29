@@ -2,12 +2,14 @@
 
 import { useRef, useEffect, useState } from "react";
 import Link from "next/link";
-import { MoreVertical, Trash2, Loader2, Pencil } from "lucide-react";
-import { Task, Project } from "@/lib/api";
+import { MoreVertical, Trash2, Loader2, Pencil, Flame } from "lucide-react";
+import { Task, Project, Habit } from "@/lib/api";
 import { formatDeadline, deadlineColorClass, projectName, labelColor } from "@/lib/format";
 import DeadlinePopover from "./DeadlinePopover";
 import PriorityDot from "./PriorityDot";
 import RecurringBadge from "./RecurringBadge";
+import TaskDoneControl from "./TaskDoneControl";
+import { occursOn } from "@/lib/recurrence";
 
 interface Props {
   task: Task;
@@ -33,6 +35,11 @@ interface Props {
   completingId: number | null;
   // Whether this card is mid-animation before disappearing from the list.
   isHiding: boolean;
+  // Habit support (#73 Habits v2): when the task is a habit, its done-control becomes a
+  // daily check-in toggle (never completes/closes it) and a flame marks it.
+  habit?: Habit;
+  pendingCheckIn?: boolean;
+  onCheckInToggle?: (id: number) => void;
 }
 
 export default function TaskCard({
@@ -49,6 +56,9 @@ export default function TaskCard({
   deletingId,
   completingId,
   isHiding,
+  habit,
+  pendingCheckIn = false,
+  onCheckInToggle,
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [deadlineOpen, setDeadlineOpen] = useState(false);
@@ -59,6 +69,9 @@ export default function TaskCard({
   // A completed task that is not mid-animation gets the dimmed + strikethrough treatment.
   const isCompletedAndVisible = task.isCompleted && !isHiding;
   const showProject = activeView === "all";
+  // A habit that isn't due today (per its schedule) - flag it so the row reads the same
+  // as the Habits view, where the check-in is gated to scheduled days.
+  const habitNotDueToday = task.isHabit && !occursOn(task.recurrence, new Date());
 
   // Close the three-dot menu when the user clicks anywhere outside it.
   useEffect(() => {
@@ -98,18 +111,33 @@ export default function TaskCard({
         </label>
       )}
 
-      {/* Circle checkbox - label provides the 44px tap target around a 20px visual circle.
-          appearance-none removes native styling; checked:bg-primary fills it on completion. */}
-      <label className="flex items-center justify-center min-w-[44px] min-h-[44px] shrink-0 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={task.isCompleted}
-          onChange={(e) => onComplete(task.id, e.target.checked)}
-          disabled={isCompleting}
-          aria-label={`Mark "${task.title}" as ${task.isCompleted ? "incomplete" : "complete"}`}
-          className="appearance-none w-5 h-5 rounded-full border-2 border-border checked:bg-primary checked:border-primary focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 shrink-0 cursor-pointer"
-        />
-      </label>
+      {/* Done control - habits are checked in (amber ring -> green; dashed when not due
+          today), never completed/closed; normal tasks use the round completion checkbox.
+          The 44px label gives a comfortable tap target. TaskDoneControl (shared with the
+          list + board) owns the habit-vs-task + due-today logic. */}
+      {task.isHabit ? (
+        <span className="flex items-center justify-center min-w-[44px] min-h-[44px] shrink-0">
+          <TaskDoneControl
+            task={task}
+            habit={habit}
+            completing={isCompleting}
+            pendingCheckIn={pendingCheckIn}
+            onComplete={onComplete}
+            onCheckInToggle={(id) => onCheckInToggle?.(id)}
+          />
+        </span>
+      ) : (
+        <label className="flex items-center justify-center min-w-[44px] min-h-[44px] shrink-0 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={task.isCompleted}
+            onChange={(e) => onComplete(task.id, e.target.checked)}
+            disabled={isCompleting}
+            aria-label={`Mark "${task.title}" as ${task.isCompleted ? "incomplete" : "complete"}`}
+            className="appearance-none w-5 h-5 rounded-full border-2 border-border checked:bg-primary checked:border-primary focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 shrink-0 cursor-pointer"
+          />
+        </label>
+      )}
 
       {/* Card body: title on top, project + deadline below */}
       <div className="flex-1 min-w-0 py-1">
@@ -121,6 +149,7 @@ export default function TaskCard({
         >
           <PriorityDot priority={task.priority} />
           <span className="min-w-0 break-words">{task.title}</span>
+          {task.isHabit && <Flame size={13} className="text-amber-500 shrink-0" aria-label="Habit" />}
         </Link>
 
         {/* Footer row: project name, deadline, and labels */}
@@ -149,6 +178,7 @@ export default function TaskCard({
               )}
             </span>
             <RecurringBadge recurrence={task.recurrence} />
+            {habitNotDueToday && <span className="text-text-muted">Not due today</span>}
           </div>
 
           {/* Right side: label names shown as #labelname in the label's color.

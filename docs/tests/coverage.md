@@ -1,6 +1,6 @@
 # Test Coverage
 
-**Last updated:** 2026-05-28 (#74 - habit tracking: HabitStreak + CheckIns/Habits controllers + IsHabit + Habits view, v2.16.0)
+**Last updated:** 2026-05-28 (#73 - UI uplift + Habits v2: schedule-aware streak, board grouping, TaskDoneControl; backend 250, frontend 131, MCP 97. Staged for review, not yet shipped)
 
 ---
 
@@ -27,7 +27,8 @@
 | HabitStreak | 100% | 100% | +9 tests (#74): empty=0, today-only=1, consecutive run, yesterday-grace, gap breaks, last-done-2-days-ago=0, ignores time + unordered, dedupes |
 | CheckInsController | 100% | 100% | +8 tests (#74): create 201, idempotent same-day 200, explicit date, unknown task 404, delete 204, delete-missing 404, list newest-first, list unknown 404 |
 | HabitsController | 100% | 100% | +5 tests (#74): only IsHabit tasks, not-done-today streak 0, done-today streak 1, consecutive run, empty |
-| TasksController (isHabit) | 100% | 100% | +7 tests (#74): create default false / true, update set/unset/omit, non-boolean -> 400 - 245 backend tests total |
+| TasksController (isHabit) | 100% | 100% | +7 tests (#74): create default false / true, update set/unset/omit, non-boolean -> 400 |
+| HabitStreak (schedule-aware) + RecurrenceRule.OccursOn | 100% | 100% | +5 tests (#73): scheduled-day streaks (every Tue/Thu skip-non-scheduled, missed-scheduled breaks, grace, daily-rule == plain, invalid rule falls back). 250 backend tests total |
 | ProjectsController | 100% | 100% | All methods and branches covered |
 | TasklogDbContext | 100% | 100% | |
 | Program.cs | 0% | - | Framework wiring - not a test target |
@@ -52,7 +53,7 @@
 
 **97 tests, 0 failures** (was 92; +5 in api-client.test.ts for the habit wire contract - isHabit on create/update, check-in body, Task.isHabit, #74). Run with: `npm test --prefix mcp` (auto-rebuilds better-sqlite3 for host arch via pretest hook if needed). Note: a fresh `npm install` on the host installs better-sqlite3 without the native binary - run `npm rebuild better-sqlite3` once after install if the OAuth store/token tests fail with `ERR_DLOPEN_FAILED`.
 
-### Next.js Frontend - last run 2026-05-28 (127 tests; +9 for habits: HabitCard render/toggle + format.lastNDays, #74)
+### Next.js Frontend - last run 2026-05-28 (136 tests; #73 added board.ts grouping (4) + TaskDoneControl (3) + recurrence.ts occursOn/nextDue (5); QuickAddInput/quickAdd updated for ! priority + ignore-token. Many #73 view components (TaskSheet, BoardView/BoardCard, HabitsPanel, schedule-aware HabitCard, ProjectLayout wiring) are integration-tested manually + via the pure helpers, not unit-rendered)
 
 | Component | Statements | Branches | Lines | Uncovered |
 |---|---|---|---|---|

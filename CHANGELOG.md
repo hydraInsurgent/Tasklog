@@ -2,6 +2,26 @@
 
 ---
 
+## Unreleased - UI uplift + Habits v2 (#73)
+*May 2026 - staged for review, not yet shipped*
+
+### Added
+
+- **Design-token foundation** - all colors now come from semantic CSS variables (surface, text, border, accent, success/warning/danger), so the look is consistent and a dark theme later is a drop-in. Focus rings are unified to one accent color (an accessibility improvement).
+- **Chip-driven task sheet** - adding and editing a task now happens in one sheet (a centered dialog on desktop, a keyboard-aware bottom-sheet on mobile). The title is a quick-add field (type `friday #Work @urgent p1` / `!urgent`); recognized bits highlight and become chips you can adjust, **Escape** (or tapping a highlight on mobile) turns a recognized bit back into plain text, and `#project` / `@label` auto-create. Replaces the old inline add form + edit modal.
+- **Board view** - a List | Board toggle with a Group-by control (due bucket / project / priority). The board shows horizontally-scrollable columns of rich cards (shadow, due-colour tint, priority pill). Each view remembers its own layout.
+- **Habits, reworked** - a habit is now **never completed/closed**; its control is a daily **check-in** (an amber ring that fills green when done today). Habit rows are marked with a flame so they stand out, a **right-side Habits panel** lets you check in without leaving your task list, and a habit can carry a **schedule** (e.g. "every Tue & Thu") - the streak counts only the scheduled days, so skipping a non-scheduled day never breaks it.
+
+### Fixed
+
+- A habit could previously be "completed" from the task list (closing it) while still showing on the Habits page - two disconnected "done" states. Habits are no longer completable; daily check-in is the only "done."
+
+### Notes
+
+- Frontend-only; no database migration. The "x times a week" habit frequency model is intentionally deferred to a later pass.
+
+---
+
 ## v2.16.0 - Habit tracking
 *May 2026*
 

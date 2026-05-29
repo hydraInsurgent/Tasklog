@@ -3,16 +3,20 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { usePolling } from "@/hooks/usePolling";
 import Link from "next/link";
-import { Trash2, CheckCircle, XCircle, Loader2, MoreHorizontal, Plus, Pencil, ListChecks } from "lucide-react";
-import { getTasks, deleteTask, completeTask, getLabels, updateTask, bulkTasks, BulkOperation, Task, Project, Label } from "@/lib/api";
+import { Trash2, CheckCircle, XCircle, Loader2, MoreHorizontal, Plus, Pencil, ListChecks, List, LayoutGrid, Flame } from "lucide-react";
+import { getTasks, deleteTask, completeTask, getLabels, updateTask, bulkTasks, BulkOperation, Task, Project, Label, Habit } from "@/lib/api";
 import { formatDate, formatDeadline, deadlineColorClass, projectName, labelColor } from "@/lib/format";
 import TaskCard from "./TaskCard";
 import TaskSheet from "./TaskSheet";
+import TaskDoneControl from "./TaskDoneControl";
+import BoardView from "./BoardView";
 import DeadlinePopover from "./DeadlinePopover";
 import BulkActionsBar from "./BulkActionsBar";
 import PriorityDot from "./PriorityDot";
 import RecurringBadge from "./RecurringBadge";
-import FilterPanel, { FilterState, EMPTY_FILTER, hasActiveFilters, activeFilterCount } from "./FilterPanel";
+import FilterPanel, { FilterState, hasActiveFilters, activeFilterCount } from "./FilterPanel";
+import { occursOn } from "@/lib/recurrence";
+import type { ViewMode, GroupBy } from "./ProjectLayout";
 
 // Feedback shown briefly after an action (replaces TempData flash messages from v1).
 type Feedback = { type: "success" | "error"; message: string } | null;
@@ -31,9 +35,37 @@ interface Props {
   // "+ Add Task" button (outside this component) can open the same sheet.
   creating: boolean;
   onCreatingChange: (creating: boolean) => void;
+  // View-mode axis (list vs board) + grouping, persisted per-view in ProjectLayout.
+  viewMode: ViewMode;
+  groupBy: GroupBy;
+  onViewModeChange: (mode: ViewMode) => void;
+  onGroupByChange: (groupBy: GroupBy) => void;
+  // Habit state (shared with the right-side panel): lookup by task id for the inline
+  // badge + check-in control on habit rows, the in-flight set, and the toggle handler.
+  habitsByTaskId: Map<number, Habit>;
+  pendingCheckIns: Set<number>;
+  onCheckInToggle: (taskId: number) => void;
+  // Called after a create/edit/delete so ProjectLayout can refresh habits (a task's
+  // habit-ness may have changed, or a habit was deleted).
+  onHabitsChanged: () => void;
 }
 
-export default function TasksClient({ activeView, projects, filterState, onFilterChange, creating, onCreatingChange }: Props) {
+export default function TasksClient({
+  activeView,
+  projects,
+  filterState,
+  onFilterChange,
+  creating,
+  onCreatingChange,
+  viewMode,
+  groupBy,
+  onViewModeChange,
+  onGroupByChange,
+  habitsByTaskId,
+  pendingCheckIns,
+  onCheckInToggle,
+  onHabitsChanged,
+}: Props) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [allLabels, setAllLabels] = useState<Label[]>([]);
   const [loading, setLoading] = useState(true);
@@ -181,6 +213,7 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
     const wasEdit = editingTask !== null;
     setEditingTask(null);
     onCreatingChange(false);
+    onHabitsChanged(); // habit-ness / schedule may have changed
     showFeedback("success", wasEdit ? "Task updated." : "Task created.");
   }
 
@@ -202,6 +235,7 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
     try {
       await deleteTask(id);
       setTasks((prev) => prev.filter((t) => t.id !== id));
+      onHabitsChanged(); // if it was a habit, drop it from the panel too
       showFeedback("success", "Task deleted.");
     } catch {
       showFeedback("error", "Failed to delete task. Please try again.");
@@ -325,9 +359,14 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
     return true;
   });
 
-  const hasCompleted = filteredTasks.some((t) => t.isCompleted);
+  // A habit checked in today is "done for the day" - it steps out of the active list
+  // (like a completed task) and returns tomorrow. It stays in the Habits panel/drawer.
+  const isDoneForToday = (t: Task) =>
+    t.isCompleted || (t.isHabit && (habitsByTaskId.get(t.id)?.doneToday ?? false));
+
+  const hasCompleted = filteredTasks.some((t) => isDoneForToday(t));
   const visibleTasks = filteredTasks.filter(
-    (t) => showCompleted || !t.isCompleted || hidingIds.has(t.id)
+    (t) => showCompleted || !isDoneForToday(t) || hidingIds.has(t.id)
   );
 
   // Human-readable label for the current view, used in empty state text.
@@ -361,7 +400,7 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
 
       {/* Task list panel */}
       <div className="bg-surface border border-border rounded-lg">
-        <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+        <div className="px-4 sm:px-6 py-4 border-b border-border flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h1
             className="text-lg font-semibold text-text-primary"
             style={{ fontFamily: "var(--font-space-grotesk), sans-serif" }}
@@ -373,8 +412,54 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
               : projects.find((p) => p.id === activeView)?.name ?? "Tasks"}
           </h1>
 
-          {/* Right side: add task shortcut + show completed toggle + filter button */}
-          <div className="flex items-center gap-3">
+          {/* Right side: view toggle + group-by + add task + show completed + filter.
+              Wraps onto its own row(s) on mobile so nothing clips off the edge. */}
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            {/* List | Board segmented toggle */}
+            <div className="flex items-center rounded-md border border-border overflow-hidden" role="group" aria-label="View mode">
+              <button
+                type="button"
+                onClick={() => onViewModeChange("list")}
+                aria-pressed={viewMode === "list"}
+                aria-label="List view"
+                title="List view"
+                className={`flex items-center justify-center w-9 h-9 transition-colors duration-150 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent ${
+                  viewMode === "list" ? "bg-surface-raised text-text-primary" : "text-text-muted hover:text-text-primary"
+                }`}
+              >
+                <List size={16} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                onClick={() => onViewModeChange("board")}
+                aria-pressed={viewMode === "board"}
+                aria-label="Board view"
+                title="Board view"
+                className={`flex items-center justify-center w-9 h-9 border-l border-border transition-colors duration-150 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent ${
+                  viewMode === "board" ? "bg-surface-raised text-text-primary" : "text-text-muted hover:text-text-primary"
+                }`}
+              >
+                <LayoutGrid size={16} aria-hidden="true" />
+              </button>
+            </div>
+
+            {/* Group-by - only meaningful in board mode */}
+            {viewMode === "board" && (
+              <label className="flex items-center gap-1.5 text-sm text-text-muted">
+                <span className="hidden sm:inline">Group</span>
+                <select
+                  value={groupBy}
+                  onChange={(e) => onGroupByChange(e.target.value as GroupBy)}
+                  aria-label="Group board by"
+                  className="px-2 py-1.5 border border-border rounded-md bg-surface text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer"
+                >
+                  <option value="due">Due</option>
+                  <option value="project">Project</option>
+                  <option value="priority">Priority</option>
+                </select>
+              </label>
+            )}
+
             <button
               type="button"
               onClick={() => onCreatingChange(true)}
@@ -404,9 +489,9 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
               </button>
             )}
 
-            {/* Select toggle - enters/leaves multi-select mode. Shown only when
-                there are tasks to select. */}
-            {!loading && filteredTasks.length > 0 && (
+            {/* Select toggle - enters/leaves multi-select mode. List view only
+                (the board has no row checkboxes). Shown only when there are tasks. */}
+            {!loading && filteredTasks.length > 0 && viewMode === "list" && (
               <button
                 onClick={() => (selectionMode ? exitSelectMode() : setSelectionMode(true))}
                 aria-pressed={selectionMode}
@@ -461,8 +546,24 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
           </div>
         ) : filteredTasks.length === 0 ? (
           <p className="py-16 text-center text-text-muted text-sm">
-            No {viewLabel} yet. Add one below.
+            No {viewLabel} yet.
           </p>
+        ) : viewMode === "board" ? (
+          <div className="p-4">
+            <BoardView
+              tasks={visibleTasks}
+              groupBy={groupBy}
+              projects={projects}
+              habitsByTaskId={habitsByTaskId}
+              completingId={completingId}
+              deletingId={deletingId}
+              pendingCheckIns={pendingCheckIns}
+              onComplete={handleComplete}
+              onCheckInToggle={onCheckInToggle}
+              onEdit={setEditingTask}
+              onDelete={handleDelete}
+            />
+          </div>
         ) : (
           <>
           {/* Desktop table - hidden on mobile to avoid horizontal scroll. */}
@@ -539,19 +640,21 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
                         </td>
                       )}
 
-                      {/* Completion checkbox */}
+                      {/* Done control: a complete checkbox, or a check-in toggle for a
+                          habit (habits are checked in daily, never completed/closed). */}
                       <td className={`${selectionMode ? "pl-2" : "pl-6"} pr-2 py-4`}>
-                        <input
-                          type="checkbox"
-                          checked={task.isCompleted}
-                          onChange={(e) => handleComplete(task.id, e.target.checked)}
-                          disabled={completingId === task.id}
-                          aria-label={`Mark ${task.title} as ${task.isCompleted ? "incomplete" : "complete"}`}
-                          className="w-4 h-4 rounded border-border text-text-primary focus:ring-accent disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                        <TaskDoneControl
+                          task={task}
+                          habit={habitsByTaskId.get(task.id)}
+                          completing={completingId === task.id}
+                          pendingCheckIn={pendingCheckIns.has(task.id)}
+                          onComplete={handleComplete}
+                          onCheckInToggle={onCheckInToggle}
                         />
                       </td>
 
-                      {/* Task title: links to detail page, with a priority dot */}
+                      {/* Task title: links to detail page, with a priority dot. Habits
+                          get a flame so they're distinguishable from normal tasks. */}
                       <td className="px-6 py-4">
                         <span className="inline-flex items-center gap-2">
                           <Link
@@ -561,7 +664,13 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
                             <PriorityDot priority={task.priority} />
                             {task.title}
                           </Link>
+                          {task.isHabit && (
+                            <Flame size={13} className="text-amber-500 shrink-0" aria-label="Habit" />
+                          )}
                           <RecurringBadge recurrence={task.recurrence} />
+                          {task.isHabit && !occursOn(task.recurrence, new Date()) && (
+                            <span className="text-xs text-text-muted">not due today</span>
+                          )}
                         </span>
                       </td>
 
@@ -682,6 +791,9 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
                 deletingId={deletingId}
                 completingId={completingId}
                 isHiding={hidingIds.has(task.id)}
+                habit={habitsByTaskId.get(task.id)}
+                pendingCheckIn={pendingCheckIns.has(task.id)}
+                onCheckInToggle={onCheckInToggle}
               />
             ))}
           </div>

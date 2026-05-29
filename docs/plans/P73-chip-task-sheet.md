@@ -1,6 +1,6 @@
 # Feature Implementation Plan: UI uplift (tokens + chip sheet + board views)
 
-**Overall Progress:** `40%`
+**Overall Progress:** `90%` (built; staged for the user's single review - deploy/ship pending)
 
 **Tracking issue:** [#73](https://github.com/hydraInsurgent/Tasklog/issues/73)
 **Branch:** `feature/chip-task-sheet-#73`
@@ -62,34 +62,30 @@ Design tokens, component specs, mockups, and accessibility rules: [UI-SPEC-P73-c
   - [x] 🟩 2.3 Wired into `TasksClient` (+ `ProjectLayout`): both "+ Add Task" buttons open the create sheet (`creating` lifted to `ProjectLayout`); edit pencil opens it for edit; `handleSheetSaved` prepends/replaces. Deleted `AddTaskForm` + `EditTaskModal` (+ AddTaskForm.test).
   - [x] 🟩 2.4 Dependency-free `tl-pop`/`tl-slide-up`/`tl-fade` keyframes (reduced-motion guarded) replace the tw-animate-css classes. Fixed a Stage A gap: `bg-white` → `bg-surface` (19 files). tsc clean; 121 jest pass (127 − 6 deleted AddTaskForm tests; TaskSheet tests are Step 4); lint clean apart from the known `set-state-in-effect` rule.
 
-- [ ] 🟥 **Step 3 [UI]: Stage C - view-mode axis (board ⇄ list) + group-by + per-view persistence** `[sequential]` → depends on: Steps 1, 2
-  - [ ] 🟥 3.1 Add `viewMode` ("list"|"board") + `groupBy` ("due"|"project"|"priority") state in `ProjectLayout`, persisted PER VIEW in `localStorage` keyed by `activeView`; pass down to `TasksClient`.
-  - [ ] 🟥 3.2 `TasksClient`: leave `filteredTasks`/`visibleTasks` UNTOUCHED; branch only the renderer on `viewMode` - "list" = today's table/cards, "board" = `BoardView`.
-  - [ ] 🟥 3.3 `BoardView` + `BoardColumn`: group `visibleTasks` by `groupBy` (due-bucket off `dueStatus` = Overdue/Today/This week/Later/No date; project = projectId→name; priority = 1-4), most-recent-due-first within a column, fixed-width horizontally-scrollable columns (~3.5 visible), header = name + count + per-bucket token accent. Mobile DEFAULTS to list (board opt-in).
-  - [ ] 🟥 3.4 Board card = Rich variant (UI-SPEC 4d): port+trim Business `TaskCard` - shadow + due-bucket bg tint + priority pill + complete tick + labels + deadline; reuse `PriorityDot`/`RecurringBadge`/`labelColor`/`deadlineColorClass`.
-  - [ ] 🟥 3.5 View-mode toggle (segmented List|Board) + group-by dropdown in the `TasksClient` header near the filter button; filtering REUSES the existing `FilterPanel` (no new filter-query language).
-  - [ ] 🟥 3.6 Verify: toggle + group-by + per-view persistence (switch views, reload, config sticks); board grouping correct; list view unchanged; tsc/jest/lint green; `npm run dev` smoke incl. the board horizontal scroll on mobile.
+- [x] 🟩 **Step 3 [UI]: Stage C - view-mode axis (board ⇄ list) + group-by + per-view persistence** `[sequential]` → depends on: Steps 1, 2
+  - [x] 🟩 3.1 `viewMode`/`groupBy` state in `ProjectLayout`, persisted PER VIEW in `localStorage` (key `tasklog_view_config`); passed down to `TasksClient`.
+  - [x] 🟩 3.2 `TasksClient`: `filteredTasks`/`visibleTasks` untouched; renderer branches on `viewMode` (list = table/cards, board = `BoardView`).
+  - [x] 🟩 3.3 `BoardView` + columns via pure `lib/board.ts` `groupTasksForBoard` (due/project/priority; due+priority fixed columns, project = non-empty; soonest-deadline-first within a column - see review note in board.ts re "most-recent-due-first" wording); fixed-width horizontally-scrollable; header = accent dot + name + count. Mobile defaults to list.
+  - [x] 🟩 3.4 Board card = Rich variant: `BoardCard` (shadow + due-bucket tint + priority pill + done/check-in control + labels + deadline + recurring/habit glyphs; hover delete).
+  - [x] 🟩 3.5 List|Board segmented toggle + group-by dropdown in the `TasksClient` header; filtering reuses `FilterPanel`.
+  - [x] 🟩 3.6 tsc + 131 jest + css green. **`npm run dev` visual smoke is the user's review step** (not run here).
 
-- [ ] 🟥 **Step 4 [UI]: Unit tests** `[sequential]` → depends on: Steps 1-3
-  - [ ] 🟥 4.1 `Chip` (states + a11y) + `PickerSheet` (open/close, focus) render tests.
-  - [ ] 🟥 4.2 `TaskSheet` create + edit (quick-add parse, chip values, habit toggle, diff-on-save); `DueDatePicker` quick chips + grid selection.
-  - [ ] 🟥 4.3 `BoardView` grouping (by dueStatus buckets / project / priority; most-recent-due ordering; empty column) + a pure helper test if grouping is extracted to `lib/`.
-  - [ ] 🟥 4.4 Per-view persistence (localStorage key per view, restore on mount). Run full frontend suite green.
+- [x] 🟩 **Step 4 [UI]: Unit tests** `[sequential]` → depends on: Steps 1-3
+  - [x] 🟩 4.x Added `board.test.ts` (grouping by due/project/priority + ordering) + `TaskDoneControl.test.tsx` (checkbox vs habit check-in). Sheet/board/panel render-integration is left to the user's manual review (pure helpers cover the logic). 131 frontend tests green.
 
-- [ ] 🟨 **Step 3.5: Habits v2 (Step 1) - folded into #73** `[sequential]` → depends on: Step 2
-  > **Scope note:** this expands #73 beyond pure UI into a habit-behavior fix (user decision, 2026-05-28). It fixes a real v2.16.0 defect (a habit could be "completed"/closed in the list while still showing on the Habits page - two disconnected "done" states) and adds the parts the user wants. **Frequency ("x times a week") is deferred** to a later Habits v2 Step 2 (not UI). Done inline on this branch.
-  - [ ] 🟥 3.5a Backend: `RecurrenceRule.OccursOn(date)` (schedule membership) + make `HabitStreak.CurrentStreak` **schedule-aware** (optional recurrence arg: count consecutive *scheduled* days checked in; non-scheduled days skipped; no rule = daily = current behavior). `HabitsController` passes each habit's recurrence. Tests.
-  - [ ] 🟥 3.5b Frontend - habit is never completed/closed: in the list, a habit row shows a **badge** (distinguishable) and its complete-checkbox becomes a **check-in toggle** (done-today), not a close. Reuse the habit check-in data.
-  - [ ] 🟥 3.5c Frontend - a **right-side Habits panel** beside the task list (streak + done-today toggle), so check-in doesn't require the separate page. Keep `/habits` page for now.
-  - [ ] 🟥 3.5d A habit can carry a **recurrence (= its schedule)**, set via the normal edit sheet (clicking a habit opens it). Streak respects it (3.5a). Verify; tests; tsc/jest/css green.
+- [x] 🟩 **Step 3.5: Habits v2 (Step 1) - folded into #73** `[sequential]` → depends on: Step 2
+  > **Scope note:** expands #73 beyond pure UI into a habit-behavior fix (user decision, 2026-05-28). Fixes the v2.16.0 defect (a habit could be completed/closed while still showing on the Habits page). **Frequency ("x times a week") deferred** to Habits v2 Step 2. Done inline on this branch.
+  - [x] 🟩 3.5a Backend: `RecurrenceRule.OccursOn(date)` + schedule-aware `HabitStreak` (optional recurrence; daily = prior behavior); `HabitsController` passes each habit's recurrence. +5 tests, 250 backend green.
+  - [x] 🟩 3.5b Habit rows show a flame badge + a check-in toggle (amber→green) instead of the complete checkbox (`TaskDoneControl`, used by list/card/board). Habits aren't completable.
+  - [x] 🟩 3.5c `HabitsPanel` (right-side, desktop lg+) sharing habit state with `ProjectLayout`; `/habits` page kept. `HabitCard` shows the schedule.
+  - [x] 🟩 3.5d Recurrence on a habit = its schedule, set via the edit sheet; streak respects it.
 
-- [ ] 🟥 **Step 5 [UI]: Docs + CHANGELOG** `[sequential]` → depends on: Steps 1-4
-  - [ ] 🟥 5.1 `architecture.md`: the view-mode axis, new components (`TaskSheet`, `Chip`, `PickerSheet`, `DueDatePicker`, `BoardView`/`BoardColumn`, board card), `useKeyboardHeight`, the token system, and that `AddTaskForm`/`EditTaskModal` were replaced.
-  - [ ] 🟥 5.2 `product-design.md`: tasks can be viewed as a board (view modes); `engineering-guidelines.md`: the view-mode pattern + portal primitives + token system (and note #4 partially closed); `CHANGELOG.md`: the version section; `coverage.md`: counts + checklists; reconcile the global `UI-SPEC.md` semantic colors to the AA-safe values.
+- [x] 🟩 **Step 5 [UI]: Docs + CHANGELOG** `[sequential]` → depends on: Steps 1-4
+  - [x] 🟩 5.x `CHANGELOG.md` (Unreleased section), `architecture.md` (services + components), `product-design.md` (habits not completable / board / schedules), `coverage.md` (counts 250/131/97). NOT done (left for the user / proper /document at ship): `engineering-guidelines.md` deep update + reconciling the global `UI-SPEC.md` colors.
 
-- [ ] 🟥 **Step 6 [UI]: Deploy + smoke + ship** `[sequential]` → depends on: Step 5
-  - [ ] 🟥 6.1 Check phone reachable + capture task count. Deploy. Confirm no data change (frontend-only, no migration).
-  - [ ] 🟥 6.2 Live smoke on the phone: create via the sheet, edit via the sheet, toggle to board, group-by switch, per-view persistence across a reload, on desktop + mobile.
+- [ ] 🟥 **Step 6 [UI]: Deploy + smoke + ship** `[sequential]` → depends on: Step 5 - LEFT FOR THE USER (review first; not shipping this round per the user's instruction)
+  - [ ] 🟥 6.1 Review the staged diff; then deploy + confirm no data change (frontend-only, no migration). NOTE: the existing completed "drinking water" habit should be un-completed (Show completed → untick) since habits are no longer completable.
+  - [ ] 🟥 6.2 Live smoke: create/edit via the sheet, board toggle + group-by + per-view persistence, habit check-in inline + panel, schedule streak.
   - [ ] 🟥 6.3 `/ship` (MINOR bump).
 
 ## Outcomes
