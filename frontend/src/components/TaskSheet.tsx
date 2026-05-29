@@ -97,14 +97,10 @@ export default function TaskSheet({ task, projects, allLabels, defaultProjectId,
   }, []);
   const keyboardHeight = useKeyboardHeight();
 
-  // Close on Escape (only when no picker is open - the picker handles its own Escape).
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape" && openPicker === null) onClose();
-    }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose, openPicker]);
+  // Escape-to-close is handled on the dialog's onKeyDown (below), NOT a document
+  // listener: that lets QuickAddInput's Escape-to-un-recognize call stopPropagation()
+  // and reliably prevent the close (a document listener fires regardless of the
+  // input's stopPropagation in React's App-Router event model).
 
   // Parse the title, dropping any tokens the user dismissed (ignored). Recomputes the
   // cleaned title + each field from only the ACTIVE tokens, so a dismissed token stays
@@ -358,6 +354,11 @@ export default function TaskSheet({ task, projects, allLabels, defaultProjectId,
         if (saving) return; // don't dismiss mid-save
         if (e.target === e.currentTarget) onClose();
       }}
+      onKeyDown={(e) => {
+        // Close on Escape - but QuickAddInput stops the event first when Escape
+        // un-recognizes a token, so this only fires when there's nothing to dismiss.
+        if (e.key === "Escape" && openPicker === null && !saving) onClose();
+      }}
     >
       <div
         role="dialog"
@@ -400,6 +401,7 @@ export default function TaskSheet({ task, projects, allLabels, defaultProjectId,
                 highlight={!isEdit}
                 ignoredKeys={ignored}
                 onIgnoreToken={(k) => setIgnored((prev) => new Set(prev).add(k))}
+                tapToDismiss={!isDesktop}
               />
               {error && (
                 <p className="mt-1 text-sm text-danger" role="alert">

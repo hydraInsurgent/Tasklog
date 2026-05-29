@@ -25,6 +25,9 @@ interface Props {
   ignoredKeys?: Set<string>;
   // Called with a token's key when the user presses Escape on it (un-recognize it).
   onIgnoreToken?: (key: string) => void;
+  // On touch/mobile (no Escape key), a tap inside a recognized token dismisses it
+  // (un-recognize -> keep as text). Off on desktop, where a click just places the caret.
+  tapToDismiss?: boolean;
 }
 
 // Subtle highlighter tints behind recognized tokens, by type (zinc-palette friendly).
@@ -55,7 +58,7 @@ interface Suggest {
   items: string[];
 }
 
-export default function QuickAddInput({ value, onChange, projects, labels, disabled, id, placeholder, showCapturedChips = true, highlight = true, ignoredKeys, onIgnoreToken }: Props) {
+export default function QuickAddInput({ value, onChange, projects, labels, disabled, id, placeholder, showCapturedChips = true, highlight = true, ignoredKeys, onIgnoreToken, tapToDismiss = false }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
   const [suggest, setSuggest] = useState<Suggest | null>(null);
@@ -206,7 +209,18 @@ export default function QuickAddInput({ value, onChange, projects, labels, disab
           // Don't let nav keys re-run refreshSuggest (it would reset the highlight).
           if (!["ArrowDown", "ArrowUp", "Enter", "Escape"].includes(e.key)) refreshSuggest(e.currentTarget);
         }}
-        onClick={(e) => refreshSuggest(e.currentTarget)}
+        onClick={(e) => {
+          // Mobile: a tap inside a recognized token un-recognizes it (keep as text).
+          if (tapToDismiss && onIgnoreToken) {
+            const caret = e.currentTarget.selectionStart ?? value.length;
+            const tok = tokens.find((t) => caret >= t.start && caret <= t.end);
+            if (tok) {
+              onIgnoreToken(tokenKey(tok));
+              return;
+            }
+          }
+          refreshSuggest(e.currentTarget);
+        }}
         onScroll={(e) => {
           if (backdropRef.current) backdropRef.current.scrollLeft = e.currentTarget.scrollLeft;
         }}
