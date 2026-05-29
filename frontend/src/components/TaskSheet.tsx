@@ -65,6 +65,9 @@ export default function TaskSheet({ task, projects, allLabels, defaultProjectId,
   const [selectedLabelIds, setSelectedLabelIds] = useState<number[]>(task ? task.labels.map((l) => l.id) : []);
   const [recurrence, setRecurrence] = useState<string | null>(task?.recurrence ?? null);
   const [isHabit, setIsHabit] = useState(task?.isHabit ?? false);
+  // Label names captured out of the title (create mode), so they are still
+  // resolved/created on submit even though their @token was stripped from the text.
+  const [capturedLabelNames, setCapturedLabelNames] = useState<string[]>([]);
 
   const [openPicker, setOpenPicker] = useState<OpenPicker>(null);
   const [saving, setSaving] = useState(false);
@@ -98,16 +101,19 @@ export default function TaskSheet({ task, projects, allLabels, defaultProjectId,
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose, openPicker]);
 
-  // Live-fill the chips from quick-add tokens in the title (create only). Typing
-  // "friday #Work @urgent p1" reflects straight into the Due / Project / Label /
-  // Priority chips, so the user sees the capture there (no separate chips row). Only
-  // a dimension whose token is present is set, so manual chip edits to other fields
-  // survive; on submit the tokens are stripped from the title (cleanedTitle). Labels
-  // resolve against existing ones here (autosuggest only offers existing labels);
-  // brand-new @names are created on submit.
+  // Live quick-add (create only): as recognized tokens in the title "settle" (the
+  // user types a space after them), move them OUT of the title and INTO their chip.
+  // Typing "Email mark this sunday #Work @urgent p1 " collapses the input to just
+  // "Email mark" while the Due / Project / Label / Priority chips fill in - so what
+  // you see in the field is exactly what gets saved as the title. A token still being
+  // typed (at the end, no trailing space) stays highlighted until you finish it.
   useEffect(() => {
     if (isEdit || !title.trim()) return;
     const parsed = parseQuickAdd(title, projects);
+
+    // Preview-fill the deterministic chips for ALL recognized tokens (so the chip
+    // updates live, even before the token settles). Only set a dimension whose token
+    // is present, so manual chip edits to other fields survive.
     if (parsed.deadline) setDeadline(parsed.deadline);
     if (parsed.priority) setPriority(parsed.priority);
     if (parsed.recurrence) setRecurrence(parsed.recurrence);
@@ -115,12 +121,28 @@ export default function TaskSheet({ task, projects, allLabels, defaultProjectId,
       const match = projects.find((p) => p.name.toLowerCase() === parsed.projectName!.toLowerCase());
       if (match) setProjectId(match.id);
     }
-    if (parsed.labelNames && parsed.labelNames.length > 0) {
-      const ids = parsed.labelNames
-        .map((n) => labels.find((l) => l.name.toLowerCase() === n.toLowerCase())?.id)
-        .filter((x): x is number => x !== undefined);
-      if (ids.length > 0) setSelectedLabelIds((prev) => Array.from(new Set([...prev, ...ids])));
+
+    // A token "settles" when it is immediately followed by whitespace (the user
+    // finished it and moved on). Only settled tokens leave the title.
+    const settled = parsed.tokens.filter((t) => t.end < title.length && /\s/.test(title.charAt(t.end)));
+    if (settled.length === 0) return;
+
+    // Settled @label tokens: resolve-or-create + select, and remember the name so
+    // submit still has it (its @token is about to leave the title).
+    for (const t of settled.filter((t) => t.type === "label")) {
+      const name = t.text.replace(/^@/, "");
+      setCapturedLabelNames((prev) => (prev.some((n) => n.toLowerCase() === name.toLowerCase()) ? prev : [...prev, name]));
+      void handleLabelCreate(name);
     }
+
+    // Strip every settled span from the title (back-to-front to keep indices valid).
+    let next = title;
+    for (const t of [...settled].sort((a, b) => b.start - a.start)) {
+      next = next.slice(0, t.start) + next.slice(t.end);
+    }
+    next = next.replace(/\s{2,}/g, " ").replace(/^\s+/, "");
+    if (next !== title) setTitle(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, isEdit, projects, labels]);
 
   // --- Label helpers ---
@@ -179,11 +201,13 @@ export default function TaskSheet({ task, projects, allLabels, defaultProjectId,
         if (match) finalProjectId = match.id;
       }
 
-      // Labels: those selected in the picker plus any @tokens in the title.
+      // Labels: those selected in the picker, plus any @tokens still in the title,
+      // plus names captured out of the title live (resolve-or-create; the live
+      // create may not have resolved yet, so this is the race guard).
       const labelObjs: Label[] = selectedLabelIds
         .map((id) => labels.find((l) => l.id === id))
         .filter((l): l is Label => !!l);
-      for (const name of parsed.labelNames ?? []) {
+      for (const name of [...(parsed.labelNames ?? []), ...capturedLabelNames]) {
         const label = await resolveOrCreateLabel(name);
         if (label && !labelObjs.some((l) => l.id === label.id)) labelObjs.push(label);
       }
