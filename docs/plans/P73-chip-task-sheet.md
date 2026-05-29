@@ -76,6 +76,13 @@ Design tokens, component specs, mockups, and accessibility rules: [UI-SPEC-P73-c
   - [ ] 🟥 4.3 `BoardView` grouping (by dueStatus buckets / project / priority; most-recent-due ordering; empty column) + a pure helper test if grouping is extracted to `lib/`.
   - [ ] 🟥 4.4 Per-view persistence (localStorage key per view, restore on mount). Run full frontend suite green.
 
+- [ ] 🟨 **Step 3.5: Habits v2 (Step 1) - folded into #73** `[sequential]` → depends on: Step 2
+  > **Scope note:** this expands #73 beyond pure UI into a habit-behavior fix (user decision, 2026-05-28). It fixes a real v2.16.0 defect (a habit could be "completed"/closed in the list while still showing on the Habits page - two disconnected "done" states) and adds the parts the user wants. **Frequency ("x times a week") is deferred** to a later Habits v2 Step 2 (not UI). Done inline on this branch.
+  - [ ] 🟥 3.5a Backend: `RecurrenceRule.OccursOn(date)` (schedule membership) + make `HabitStreak.CurrentStreak` **schedule-aware** (optional recurrence arg: count consecutive *scheduled* days checked in; non-scheduled days skipped; no rule = daily = current behavior). `HabitsController` passes each habit's recurrence. Tests.
+  - [ ] 🟥 3.5b Frontend - habit is never completed/closed: in the list, a habit row shows a **badge** (distinguishable) and its complete-checkbox becomes a **check-in toggle** (done-today), not a close. Reuse the habit check-in data.
+  - [ ] 🟥 3.5c Frontend - a **right-side Habits panel** beside the task list (streak + done-today toggle), so check-in doesn't require the separate page. Keep `/habits` page for now.
+  - [ ] 🟥 3.5d A habit can carry a **recurrence (= its schedule)**, set via the normal edit sheet (clicking a habit opens it). Streak respects it (3.5a). Verify; tests; tsc/jest/css green.
+
 - [ ] 🟥 **Step 5 [UI]: Docs + CHANGELOG** `[sequential]` → depends on: Steps 1-4
   - [ ] 🟥 5.1 `architecture.md`: the view-mode axis, new components (`TaskSheet`, `Chip`, `PickerSheet`, `DueDatePicker`, `BoardView`/`BoardColumn`, board card), `useKeyboardHeight`, the token system, and that `AddTaskForm`/`EditTaskModal` were replaced.
   - [ ] 🟥 5.2 `product-design.md`: tasks can be viewed as a board (view modes); `engineering-guidelines.md`: the view-mode pattern + portal primitives + token system (and note #4 partially closed); `CHANGELOG.md`: the version section; `coverage.md`: counts + checklists; reconcile the global `UI-SPEC.md` semantic colors to the AA-safe values.

@@ -43,7 +43,9 @@ namespace Tasklog.Api.Controllers
                 var dates = task.CheckIns.Select(c => c.CheckInDate.Date).ToList();
                 return new HabitResponse(
                     task,
-                    HabitStreak.CurrentStreak(dates, today),
+                    // Pass the habit's recurrence as its schedule so the streak counts only
+                    // scheduled days (e.g. "every Tue & Thu"); null = daily. (#73 Habits v2)
+                    HabitStreak.CurrentStreak(dates, today, task.Recurrence),
                     dates.Contains(today),
                     dates.OrderByDescending(d => d).ToList());
             }).ToList();

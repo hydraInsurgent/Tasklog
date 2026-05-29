@@ -385,5 +385,54 @@ namespace Tasklog.Api.Services
             if (Count is int count && existingSeriesCount >= count) return false;
             return true;
         }
+
+        // Whether `date` is a scheduled day of this rule's PATTERN - "is the habit due on
+        // this day?" - IGNORING Interval and any UNTIL/COUNT. Used for habit streaks, which
+        // only care about the day pattern (every Tue/Thu, the 15th, the 3rd Thursday), not
+        // how many weeks apart the occurrences are or when the series ends. Daily => every day.
+        // Simplification: interval>1 (e.g. "every other Tuesday") is treated as every Tuesday
+        // here - acceptable for a streak, and it avoids needing an anchor date for habits.
+        public bool OccursOn(DateTime date)
+        {
+            var d = date.Date;
+            switch (Freq)
+            {
+                case RecurrenceFreq.Daily:
+                    return true;
+                case RecurrenceFreq.Weekly:
+                    return Weekdays.Contains(d.DayOfWeek);
+                case RecurrenceFreq.Monthly:
+                {
+                    var daysInMonth = DateTime.DaysInMonth(d.Year, d.Month);
+                    if (Ordinal is int ord)
+                    {
+                        var target = Weekdays[0];
+                        int day;
+                        if (ord > 0)
+                        {
+                            var first = new DateTime(d.Year, d.Month, 1);
+                            var firstMatch = 1 + (((int)target - (int)first.DayOfWeek + 7) % 7);
+                            day = firstMatch + 7 * (ord - 1);
+                            if (day > daysInMonth) day -= 7;
+                        }
+                        else
+                        {
+                            var last = new DateTime(d.Year, d.Month, daysInMonth);
+                            day = daysInMonth - (((int)last.DayOfWeek - (int)target + 7) % 7);
+                        }
+                        return d.Day == day;
+                    }
+                    if (MonthDay < 0)
+                    {
+                        var day = daysInMonth + 1 + MonthDay;
+                        if (day < 1) day = 1;
+                        return d.Day == day;
+                    }
+                    return d.Day == Math.Min(MonthDay, daysInMonth);
+                }
+                default:
+                    return false;
+            }
+        }
     }
 }
