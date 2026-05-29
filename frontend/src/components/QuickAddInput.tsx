@@ -2,7 +2,7 @@
 
 import { useRef, useState, useLayoutEffect } from "react";
 import { X } from "lucide-react";
-import { parseQuickAdd, QuickAddProject, QuickAddToken, QuickAddTokenType } from "@/lib/quickAdd";
+import { parseQuickAdd, tokenKey, QuickAddProject, QuickAddToken, QuickAddTokenType } from "@/lib/quickAdd";
 
 interface Props {
   value: string;
@@ -20,6 +20,11 @@ interface Props {
   // Whether to recognize + highlight quick-add tokens and offer #/@ autosuggest.
   // Off in edit mode, where the title is a literal value (no parsing) (#73).
   highlight?: boolean;
+  // Token keys (see tokenKey) the user has dismissed with Escape: rendered as plain
+  // text, not highlighted/parsed. The parent owns the set so its chips/save agree.
+  ignoredKeys?: Set<string>;
+  // Called with a token's key when the user presses Escape on it (un-recognize it).
+  onIgnoreToken?: (key: string) => void;
 }
 
 // Subtle highlighter tints behind recognized tokens, by type (zinc-palette friendly).
@@ -50,7 +55,7 @@ interface Suggest {
   items: string[];
 }
 
-export default function QuickAddInput({ value, onChange, projects, labels, disabled, id, placeholder, showCapturedChips = true, highlight = true }: Props) {
+export default function QuickAddInput({ value, onChange, projects, labels, disabled, id, placeholder, showCapturedChips = true, highlight = true, ignoredKeys, onIgnoreToken }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
   const [suggest, setSuggest] = useState<Suggest | null>(null);
@@ -59,7 +64,10 @@ export default function QuickAddInput({ value, onChange, projects, labels, disab
 
   // Recognized token spans drive the highlight; recompute on each render (cheap).
   // Disabled (no tint, no autosuggest) when highlight=false, e.g. the edit title field.
-  const tokens = highlight ? parseQuickAdd(value, projects).tokens : [];
+  // Tokens the user dismissed (ignoredKeys) are excluded, so they render as plain text.
+  const tokens = highlight
+    ? parseQuickAdd(value, projects).tokens.filter((t) => !ignoredKeys?.has(tokenKey(t)))
+    : [];
 
   // Keep the backdrop scrolled in lockstep with the input (single-line h-scroll).
   useLayoutEffect(() => {
@@ -116,6 +124,30 @@ export default function QuickAddInput({ value, onChange, projects, labels, disab
     }
   }
 
+  // Escape on a recognized token un-recognizes it (keeps the text, stops parsing it)
+  // rather than closing the sheet. Targets the token under the caret, else the last
+  // active token (so repeated Escape peels recognitions off). Returns true if it
+  // handled the key, so the caller can stop it bubbling to the sheet's close handler.
+  function handleEscapeIgnore(e: React.KeyboardEvent<HTMLInputElement>): boolean {
+    if (!highlight || !onIgnoreToken || tokens.length === 0) return false;
+    const caret = inputRef.current?.selectionStart ?? value.length;
+    const under = tokens.find((t) => caret >= t.start && caret <= t.end);
+    const target = under ?? [...tokens].reverse().find((t) => t.end <= caret) ?? tokens[tokens.length - 1];
+    if (!target) return false;
+    e.preventDefault();
+    e.stopPropagation(); // don't let the sheet's Escape-to-close fire
+    onIgnoreToken(tokenKey(target));
+    return true;
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (suggest) {
+      handleNavKey(e);
+      return;
+    }
+    if (e.key === "Escape") handleEscapeIgnore(e);
+  }
+
   // "Unlink" a recognized token: remove its text from the title so it is no longer
   // parsed (the field/highlight updates on the next render). Simpler + safer than an
   // in-place contenteditable click-to-unlink.
@@ -169,7 +201,7 @@ export default function QuickAddInput({ value, onChange, projects, labels, disab
           onChange(e.target.value);
           refreshSuggest(e.target);
         }}
-        onKeyDown={handleNavKey}
+        onKeyDown={handleKeyDown}
         onKeyUp={(e) => {
           // Don't let nav keys re-run refreshSuggest (it would reset the highlight).
           if (!["ArrowDown", "ArrowUp", "Enter", "Escape"].includes(e.key)) refreshSuggest(e.currentTarget);

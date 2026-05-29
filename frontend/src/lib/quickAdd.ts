@@ -26,6 +26,13 @@ export interface QuickAddToken {
   end: number; // exclusive
 }
 
+// Stable identity for a token: its type, position, and text. Used to mark a token
+// as "ignored" (keep it as literal text, do not parse it). Tied to the exact span,
+// so editing that text drops the ignore and it re-matches (see TaskSheet).
+export function tokenKey(t: QuickAddToken): string {
+  return `${t.type}:${t.start}:${t.text}`;
+}
+
 export interface QuickAddResult {
   cleanedTitle: string;
   deadline?: string; // "YYYY-MM-DD" (date-only) or "YYYY-MM-DDTHH:mm" (timed)

@@ -13,7 +13,7 @@
  * (due date / priority / project / label / recurrence) is a <Chip> that opens its
  * picker in a <PickerSheet>. Replaces AddTaskForm + EditTaskModal. */
 
-import { useState, useEffect, useMemo, useRef, FormEvent } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, FormEvent } from "react";
 import { X, Loader2, Calendar, Flag, Folder, Tag, Repeat } from "lucide-react";
 import {
   Task,
@@ -28,7 +28,7 @@ import {
   createProject,
 } from "@/lib/api";
 import { priorityMeta, formatDeadline, describeRecurrence } from "@/lib/format";
-import { parseQuickAdd, QuickAddTokenType } from "@/lib/quickAdd";
+import { parseQuickAdd, tokenKey, QuickAddTokenType } from "@/lib/quickAdd";
 import { resolvePreset } from "@/lib/deadlinePresets";
 import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
 import Chip from "./Chip";
@@ -70,6 +70,9 @@ export default function TaskSheet({ task, projects, allLabels, defaultProjectId,
   const [selectedLabelIds, setSelectedLabelIds] = useState<number[]>(task ? task.labels.map((l) => l.id) : []);
   const [recurrence, setRecurrence] = useState<string | null>(task?.recurrence ?? null);
   const [isHabit, setIsHabit] = useState(task?.isHabit ?? false);
+  // Token keys the user dismissed with Escape (keep as literal text, do not parse).
+  // Pruned whenever the title changes so editing the span lets it re-match.
+  const [ignored, setIgnored] = useState<Set<string>>(new Set());
 
   const [openPicker, setOpenPicker] = useState<OpenPicker>(null);
   const [saving, setSaving] = useState(false);
@@ -103,13 +106,47 @@ export default function TaskSheet({ task, projects, allLabels, defaultProjectId,
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose, openPicker]);
 
-  // --- Derived (create only): parse the current title each render. The chips are
-  //     computed from this, so they always reflect exactly what is typed now and the
-  //     save uses the same parse. In edit mode the title is literal (no parse). ---
-  const parsed = useMemo(
-    () => (!isEdit && title.trim() ? parseQuickAdd(title, projects) : null),
-    [isEdit, title, projects],
+  // Parse the title, dropping any tokens the user dismissed (ignored). Recomputes the
+  // cleaned title + each field from only the ACTIVE tokens, so a dismissed token stays
+  // as literal text in both the chips and the saved title. Returns null in edit mode.
+  const buildParse = useCallback(
+    (text: string) => {
+      if (isEdit || !text.trim()) return null;
+      const raw = parseQuickAdd(text, projects);
+      const active = raw.tokens.filter((t) => !ignored.has(tokenKey(t)));
+      const types = new Set(active.map((t) => t.type));
+      let cleaned = text;
+      for (const t of [...active].sort((a, b) => b.start - a.start)) cleaned = cleaned.slice(0, t.start) + cleaned.slice(t.end);
+      cleaned = cleaned.replace(/\s{2,}/g, " ").trim();
+      const labelNames = active.filter((t) => t.type === "label").map((t) => t.text.replace(/^@/, ""));
+      return {
+        cleanedTitle: cleaned,
+        // A bare-weekday recurrence sets deadline via its recurrence token, so accept
+        // deadline if either a date OR a recurrence token is active.
+        deadline: types.has("date") || (types.has("recurrence") && raw.deadline) ? raw.deadline : undefined,
+        priority: types.has("priority") ? raw.priority : undefined,
+        recurrence: types.has("recurrence") ? raw.recurrence : undefined,
+        projectName: types.has("project") ? raw.projectName : undefined,
+        labelNames: labelNames.length ? labelNames : undefined,
+      };
+    },
+    [isEdit, projects, ignored],
   );
+
+  const parsed = useMemo(() => buildParse(title), [buildParse, title]);
+
+  // Prune dismissed tokens that no longer correspond to a current token (the user
+  // edited that span) so editing the text lets it re-match - the "remove y, add y
+  // re-recognizes" behavior. No-op in edit mode.
+  useEffect(() => {
+    if (isEdit) return;
+    setIgnored((prev) => {
+      if (prev.size === 0) return prev;
+      const present = new Set(parseQuickAdd(title, projects).tokens.map(tokenKey));
+      const kept = [...prev].filter((k) => present.has(k));
+      return kept.length === prev.size ? prev : new Set(kept); // unchanged -> same ref (no loop)
+    });
+  }, [title, projects, isEdit]);
 
   // Effective values: a parsed token (if present) overrides the manual chip value.
   const effDeadline = parsed?.deadline ?? deadline;
@@ -182,9 +219,10 @@ export default function TaskSheet({ task, projects, allLabels, defaultProjectId,
   }
 
   async function handleCreate() {
-    // Re-parse the current title; the cleaned title strips exactly the highlighted
-    // tokens, so nothing recognized leaks into the saved title.
-    const p = parseQuickAdd(title, projects);
+    // Use the same ignore-aware parse the chips/highlights use, so the cleaned title
+    // strips exactly the still-highlighted tokens (dismissed ones stay as text) and
+    // nothing recognized leaks into the saved title.
+    const p = buildParse(title) ?? { cleanedTitle: title.trim(), deadline: undefined, recurrence: undefined, priority: undefined, projectName: undefined, labelNames: undefined };
     const finalTitle = p.cleanedTitle || title.trim();
     if (!finalTitle) {
       setError("Title is required.");
@@ -360,6 +398,8 @@ export default function TaskSheet({ task, projects, allLabels, defaultProjectId,
                 placeholder={isEdit ? "Task title" : 'e.g. "Email Mark friday #Work @urgent p1"'}
                 showCapturedChips={false}
                 highlight={!isEdit}
+                ignoredKeys={ignored}
+                onIgnoreToken={(k) => setIgnored((prev) => new Set(prev).add(k))}
               />
               {error && (
                 <p className="mt-1 text-sm text-danger" role="alert">
