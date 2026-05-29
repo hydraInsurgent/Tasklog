@@ -17,6 +17,9 @@ interface Props {
   // TaskSheet, where the sheet's own chips (Due/Priority/Project/Label/Repeat)
   // already reflect the parsed tokens, so the row would be redundant (#73).
   showCapturedChips?: boolean;
+  // Whether to recognize + highlight quick-add tokens and offer #/@ autosuggest.
+  // Off in edit mode, where the title is a literal value (no parsing) (#73).
+  highlight?: boolean;
 }
 
 // Subtle highlighter tints behind recognized tokens, by type (zinc-palette friendly).
@@ -47,7 +50,7 @@ interface Suggest {
   items: string[];
 }
 
-export default function QuickAddInput({ value, onChange, projects, labels, disabled, id, placeholder, showCapturedChips = true }: Props) {
+export default function QuickAddInput({ value, onChange, projects, labels, disabled, id, placeholder, showCapturedChips = true, highlight = true }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
   const [suggest, setSuggest] = useState<Suggest | null>(null);
@@ -55,7 +58,8 @@ export default function QuickAddInput({ value, onChange, projects, labels, disab
   const [active, setActive] = useState(0);
 
   // Recognized token spans drive the highlight; recompute on each render (cheap).
-  const tokens = parseQuickAdd(value, projects).tokens;
+  // Disabled (no tint, no autosuggest) when highlight=false, e.g. the edit title field.
+  const tokens = highlight ? parseQuickAdd(value, projects).tokens : [];
 
   // Keep the backdrop scrolled in lockstep with the input (single-line h-scroll).
   useLayoutEffect(() => {
@@ -77,6 +81,7 @@ export default function QuickAddInput({ value, onChange, projects, labels, disab
 
   // Autosuggest: if the caret sits inside a #word / @word, offer matching names.
   function refreshSuggest(el: HTMLInputElement) {
+    if (!highlight) return; // edit mode: literal title, no token autosuggest
     const caret = el.selectionStart ?? value.length;
     const before = value.slice(0, caret);
     const m = before.match(/([#@])([\w-]*)$/);

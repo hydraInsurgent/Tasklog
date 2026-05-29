@@ -21,10 +21,11 @@ describe('parseQuickAdd - tokens', () => {
     expect(r.recurrence).toBeUndefined()
   })
 
-  it('leaves an unknown #project in the title', () => {
+  it('recognizes an unknown #project (created downstream) and strips it from the title', () => {
     const r = parse('plan #Holiday trip')
-    expect(r.projectName).toBeUndefined()
-    expect(r.cleanedTitle).toContain('#Holiday')
+    expect(r.projectName).toBe('Holiday') // returned as-is; resolve-or-create happens on submit
+    expect(r.cleanedTitle).not.toContain('#Holiday')
+    expect(r.cleanedTitle).toBe('plan trip')
   })
 
   it('collects multiple @labels', () => {

@@ -275,14 +275,15 @@ export function parseQuickAdd(
     for (const t of tokens.filter((t) => t.type === "priority")) work = mask(work, t.start, t.end);
   }
 
-  // 4. #project - only recognized when it matches a known project (case-insensitive);
-  //    an unknown #foo is left in the title untouched.
+  // 4. #project - the first #word becomes the project. A known project resolves to
+  //    its canonical name; an unknown #foo is returned as-is and created downstream
+  //    (same as @label auto-creating). Always tokenized so it highlights + is stripped
+  //    from the cleaned title.
   let projectName: string | undefined;
   for (const m of [...work.matchAll(/#([\w-]+)/g)]) {
     if (m.index === undefined) continue;
     const match = projects.find((p) => p.name.toLowerCase() === m[1].toLowerCase());
-    if (!match) continue;
-    projectName = match.name;
+    projectName = match ? match.name : m[1];
     tokens.push({ type: "project", text: m[0], start: m.index, end: m.index + m[0].length });
     work = mask(work, m.index, m.index + m[0].length);
     break; // one project

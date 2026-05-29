@@ -1,16 +1,19 @@
 "use client";
 
 /* Chip-driven create/edit task sheet (#73). One component for both:
- *   - create: task undefined. Title runs through quick-add parsing on submit
- *     (same as the old AddTaskForm), chips supply the rest.
- *   - edit:   task provided. Title is literal; fields diff against the original
- *     and only what changed is sent (same fan-out as the old EditTaskModal).
+ *   - create: the title is a quick-add line. Recognized tokens stay HIGHLIGHTED in
+ *     the input (so an accidental one is visible and removable before save); the
+ *     chips are DERIVED from the current title each render, so deleting a token
+ *     clears its chip. On submit the title is cleaned from the same parse, which
+ *     guarantees "highlighted <=> removed from the saved title" by construction.
+ *   - edit:   title is literal (no parsing/highlighting); chips are seeded from the
+ *     task and edited via the pickers; fields diff against the original on save.
  *
  * Layout: centered modal at >=640px, keyboard-aware bottom-sheet below. Each field
  * (due date / priority / project / label / recurrence) is a <Chip> that opens its
  * picker in a <PickerSheet>. Replaces AddTaskForm + EditTaskModal. */
 
-import { useState, useEffect, useRef, FormEvent } from "react";
+import { useState, useEffect, useMemo, useRef, FormEvent } from "react";
 import { X, Loader2, Calendar, Flag, Folder, Tag, Repeat } from "lucide-react";
 import {
   Task,
@@ -22,9 +25,10 @@ import {
   assignTaskProject,
   getTask,
   createLabel,
+  createProject,
 } from "@/lib/api";
 import { priorityMeta, formatDeadline, describeRecurrence } from "@/lib/format";
-import { parseQuickAdd } from "@/lib/quickAdd";
+import { parseQuickAdd, QuickAddTokenType } from "@/lib/quickAdd";
 import { resolvePreset } from "@/lib/deadlinePresets";
 import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
 import Chip from "./Chip";
@@ -53,21 +57,19 @@ type OpenPicker = null | "due" | "priority" | "project" | "label" | "recurrence"
 export default function TaskSheet({ task, projects, allLabels, defaultProjectId, onSaved, onClose }: Props) {
   const isEdit = !!task;
 
-  // --- Form state (seeded from the task on edit, defaults on create) ---
+  // --- Title + description ---
   const [title, setTitle] = useState(task?.title ?? "");
   const [description, setDescription] = useState(task?.description ?? "");
-  // Deadline as an ISO string (date-only "YYYY-MM-DD" or date+time), or null.
+
+  // --- Manual field state (set by the pickers). In edit mode these ARE the values;
+  //     in create mode they are overlaid by tokens parsed from the title (see eff* below). ---
   const [deadline, setDeadline] = useState<string | null>(task?.deadline ?? null);
   const [priority, setPriority] = useState(task?.priority ?? 4);
   const [projectId, setProjectId] = useState<number | null>(task ? task.projectId : defaultProjectId ?? null);
-  // Growable master label list (created labels are appended here).
-  const [labels, setLabels] = useState<Label[]>(allLabels);
+  const [labels, setLabels] = useState<Label[]>(allLabels); // growable (created labels appended)
   const [selectedLabelIds, setSelectedLabelIds] = useState<number[]>(task ? task.labels.map((l) => l.id) : []);
   const [recurrence, setRecurrence] = useState<string | null>(task?.recurrence ?? null);
   const [isHabit, setIsHabit] = useState(task?.isHabit ?? false);
-  // Label names captured out of the title (create mode), so they are still
-  // resolved/created on submit even though their @token was stripped from the text.
-  const [capturedLabelNames, setCapturedLabelNames] = useState<string[]>([]);
 
   const [openPicker, setOpenPicker] = useState<OpenPicker>(null);
   const [saving, setSaving] = useState(false);
@@ -101,51 +103,44 @@ export default function TaskSheet({ task, projects, allLabels, defaultProjectId,
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose, openPicker]);
 
-  // Live quick-add (create only): as recognized tokens in the title "settle" (the
-  // user types a space after them), move them OUT of the title and INTO their chip.
-  // Typing "Email mark this sunday #Work @urgent p1 " collapses the input to just
-  // "Email mark" while the Due / Project / Label / Priority chips fill in - so what
-  // you see in the field is exactly what gets saved as the title. A token still being
-  // typed (at the end, no trailing space) stays highlighted until you finish it.
-  useEffect(() => {
-    if (isEdit || !title.trim()) return;
-    const parsed = parseQuickAdd(title, projects);
+  // --- Derived (create only): parse the current title each render. The chips are
+  //     computed from this, so they always reflect exactly what is typed now and the
+  //     save uses the same parse. In edit mode the title is literal (no parse). ---
+  const parsed = useMemo(
+    () => (!isEdit && title.trim() ? parseQuickAdd(title, projects) : null),
+    [isEdit, title, projects],
+  );
 
-    // Preview-fill the deterministic chips for ALL recognized tokens (so the chip
-    // updates live, even before the token settles). Only set a dimension whose token
-    // is present, so manual chip edits to other fields survive.
-    if (parsed.deadline) setDeadline(parsed.deadline);
-    if (parsed.priority) setPriority(parsed.priority);
-    if (parsed.recurrence) setRecurrence(parsed.recurrence);
-    if (parsed.projectName) {
-      const match = projects.find((p) => p.name.toLowerCase() === parsed.projectName!.toLowerCase());
-      if (match) setProjectId(match.id);
-    }
+  // Effective values: a parsed token (if present) overrides the manual chip value.
+  const effDeadline = parsed?.deadline ?? deadline;
+  const effPriority = parsed?.priority ?? priority;
+  const effRecurrence = parsed?.recurrence ?? recurrence;
+  const parsedProjectName = parsed?.projectName ?? null;
+  // A typed #project may be new (no id yet); resolve a known one for the picker value.
+  const effProjectId = parsedProjectName
+    ? projects.find((p) => p.name.toLowerCase() === parsedProjectName.toLowerCase())?.id ?? null
+    : projectId;
+  const effProjectName = parsedProjectName
+    ?? (projectId !== null ? projects.find((p) => p.id === projectId)?.name ?? "Inbox" : "Inbox");
+  const effLabelNames = useMemo(() => {
+    const fromIds = selectedLabelIds.map((id) => labels.find((l) => l.id === id)?.name).filter((n): n is string => !!n);
+    return Array.from(new Set([...(parsed?.labelNames ?? []), ...fromIds]));
+  }, [parsed, selectedLabelIds, labels]);
 
-    // A token "settles" when it is immediately followed by whitespace (the user
-    // finished it and moved on). Only settled tokens leave the title.
-    const settled = parsed.tokens.filter((t) => t.end < title.length && /\s/.test(title.charAt(t.end)));
-    if (settled.length === 0) return;
-
-    // Settled @label tokens: resolve-or-create + select, and remember the name so
-    // submit still has it (its @token is about to leave the title).
-    for (const t of settled.filter((t) => t.type === "label")) {
-      const name = t.text.replace(/^@/, "");
-      setCapturedLabelNames((prev) => (prev.some((n) => n.toLowerCase() === name.toLowerCase()) ? prev : [...prev, name]));
-      void handleLabelCreate(name);
-    }
-
-    // Strip every settled span from the title (back-to-front to keep indices valid).
+  // When a picker sets a field that ALSO has a token in the title, the token would
+  // otherwise win (parsed-first). So a picker action strips that field's token from
+  // the title, handing control to the manual value. No-op in edit mode.
+  function clearTokenOfType(type: QuickAddTokenType) {
+    if (isEdit) return;
+    const p = parseQuickAdd(title, projects);
+    const toks = p.tokens.filter((t) => t.type === type);
+    if (toks.length === 0) return;
     let next = title;
-    for (const t of [...settled].sort((a, b) => b.start - a.start)) {
-      next = next.slice(0, t.start) + next.slice(t.end);
-    }
-    next = next.replace(/\s{2,}/g, " ").replace(/^\s+/, "");
-    if (next !== title) setTitle(next);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, isEdit, projects, labels]);
+    for (const t of [...toks].sort((a, b) => b.start - a.start)) next = next.slice(0, t.start) + next.slice(t.end);
+    setTitle(next.replace(/\s{2,}/g, " ").trim());
+  }
 
-  // --- Label helpers ---
+  // --- Resolve-or-create helpers (labels + projects auto-create on @/# like Todoist) ---
   async function resolveOrCreateLabel(name: string): Promise<Label | null> {
     const existing = labels.find((l) => l.name.toLowerCase() === name.toLowerCase());
     if (existing) return existing;
@@ -153,6 +148,15 @@ export default function TaskSheet({ task, projects, allLabels, defaultProjectId,
       const created = await createLabel(name, labels.length % 10);
       setLabels((prev) => [...prev, created]);
       return created;
+    } catch {
+      return null;
+    }
+  }
+  async function resolveOrCreateProject(name: string): Promise<number | null> {
+    const existing = projects.find((p) => p.name.toLowerCase() === name.toLowerCase());
+    if (existing) return existing.id;
+    try {
+      return (await createProject(name)).id;
     } catch {
       return null;
     }
@@ -178,10 +182,10 @@ export default function TaskSheet({ task, projects, allLabels, defaultProjectId,
   }
 
   async function handleCreate() {
-    // Parse the title as a quick-add line; parsed tokens win over the chips (same
-    // precedence as the old AddTaskForm).
-    const parsed = parseQuickAdd(title, projects);
-    const finalTitle = parsed.cleanedTitle || title.trim();
+    // Re-parse the current title; the cleaned title strips exactly the highlighted
+    // tokens, so nothing recognized leaks into the saved title.
+    const p = parseQuickAdd(title, projects);
+    const finalTitle = p.cleanedTitle || title.trim();
     if (!finalTitle) {
       setError("Title is required.");
       return;
@@ -189,25 +193,20 @@ export default function TaskSheet({ task, projects, allLabels, defaultProjectId,
 
     setSaving(true);
     try {
-      let finalDeadline = parsed.deadline ?? deadline ?? undefined;
-      const finalRecurrence = parsed.recurrence ?? (finalDeadline ? recurrence ?? undefined : undefined);
+      let finalDeadline = p.deadline ?? deadline ?? undefined;
+      const finalRecurrence = p.recurrence ?? (finalDeadline ? recurrence ?? undefined : undefined);
       // A recurrence needs a deadline anchor - default to today if none was given.
       if (finalRecurrence && !finalDeadline) finalDeadline = resolvePreset("today") ?? undefined;
-      const finalPriority = parsed.priority ?? priority;
+      const finalPriority = p.priority ?? priority;
 
-      let finalProjectId = projectId;
-      if (parsed.projectName) {
-        const match = projects.find((p) => p.name.toLowerCase() === parsed.projectName!.toLowerCase());
-        if (match) finalProjectId = match.id;
-      }
+      // Project: a typed #project (known or new) wins and resolve-or-creates; else the chip.
+      const finalProjectId = p.projectName ? await resolveOrCreateProject(p.projectName) : projectId;
 
-      // Labels: those selected in the picker, plus any @tokens still in the title,
-      // plus names captured out of the title live (resolve-or-create; the live
-      // create may not have resolved yet, so this is the race guard).
+      // Labels: the manually-selected ids plus any @tokens in the title (resolve-or-create).
       const labelObjs: Label[] = selectedLabelIds
         .map((id) => labels.find((l) => l.id === id))
         .filter((l): l is Label => !!l);
-      for (const name of [...(parsed.labelNames ?? []), ...capturedLabelNames]) {
+      for (const name of p.labelNames ?? []) {
         const label = await resolveOrCreateLabel(name);
         if (label && !labelObjs.some((l) => l.id === label.id)) labelObjs.push(label);
       }
@@ -302,17 +301,13 @@ export default function TaskSheet({ task, projects, allLabels, defaultProjectId,
     }
   }
 
-  // --- Chip display values ---
-  const dueValue = deadline ? formatDeadline(deadline) : undefined;
-  const priorityValue = priority !== 4 ? priorityMeta(priority).label : undefined;
-  const projectValue = projectId === null ? "Inbox" : projects.find((p) => p.id === projectId)?.name ?? "Inbox";
+  // --- Chip display values (derived effective values) ---
+  const dueValue = effDeadline ? formatDeadline(effDeadline) : undefined;
+  const priorityValue = effPriority !== 4 ? priorityMeta(effPriority).label : undefined;
+  const projectValue = effProjectName;
   const labelValue =
-    selectedLabelIds.length > 0
-      ? selectedLabelIds.length === 1
-        ? labels.find((l) => l.id === selectedLabelIds[0])?.name ?? "1 label"
-        : `${selectedLabelIds.length} labels`
-      : undefined;
-  const recurrenceValue = recurrence ? describeRecurrence(recurrence) : undefined;
+    effLabelNames.length === 1 ? effLabelNames[0] : effLabelNames.length > 1 ? `${effLabelNames.length} labels` : undefined;
+  const recurrenceValue = effRecurrence ? describeRecurrence(effRecurrence) : undefined;
 
   const panelClasses = isDesktop
     ? "bg-surface rounded-lg shadow-xl w-full max-w-lg flex flex-col max-h-[85vh] tl-pop"
@@ -350,7 +345,7 @@ export default function TaskSheet({ task, projects, allLabels, defaultProjectId,
 
         <form onSubmit={handleSubmit} className="flex flex-col overflow-hidden">
           <div className="px-5 py-4 space-y-4 overflow-y-auto">
-            {/* Title (quick-add field) */}
+            {/* Title - quick-add field on create (highlights tokens), plain on edit. */}
             <div>
               <label htmlFor="sheet-title" className="block text-sm font-medium text-text-primary mb-1">
                 Title
@@ -364,6 +359,7 @@ export default function TaskSheet({ task, projects, allLabels, defaultProjectId,
                 disabled={saving}
                 placeholder={isEdit ? "Task title" : 'e.g. "Email Mark friday #Work @urgent p1"'}
                 showCapturedChips={false}
+                highlight={!isEdit}
               />
               {error && (
                 <p className="mt-1 text-sm text-danger" role="alert">
@@ -476,27 +472,38 @@ export default function TaskSheet({ task, projects, allLabels, defaultProjectId,
         </form>
       </div>
 
-      {/* Pickers (portal to body via PickerSheet, anchored to their chip) */}
+      {/* Pickers (portal to body via PickerSheet, anchored to their chip). Each picker
+          writes the manual field state and strips its token from the title so the
+          manual value takes over (parsed-first otherwise). */}
       <DueDatePicker
         open={openPicker === "due"}
         triggerRef={dueRef}
-        value={deadline}
-        onChange={setDeadline}
+        value={effDeadline}
+        onChange={(v) => {
+          setDeadline(v);
+          clearTokenOfType("date");
+        }}
         onClose={() => setOpenPicker(null)}
       />
       <PriorityPicker
         open={openPicker === "priority"}
         triggerRef={priorityRef}
-        value={priority}
-        onChange={setPriority}
+        value={effPriority}
+        onChange={(p) => {
+          setPriority(p);
+          clearTokenOfType("priority");
+        }}
         onClose={() => setOpenPicker(null)}
       />
       <ProjectPicker
         open={openPicker === "project"}
         triggerRef={projectRef}
-        value={projectId}
+        value={effProjectId}
         projects={projects}
-        onChange={setProjectId}
+        onChange={(id) => {
+          setProjectId(id);
+          clearTokenOfType("project");
+        }}
         onClose={() => setOpenPicker(null)}
       />
       <LabelPicker
@@ -514,7 +521,14 @@ export default function TaskSheet({ task, projects, allLabels, defaultProjectId,
         title="Repeat"
         onClose={() => setOpenPicker(null)}
       >
-        <RecurrencePicker value={recurrence} onChange={setRecurrence} deadline={deadline ?? undefined} />
+        <RecurrencePicker
+          value={effRecurrence}
+          onChange={(r) => {
+            setRecurrence(r);
+            clearTokenOfType("recurrence");
+          }}
+          deadline={effDeadline ?? undefined}
+        />
       </PickerSheet>
     </div>
   );
