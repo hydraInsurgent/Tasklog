@@ -2,8 +2,8 @@
 
 ---
 
-## Unreleased - UI uplift + Habits v2 (#73)
-*May 2026 - staged for review, not yet shipped*
+## v2.17.0 - UI uplift (tokens + chip sheet + board) + Habits v2
+*May 2026*
 
 ### Added
 
