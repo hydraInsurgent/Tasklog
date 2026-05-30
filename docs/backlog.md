@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| [P73-chip-task-sheet.md](plans/P73-chip-task-sheet.md) | #73 | feature/chip-task-sheet-#73 | In Progress |
+| _(none active)_ | | | |
 
 ---
 
@@ -32,6 +32,9 @@ Future features - not yet started. Add GitHub issue number when created.
 
 | # | Title | Priority | Notes |
 |---|-------|----------|-------|
+| - | Habits v2 Step 2: frequency ("x times a week") + decouple deadline from a habit's schedule (hide Due chip for habits, recurrence-without-deadline) | medium | deferred from #73; backend RecurrenceRule.OccursOn already supports schedules |
+| - | Dark mode (tokens already in place from #73 - add a `.dark` block) | low | #73 made it a drop-in |
+| - | Habits calendar heatmap (GitHub-style) | low | check-in data already supports it |
 | #25 | Guard against invalid date strings in format.ts | low | from #22 review |
 | #26 | Simplify className construction in TaskCard | low | from #22 review |
 | #27 | Add overflow guard to three-dot dropdown menu | low | from #22 review |
@@ -77,6 +80,7 @@ Recently completed work (keep last 10):
 
 | # | Title | Type | Closed |
 |---|-------|------|--------|
+| #73 | UI uplift: design tokens + chip-driven sheet + board view + Habits v2 Step 1 (v2.17.0) | feature | 2026-05-30 |
 | #74 | Habit tracking (IsHabit + daily check-ins + streaks) (v2.16.0) - completes the recurring+habits program | feature | 2026-05-28 |
 | #72 | Natural-language quick-add (Todoist-style title parsing) (v2.15.0) | feature | 2026-05-27 |
 | #71 | Advanced recurrence grammar (nth-weekday, end conditions, intervals) (v2.14.1) | feature | 2026-05-27 |
