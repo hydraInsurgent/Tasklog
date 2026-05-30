@@ -26,6 +26,13 @@ export interface QuickAddToken {
   end: number; // exclusive
 }
 
+// Stable identity for a token: its type, position, and text. Used to mark a token
+// as "ignored" (keep it as literal text, do not parse it). Tied to the exact span,
+// so editing that text drops the ignore and it re-matches (see TaskSheet).
+export function tokenKey(t: QuickAddToken): string {
+  return `${t.type}:${t.start}:${t.text}`;
+}
+
 export interface QuickAddResult {
   cleanedTitle: string;
   deadline?: string; // "YYYY-MM-DD" (date-only) or "YYYY-MM-DDTHH:mm" (timed)
@@ -52,6 +59,15 @@ const WD_LIST = `${WD}(?:\\s*(?:,|and|,\\s*and)\\s*|\\s+)${WD}|${WD}`;
 const ORDINAL_WORD: Record<string, number> = {
   first: 1, second: 2, third: 3, fourth: 4, last: -1,
 };
+
+// Priority words -> our P1-P4 scale (1 = urgent .. 4 = none). Todoist-style "!" syntax.
+const PRIORITY_WORD: Record<string, number> = {
+  urgent: 1, high: 2, medium: 3, med: 3, normal: 3, low: 4, none: 4,
+};
+// Matches a priority token, capturing one of: (1) bare "p1".."p4"; (2) the digit of
+// "!p1".."!p4" / "!1".."!4"; (3) a "!word" from PRIORITY_WORD. The "!" alternative is
+// listed so it claims the leading "!" before the bare-pN branch can match inside it.
+const PRIORITY_RE = /\bp([1-4])\b|!\s?(?:p?([1-4])\b|(urgent|high|medium|med|normal|low|none)\b)/gi;
 
 // --- date helpers ---
 
@@ -264,25 +280,37 @@ export function parseQuickAdd(
     }
   }
 
-  // 3. Priority pN (last one wins).
+  // 3. Priority (last one wins). Two syntaxes, both mapping to our P1-P4 scale:
+  //    - bare "p1".."p4"
+  //    - Todoist-style "!" word/number: "!urgent" (P1), "!high" (P2), "!medium"/"!med"
+  //      (P3), "!low"/"!none" (P4), and "!p1".."!p4" / "!1".."!4".
   let priority: number | undefined;
-  for (const m of [...work.matchAll(/\bp([1-4])\b/gi)]) {
+  for (const m of [...work.matchAll(PRIORITY_RE)]) {
     if (m.index === undefined) continue;
-    priority = parseInt(m[1], 10);
+    const val = m[1] // bare pN
+      ? parseInt(m[1], 10)
+      : m[2] // !pN or !N
+        ? parseInt(m[2], 10)
+        : m[3] // !word
+          ? PRIORITY_WORD[m[3].toLowerCase()]
+          : undefined;
+    if (val === undefined) continue;
+    priority = val; // last match wins
     tokens.push({ type: "priority", text: m[0], start: m.index, end: m.index + m[0].length });
   }
   if (priority !== undefined) {
     for (const t of tokens.filter((t) => t.type === "priority")) work = mask(work, t.start, t.end);
   }
 
-  // 4. #project - only recognized when it matches a known project (case-insensitive);
-  //    an unknown #foo is left in the title untouched.
+  // 4. #project - the first #word becomes the project. A known project resolves to
+  //    its canonical name; an unknown #foo is returned as-is and created downstream
+  //    (same as @label auto-creating). Always tokenized so it highlights + is stripped
+  //    from the cleaned title.
   let projectName: string | undefined;
   for (const m of [...work.matchAll(/#([\w-]+)/g)]) {
     if (m.index === undefined) continue;
     const match = projects.find((p) => p.name.toLowerCase() === m[1].toLowerCase());
-    if (!match) continue;
-    projectName = match.name;
+    projectName = match ? match.name : m[1];
     tokens.push({ type: "project", text: m[0], start: m.index, end: m.index + m[0].length });
     work = mask(work, m.index, m.index + m[0].length);
     break; // one project

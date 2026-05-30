@@ -3,17 +3,20 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { usePolling } from "@/hooks/usePolling";
 import Link from "next/link";
-import { Trash2, CheckCircle, XCircle, Loader2, MoreHorizontal, Plus, Pencil, ListChecks } from "lucide-react";
-import { getTasks, createTask, deleteTask, completeTask, getLabels, setTaskLabels, updateTask, bulkTasks, BulkOperation, Task, Project, Label } from "@/lib/api";
+import { Trash2, CheckCircle, XCircle, Loader2, MoreHorizontal, Plus, Pencil, ListChecks, List, LayoutGrid, Flame } from "lucide-react";
+import { getTasks, deleteTask, completeTask, getLabels, updateTask, bulkTasks, BulkOperation, Task, Project, Label, Habit } from "@/lib/api";
 import { formatDate, formatDeadline, deadlineColorClass, projectName, labelColor } from "@/lib/format";
-import AddTaskForm from "./AddTaskForm";
 import TaskCard from "./TaskCard";
-import EditTaskModal from "./EditTaskModal";
+import TaskSheet from "./TaskSheet";
+import TaskDoneControl from "./TaskDoneControl";
+import BoardView from "./BoardView";
 import DeadlinePopover from "./DeadlinePopover";
 import BulkActionsBar from "./BulkActionsBar";
 import PriorityDot from "./PriorityDot";
 import RecurringBadge from "./RecurringBadge";
-import FilterPanel, { FilterState, EMPTY_FILTER, hasActiveFilters, activeFilterCount } from "./FilterPanel";
+import FilterPanel, { FilterState, hasActiveFilters, activeFilterCount } from "./FilterPanel";
+import { occursOn } from "@/lib/recurrence";
+import type { ViewMode, GroupBy } from "./ProjectLayout";
 
 // Feedback shown briefly after an action (replaces TempData flash messages from v1).
 type Feedback = { type: "success" | "error"; message: string } | null;
@@ -28,9 +31,41 @@ interface Props {
   filterState: FilterState;
   // Called when the user applies new filters from the panel.
   onFilterChange: (fs: FilterState) => void;
+  // Whether the create-task sheet is open. Lifted to ProjectLayout so its mobile
+  // "+ Add Task" button (outside this component) can open the same sheet.
+  creating: boolean;
+  onCreatingChange: (creating: boolean) => void;
+  // View-mode axis (list vs board) + grouping, persisted per-view in ProjectLayout.
+  viewMode: ViewMode;
+  groupBy: GroupBy;
+  onViewModeChange: (mode: ViewMode) => void;
+  onGroupByChange: (groupBy: GroupBy) => void;
+  // Habit state (shared with the right-side panel): lookup by task id for the inline
+  // badge + check-in control on habit rows, the in-flight set, and the toggle handler.
+  habitsByTaskId: Map<number, Habit>;
+  pendingCheckIns: Set<number>;
+  onCheckInToggle: (taskId: number) => void;
+  // Called after a create/edit/delete so ProjectLayout can refresh habits (a task's
+  // habit-ness may have changed, or a habit was deleted).
+  onHabitsChanged: () => void;
 }
 
-export default function TasksClient({ activeView, projects, filterState, onFilterChange }: Props) {
+export default function TasksClient({
+  activeView,
+  projects,
+  filterState,
+  onFilterChange,
+  creating,
+  onCreatingChange,
+  viewMode,
+  groupBy,
+  onViewModeChange,
+  onGroupByChange,
+  habitsByTaskId,
+  pendingCheckIns,
+  onCheckInToggle,
+  onHabitsChanged,
+}: Props) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [allLabels, setAllLabels] = useState<Label[]>([]);
   const [loading, setLoading] = useState(true);
@@ -167,31 +202,19 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
     }
   }
 
-  // Called by AddTaskForm on submit. Updates local state so no full reload is needed.
-  // When viewing a specific project, new tasks are assigned to that project automatically.
-  async function handleAdd(title: string, deadline?: string, projectId?: number | null, labelIds?: number[], priority?: number, description?: string, recurrence?: string, isHabit?: boolean) {
-    // If the caller didn't pass a projectId but we're viewing a specific project,
-    // default to that project. Inbox / All views default to null (Inbox).
-    const resolvedProjectId =
-      projectId !== undefined ? projectId : typeof activeView === "number" ? activeView : null;
-    let task = await createTask(title, deadline, resolvedProjectId, priority, description, recurrence, isHabit);
-
-    // Apply labels immediately after creation if any were selected.
-    // setTaskLabels returns the updated task with labels populated.
-    if (labelIds && labelIds.length > 0) {
-      task = await setTaskLabels(task.id, labelIds);
-    }
-
-    setTasks((prev) => [task, ...prev]);
-    showFeedback("success", "Task created.");
-  }
-
-  // Called by EditTaskModal after a successful save with the canonical task.
-  // Replace it in local state so the list reflects the edit without a reload.
-  function handleSaved(updated: Task) {
-    setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+  // Called by TaskSheet after a successful create OR edit, with the canonical task.
+  // New tasks (id not yet in the list) are prepended; edits replace in place. The
+  // sheet handles the API calls itself; this just reconciles local state + closes.
+  function handleSheetSaved(task: Task) {
+    setTasks((prev) => {
+      const exists = prev.some((t) => t.id === task.id);
+      return exists ? prev.map((t) => (t.id === task.id ? task : t)) : [task, ...prev];
+    });
+    const wasEdit = editingTask !== null;
     setEditingTask(null);
-    showFeedback("success", "Task updated.");
+    onCreatingChange(false);
+    onHabitsChanged(); // habit-ness / schedule may have changed
+    showFeedback("success", wasEdit ? "Task updated." : "Task created.");
   }
 
   // Quick deadline change from the popover (desktop rows + mobile cards).
@@ -212,6 +235,7 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
     try {
       await deleteTask(id);
       setTasks((prev) => prev.filter((t) => t.id !== id));
+      onHabitsChanged(); // if it was a habit, drop it from the panel too
       showFeedback("success", "Task deleted.");
     } catch {
       showFeedback("error", "Failed to delete task. Please try again.");
@@ -335,9 +359,14 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
     return true;
   });
 
-  const hasCompleted = filteredTasks.some((t) => t.isCompleted);
+  // A habit checked in today is "done for the day" - it steps out of the active list
+  // (like a completed task) and returns tomorrow. It stays in the Habits panel/drawer.
+  const isDoneForToday = (t: Task) =>
+    t.isCompleted || (t.isHabit && (habitsByTaskId.get(t.id)?.doneToday ?? false));
+
+  const hasCompleted = filteredTasks.some((t) => isDoneForToday(t));
   const visibleTasks = filteredTasks.filter(
-    (t) => showCompleted || !t.isCompleted || hidingIds.has(t.id)
+    (t) => showCompleted || !isDoneForToday(t) || hidingIds.has(t.id)
   );
 
   // Human-readable label for the current view, used in empty state text.
@@ -370,10 +399,10 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
       )}
 
       {/* Task list panel */}
-      <div className="bg-white border border-zinc-200 rounded-lg">
-        <div className="px-6 py-4 border-b border-zinc-200 flex items-center justify-between">
+      <div className="bg-surface border border-border rounded-lg">
+        <div className="px-4 sm:px-6 py-4 border-b border-border flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h1
-            className="text-lg font-semibold text-zinc-900"
+            className="text-lg font-semibold text-text-primary"
             style={{ fontFamily: "var(--font-space-grotesk), sans-serif" }}
           >
             {activeView === "all"
@@ -383,15 +412,58 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
               : projects.find((p) => p.id === activeView)?.name ?? "Tasks"}
           </h1>
 
-          {/* Right side: add task shortcut + show completed toggle + filter button */}
-          <div className="flex items-center gap-3">
+          {/* Right side: view toggle + group-by + add task + show completed + filter.
+              Wraps onto its own row(s) on mobile so nothing clips off the edge. */}
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            {/* List | Board segmented toggle */}
+            <div className="flex items-center rounded-md border border-border overflow-hidden" role="group" aria-label="View mode">
+              <button
+                type="button"
+                onClick={() => onViewModeChange("list")}
+                aria-pressed={viewMode === "list"}
+                aria-label="List view"
+                title="List view"
+                className={`flex items-center justify-center w-9 h-9 transition-colors duration-150 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent ${
+                  viewMode === "list" ? "bg-surface-raised text-text-primary" : "text-text-muted hover:text-text-primary"
+                }`}
+              >
+                <List size={16} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                onClick={() => onViewModeChange("board")}
+                aria-pressed={viewMode === "board"}
+                aria-label="Board view"
+                title="Board view"
+                className={`flex items-center justify-center w-9 h-9 border-l border-border transition-colors duration-150 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent ${
+                  viewMode === "board" ? "bg-surface-raised text-text-primary" : "text-text-muted hover:text-text-primary"
+                }`}
+              >
+                <LayoutGrid size={16} aria-hidden="true" />
+              </button>
+            </div>
+
+            {/* Group-by - only meaningful in board mode */}
+            {viewMode === "board" && (
+              <label className="flex items-center gap-1.5 text-sm text-text-muted">
+                <span className="hidden sm:inline">Group</span>
+                <select
+                  value={groupBy}
+                  onChange={(e) => onGroupByChange(e.target.value as GroupBy)}
+                  aria-label="Group board by"
+                  className="px-2 py-1.5 border border-border rounded-md bg-surface text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer"
+                >
+                  <option value="due">Due</option>
+                  <option value="project">Project</option>
+                  <option value="priority">Priority</option>
+                </select>
+              </label>
+            )}
+
             <button
               type="button"
-              onClick={() => {
-                const el = document.getElementById("task-title") as HTMLInputElement | null;
-                if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); el.focus(); }
-              }}
-              className="hidden md:flex items-center gap-2 px-4 py-2 bg-zinc-900 text-white text-sm font-medium rounded-md hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:ring-offset-2 transition-colors duration-150 cursor-pointer"
+              onClick={() => onCreatingChange(true)}
+              className="hidden md:flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-medium rounded-md hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 transition-colors duration-150 cursor-pointer"
             >
               <Plus size={16} aria-hidden="true" />
               Add Task
@@ -411,20 +483,20 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
                     return next;
                   });
                 }}
-                className="text-sm text-zinc-500 hover:text-zinc-900 focus:outline-none focus:underline transition-colors duration-150 cursor-pointer"
+                className="text-sm text-text-muted hover:text-text-primary focus:outline-none focus:underline transition-colors duration-150 cursor-pointer"
               >
                 {showCompleted ? "Hide completed" : "Show completed"}
               </button>
             )}
 
-            {/* Select toggle - enters/leaves multi-select mode. Shown only when
-                there are tasks to select. */}
-            {!loading && filteredTasks.length > 0 && (
+            {/* Select toggle - enters/leaves multi-select mode. List view only
+                (the board has no row checkboxes). Shown only when there are tasks. */}
+            {!loading && filteredTasks.length > 0 && viewMode === "list" && (
               <button
                 onClick={() => (selectionMode ? exitSelectMode() : setSelectionMode(true))}
                 aria-pressed={selectionMode}
                 className={`flex items-center gap-1.5 text-sm focus:outline-none focus:underline transition-colors duration-150 cursor-pointer ${
-                  selectionMode ? "text-blue-600 font-medium" : "text-zinc-500 hover:text-zinc-900"
+                  selectionMode ? "text-accent font-medium" : "text-text-muted hover:text-text-primary"
                 }`}
               >
                 <ListChecks size={16} aria-hidden="true" />
@@ -438,12 +510,12 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
                 onClick={() => setFilterPanelOpen((prev) => !prev)}
                 aria-label="Filter tasks"
                 aria-expanded={filterPanelOpen}
-                className="relative flex items-center justify-center w-8 h-8 min-w-[44px] min-h-[44px] text-zinc-400 hover:text-zinc-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-1 rounded transition-colors duration-150 cursor-pointer"
+                className="relative flex items-center justify-center w-8 h-8 min-w-[44px] min-h-[44px] text-text-muted hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 rounded transition-colors duration-150 cursor-pointer"
               >
                 <MoreHorizontal size={16} aria-hidden="true" />
                 {/* Active filter count badge */}
                 {hasActiveFilters(filterState) && (
-                  <span className="absolute top-1 right-1 flex items-center justify-center w-4 h-4 rounded-full bg-blue-600 text-white text-[10px] font-bold leading-none">
+                  <span className="absolute top-1 right-1 flex items-center justify-center w-4 h-4 rounded-full bg-accent text-white text-[10px] font-bold leading-none">
                     {activeFilterCount(filterState)}
                   </span>
                 )}
@@ -468,21 +540,37 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
 
         {loading ? (
           // Loading state: spinner (loading-states rule).
-          <div className="flex items-center justify-center gap-2 py-16 text-zinc-400">
+          <div className="flex items-center justify-center gap-2 py-16 text-text-muted">
             <Loader2 size={20} className="animate-spin" aria-hidden="true" />
             <span>Loading tasks...</span>
           </div>
         ) : filteredTasks.length === 0 ? (
-          <p className="py-16 text-center text-zinc-400 text-sm">
-            No {viewLabel} yet. Add one below.
+          <p className="py-16 text-center text-text-muted text-sm">
+            No {viewLabel} yet.
           </p>
+        ) : viewMode === "board" ? (
+          <div className="p-4">
+            <BoardView
+              tasks={visibleTasks}
+              groupBy={groupBy}
+              projects={projects}
+              habitsByTaskId={habitsByTaskId}
+              completingId={completingId}
+              deletingId={deletingId}
+              pendingCheckIns={pendingCheckIns}
+              onComplete={handleComplete}
+              onCheckInToggle={onCheckInToggle}
+              onEdit={setEditingTask}
+              onDelete={handleDelete}
+            />
+          </div>
         ) : (
           <>
           {/* Desktop table - hidden on mobile to avoid horizontal scroll. */}
           <div className="hidden md:block overflow-x-auto overflow-hidden rounded-b-lg">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-zinc-100 text-left">
+                <tr className="border-b border-border-muted text-left">
                   {/* Select-all checkbox - only in select mode. */}
                   {selectionMode && (
                     <th className="pl-6 pr-2 py-3 w-8">
@@ -495,32 +583,32 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
                           )
                         }
                         aria-label="Select all tasks"
-                        className="w-4 h-4 rounded border-zinc-300 text-blue-600 focus:ring-2 focus:ring-blue-600 cursor-pointer"
+                        className="w-4 h-4 rounded border-border text-accent focus:ring-2 focus:ring-accent cursor-pointer"
                       />
                     </th>
                   )}
                   <th className={`${selectionMode ? "pl-2" : "pl-6"} pr-2 py-3 w-8`}>
                     <span className="sr-only">Complete</span>
                   </th>
-                  <th className="px-6 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">
+                  <th className="px-6 py-3 text-xs font-medium text-text-muted uppercase tracking-wide">
                     Title
                   </th>
                   {/* Project column - only meaningful in the All Tasks view */}
                   {activeView === "all" && (
-                    <th className="px-6 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">
+                    <th className="px-6 py-3 text-xs font-medium text-text-muted uppercase tracking-wide">
                       Project
                     </th>
                   )}
-                  <th className="px-6 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">
+                  <th className="px-6 py-3 text-xs font-medium text-text-muted uppercase tracking-wide">
                     Deadline
                   </th>
-                  <th className="px-6 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">
+                  <th className="px-6 py-3 text-xs font-medium text-text-muted uppercase tracking-wide">
                     Created
                   </th>
-                  <th className="px-6 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">
+                  <th className="px-6 py-3 text-xs font-medium text-text-muted uppercase tracking-wide">
                     Labels
                   </th>
-                  <th className="px-6 py-3 text-xs font-medium text-zinc-500 uppercase tracking-wide">
+                  <th className="px-6 py-3 text-xs font-medium text-text-muted uppercase tracking-wide">
                     Completed
                   </th>
                   <th className="px-6 py-3 w-12">
@@ -528,14 +616,14 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-100">
+              <tbody className="divide-y divide-border-muted">
                 {visibleTasks.map((task) => {
                   const isHiding = hidingIds.has(task.id);
                   const isCompletedAndVisible = task.isCompleted && !isHiding;
                   return (
                     <tr
                       key={task.id}
-                      className={`hover:bg-zinc-50 transition-colors duration-150${
+                      className={`hover:bg-surface-raised transition-colors duration-150${
                         isHiding ? " transition-all duration-300 opacity-0 translate-y-1" : ""
                       }${isCompletedAndVisible ? " opacity-50" : ""}`}
                     >
@@ -547,40 +635,48 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
                             checked={selectedIds.has(task.id)}
                             onChange={() => toggleSelect(task.id)}
                             aria-label={`Select ${task.title}`}
-                            className="w-4 h-4 rounded border-zinc-300 text-blue-600 focus:ring-2 focus:ring-blue-600 cursor-pointer"
+                            className="w-4 h-4 rounded border-border text-accent focus:ring-2 focus:ring-accent cursor-pointer"
                           />
                         </td>
                       )}
 
-                      {/* Completion checkbox */}
+                      {/* Done control: a complete checkbox, or a check-in toggle for a
+                          habit (habits are checked in daily, never completed/closed). */}
                       <td className={`${selectionMode ? "pl-2" : "pl-6"} pr-2 py-4`}>
-                        <input
-                          type="checkbox"
-                          checked={task.isCompleted}
-                          onChange={(e) => handleComplete(task.id, e.target.checked)}
-                          disabled={completingId === task.id}
-                          aria-label={`Mark ${task.title} as ${task.isCompleted ? "incomplete" : "complete"}`}
-                          className="w-4 h-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                        <TaskDoneControl
+                          task={task}
+                          habit={habitsByTaskId.get(task.id)}
+                          completing={completingId === task.id}
+                          pendingCheckIn={pendingCheckIns.has(task.id)}
+                          onComplete={handleComplete}
+                          onCheckInToggle={onCheckInToggle}
                         />
                       </td>
 
-                      {/* Task title: links to detail page, with a priority dot */}
+                      {/* Task title: links to detail page, with a priority dot. Habits
+                          get a flame so they're distinguishable from normal tasks. */}
                       <td className="px-6 py-4">
                         <span className="inline-flex items-center gap-2">
                           <Link
                             href={`/tasks/${task.id}`}
-                            className="inline-flex items-center gap-1.5 text-zinc-900 font-medium hover:text-blue-600 focus:outline-none focus:underline transition-colors duration-150"
+                            className="inline-flex items-center gap-1.5 text-text-primary font-medium hover:text-accent focus:outline-none focus:underline transition-colors duration-150"
                           >
                             <PriorityDot priority={task.priority} />
                             {task.title}
                           </Link>
+                          {task.isHabit && (
+                            <Flame size={13} className="text-amber-500 shrink-0" aria-label="Habit" />
+                          )}
                           <RecurringBadge recurrence={task.recurrence} />
+                          {task.isHabit && !occursOn(task.recurrence, new Date()) && (
+                            <span className="text-xs text-text-muted">not due today</span>
+                          )}
                         </span>
                       </td>
 
                       {/* Project cell - only shown in All Tasks view */}
                       {activeView === "all" && (
-                        <td className="px-6 py-4 text-zinc-500 text-sm">
+                        <td className="px-6 py-4 text-text-muted text-sm">
                           {projectName(task.projectId, projects)}
                         </td>
                       )}
@@ -594,7 +690,7 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
                               setDeadlinePopoverId(deadlinePopoverId === task.id ? null : task.id)
                             }
                             aria-label={`Change deadline for ${task.title}`}
-                            className={`rounded px-1 -mx-1 hover:bg-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-600 cursor-pointer transition-colors duration-150 ${deadlineColorClass(task.deadline)}`}
+                            className={`rounded px-1 -mx-1 hover:bg-surface-raised focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer transition-colors duration-150 ${deadlineColorClass(task.deadline)}`}
                           >
                             {task.deadline ? formatDeadline(task.deadline) : (
                               <span className="text-zinc-300">Set date</span>
@@ -610,7 +706,7 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
                       </td>
 
                       {/* Creation date */}
-                      <td className="px-6 py-4 text-zinc-500">
+                      <td className="px-6 py-4 text-text-muted">
                         {formatDate(task.createdAt)}
                       </td>
 
@@ -634,7 +730,7 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
                       </td>
 
                       {/* Completion date - shown when task is done, dash otherwise */}
-                      <td className="px-6 py-4 text-zinc-500">
+                      <td className="px-6 py-4 text-text-muted">
                         {task.completedAt ? (
                           <span className="text-green-600">{formatDate(task.completedAt)}</span>
                         ) : (
@@ -648,7 +744,7 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
                           <button
                             onClick={() => setEditingTask(task)}
                             aria-label={`Edit task: ${task.title}`}
-                            className="flex items-center justify-center w-8 h-8 min-w-[44px] min-h-[44px] text-zinc-400 hover:text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-1 rounded transition-colors duration-150 cursor-pointer"
+                            className="flex items-center justify-center w-8 h-8 min-w-[44px] min-h-[44px] text-text-muted hover:text-accent focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 rounded transition-colors duration-150 cursor-pointer"
                           >
                             <Pencil size={16} aria-hidden="true" />
                           </button>
@@ -656,7 +752,7 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
                             onClick={() => handleDelete(task.id)}
                             disabled={deletingId === task.id}
                             aria-label={`Delete task: ${task.title}`}
-                            className="flex items-center justify-center w-8 h-8 min-w-[44px] min-h-[44px] text-zinc-400 hover:text-red-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1 rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors duration-150 cursor-pointer"
+                            className="flex items-center justify-center w-8 h-8 min-w-[44px] min-h-[44px] text-text-muted hover:text-danger focus:outline-none focus:ring-2 focus:ring-danger focus:ring-offset-1 rounded disabled:opacity-30 disabled:cursor-not-allowed transition-colors duration-150 cursor-pointer"
                           >
                             {deletingId === task.id ? (
                               <Loader2
@@ -695,6 +791,9 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
                 deletingId={deletingId}
                 completingId={completingId}
                 isHiding={hidingIds.has(task.id)}
+                habit={habitsByTaskId.get(task.id)}
+                pendingCheckIn={pendingCheckIns.has(task.id)}
+                onCheckInToggle={onCheckInToggle}
               />
             ))}
           </div>
@@ -702,22 +801,18 @@ export default function TasksClient({ activeView, projects, filterState, onFilte
         )}
       </div>
 
-      {/* Add task form - pass projects and labels for dropdowns, pre-select the active project */}
-      <AddTaskForm
-        onAdd={handleAdd}
-        projects={projects}
-        defaultProjectId={typeof activeView === "number" ? activeView : null}
-        allLabels={allLabels}
-      />
-
-      {/* Edit modal - rendered only when a task is being edited */}
-      {editingTask && (
-        <EditTaskModal
-          task={editingTask}
+      {/* Chip-driven sheet for both create (creating) and edit (editingTask). */}
+      {(creating || editingTask) && (
+        <TaskSheet
+          task={editingTask ?? undefined}
           projects={projects}
           allLabels={allLabels}
-          onSaved={handleSaved}
-          onClose={() => setEditingTask(null)}
+          defaultProjectId={typeof activeView === "number" ? activeView : null}
+          onSaved={handleSheetSaved}
+          onClose={() => {
+            setEditingTask(null);
+            onCreatingChange(false);
+          }}
         />
       )}
 

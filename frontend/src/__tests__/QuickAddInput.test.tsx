@@ -22,9 +22,18 @@ describe('QuickAddInput', () => {
     expect(tint).toHaveTextContent('#Work')
   })
 
-  it('does not tint an unknown #project', () => {
+  it('tints an unknown #project too (auto-created on save, #73)', () => {
     const { container } = render(
       <QuickAddInput value="trip #Holiday" onChange={() => {}} projects={projects} labels={labels} />,
+    )
+    const tint = container.querySelector('.bg-indigo-100')
+    expect(tint).not.toBeNull()
+    expect(tint).toHaveTextContent('#Holiday')
+  })
+
+  it('does not tint or autosuggest when highlight=false (edit mode)', () => {
+    const { container } = render(
+      <QuickAddInput value="buy paint #Work" onChange={() => {}} projects={projects} labels={labels} highlight={false} />,
     )
     expect(container.querySelector('.bg-indigo-100')).toBeNull()
   })

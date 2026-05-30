@@ -25,12 +25,12 @@ function formatDate(iso: string): string {
 
 // Returns a Tailwind class for deadline proximity coloring.
 function deadlineColorClass(deadline: string | null): string {
-  if (!deadline) return "text-zinc-400";
+  if (!deadline) return "text-text-muted";
   const diff =
     (new Date(deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24);
-  if (diff < 0) return "text-red-500 font-semibold";
+  if (diff < 0) return "text-danger font-semibold";
   if (diff <= 3) return "text-yellow-500 font-semibold";
-  return "text-zinc-700";
+  return "text-text-primary";
 }
 
 interface PageProps {
@@ -74,17 +74,17 @@ export default async function TaskDetailPage({ params }: PageProps) {
       {/* Back navigation */}
       <Link
         href="/"
-        className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-900 focus:outline-none focus:underline transition-colors duration-150"
+        className="inline-flex items-center gap-1.5 text-sm text-text-muted hover:text-text-primary focus:outline-none focus:underline transition-colors duration-150"
       >
         <ArrowLeft size={16} aria-hidden="true" />
         Back to tasks
       </Link>
 
       {/* Task detail card */}
-      <div className="bg-white border border-zinc-200 rounded-lg overflow-hidden">
-        <div className="px-6 py-5 border-b border-zinc-200">
+      <div className="bg-surface border border-border rounded-lg overflow-hidden">
+        <div className="px-6 py-5 border-b border-border">
           <h1
-            className="text-xl font-semibold text-zinc-900"
+            className="text-xl font-semibold text-text-primary"
             style={{ fontFamily: "var(--font-space-grotesk), sans-serif" }}
           >
             {task.title}
@@ -97,15 +97,15 @@ export default async function TaskDetailPage({ params }: PageProps) {
           )}
         </div>
 
-        <dl className="divide-y divide-zinc-100">
+        <dl className="divide-y divide-border-muted">
           <div className="px-6 py-4 flex justify-between items-center">
-            <dt className="text-sm font-medium text-zinc-500">Status</dt>
-            <dd className={`text-sm font-medium ${task.isCompleted ? "text-green-600" : "text-zinc-500"}`}>
+            <dt className="text-sm font-medium text-text-muted">Status</dt>
+            <dd className={`text-sm font-medium ${task.isCompleted ? "text-green-600" : "text-text-muted"}`}>
               {task.isCompleted ? "Complete" : "Pending"}
             </dd>
           </div>
           <div className="px-6 py-4 flex justify-between items-center">
-            <dt className="text-sm font-medium text-zinc-500">Completed</dt>
+            <dt className="text-sm font-medium text-text-muted">Completed</dt>
             <dd className="text-sm">
               {task.completedAt ? (
                 <span className="text-green-600 font-medium">{formatDate(task.completedAt)}</span>
@@ -115,7 +115,7 @@ export default async function TaskDetailPage({ params }: PageProps) {
             </dd>
           </div>
           <div className="px-6 py-4 flex justify-between items-center">
-            <dt className="text-sm font-medium text-zinc-500">Deadline</dt>
+            <dt className="text-sm font-medium text-text-muted">Deadline</dt>
             <dd className={`text-sm ${deadlineColorClass(task.deadline)}`}>
               {task.deadline ? formatDeadline(task.deadline) : (
                 <span className="text-zinc-300">Not set</span>
@@ -123,7 +123,7 @@ export default async function TaskDetailPage({ params }: PageProps) {
             </dd>
           </div>
           <div className="px-6 py-4 flex justify-between items-center">
-            <dt className="text-sm font-medium text-zinc-500">Repeats</dt>
+            <dt className="text-sm font-medium text-text-muted">Repeats</dt>
             <dd className="text-sm">
               {task.recurrence ? (
                 <RecurringBadge recurrence={task.recurrence} showLabel />
@@ -133,12 +133,12 @@ export default async function TaskDetailPage({ params }: PageProps) {
             </dd>
           </div>
           <div className="px-6 py-4 flex justify-between items-center">
-            <dt className="text-sm font-medium text-zinc-500">Created</dt>
-            <dd className="text-sm text-zinc-700">{formatDate(task.createdAt)}</dd>
+            <dt className="text-sm font-medium text-text-muted">Created</dt>
+            <dd className="text-sm text-text-primary">{formatDate(task.createdAt)}</dd>
           </div>
           {/* Project assignment - editable via dropdown */}
           <div className="px-6 py-4 flex justify-between items-center">
-            <dt className="text-sm font-medium text-zinc-500">Project</dt>
+            <dt className="text-sm font-medium text-text-muted">Project</dt>
             <dd>
               <AssignProjectButton
                 taskId={task.id}
@@ -149,7 +149,7 @@ export default async function TaskDetailPage({ params }: PageProps) {
           </div>
           {/* Label assignment - editable via chip + dropdown UI */}
           <div className="px-6 py-4 flex justify-between items-start gap-4">
-            <dt className="text-sm font-medium text-zinc-500 pt-1">Labels</dt>
+            <dt className="text-sm font-medium text-text-muted pt-1">Labels</dt>
             <dd>
               <AssignLabelsButton
                 taskId={task.id}
@@ -161,7 +161,7 @@ export default async function TaskDetailPage({ params }: PageProps) {
         </dl>
 
         {/* Complete/incomplete toggle and delete actions. Both are Client Components. */}
-        <div className="px-6 py-5 border-t border-zinc-200 flex items-center gap-3">
+        <div className="px-6 py-5 border-t border-border flex items-center gap-3">
           <CompleteTaskButton
             taskId={task.id}
             taskTitle={task.title}

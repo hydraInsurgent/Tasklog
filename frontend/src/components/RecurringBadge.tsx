@@ -15,7 +15,7 @@ export default function RecurringBadge({
   const label = describeRecurrence(recurrence);
   return (
     <span
-      className="inline-flex items-center gap-1 text-zinc-500"
+      className="inline-flex items-center gap-1 text-text-muted"
       title={label}
       aria-label={`Repeats: ${label}`}
     >

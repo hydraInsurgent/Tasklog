@@ -32,14 +32,14 @@ export default function RootLayout({
     <html lang="en">
       {/* Inject font CSS variables onto the body so globals.css can reference them. */}
       <body
-        className={`${spaceGrotesk.variable} ${dmSans.variable} antialiased min-h-screen bg-zinc-50`}
+        className={`${spaceGrotesk.variable} ${dmSans.variable} antialiased min-h-screen bg-surface-raised`}
       >
         {/* Site header */}
-        <header className="border-b border-zinc-200 bg-white">
+        <header className="border-b border-border bg-surface">
           <div className="max-w-6xl mx-auto px-4 py-4">
             <a
               href="/"
-              className="font-heading text-xl font-semibold text-zinc-900 hover:text-blue-600 transition-colors duration-150"
+              className="font-heading text-xl font-semibold text-text-primary hover:text-accent transition-colors duration-150"
               style={{ fontFamily: "var(--font-space-grotesk), sans-serif" }}
             >
               Tasklog

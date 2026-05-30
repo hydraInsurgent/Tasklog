@@ -17,9 +17,9 @@ interface Props {
 
 // Shared classes for nav items.
 const activeNavClass =
-  "border-l-2 border-zinc-900 font-semibold text-zinc-900 bg-zinc-50";
+  "border-l-2 border-primary font-semibold text-text-primary bg-surface-raised";
 const inactiveNavClass =
-  "border-l-2 border-transparent text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50";
+  "border-l-2 border-transparent text-zinc-600 hover:text-text-primary hover:bg-surface-raised";
 
 export default function ProjectSidebar({
   projects,
@@ -103,10 +103,10 @@ export default function ProjectSidebar({
           Inbox
         </button>
 
-        <hr className="my-3 border-zinc-200" />
+        <hr className="my-3 border-border" />
 
         {/* Projects section */}
-        <p className="px-4 mb-1 text-xs font-medium uppercase tracking-wide text-zinc-400">
+        <p className="px-4 mb-1 text-xs font-medium uppercase tracking-wide text-text-muted">
           Projects
         </p>
 
@@ -131,7 +131,7 @@ export default function ProjectSidebar({
                   setEditingProject({ id: project.id, name: project.name })
                 }
                 aria-label={`Edit project: ${project.name}`}
-                className="opacity-0 group-hover:opacity-100 flex items-center justify-center min-w-[44px] min-h-[44px] text-zinc-400 hover:text-zinc-900 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-1 rounded transition-colors duration-150 cursor-pointer"
+                className="opacity-0 group-hover:opacity-100 flex items-center justify-center min-w-[44px] min-h-[44px] text-text-muted hover:text-text-primary focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 rounded transition-colors duration-150 cursor-pointer"
               >
                 <Pencil size={14} aria-hidden="true" />
               </button>
@@ -142,7 +142,7 @@ export default function ProjectSidebar({
                   setDeletingProject({ id: project.id, name: project.name })
                 }
                 aria-label={`Delete project: ${project.name}`}
-                className="opacity-0 group-hover:opacity-100 flex items-center justify-center min-w-[44px] min-h-[44px] text-zinc-400 hover:text-red-500 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-1 rounded transition-colors duration-150 cursor-pointer mr-1"
+                className="opacity-0 group-hover:opacity-100 flex items-center justify-center min-w-[44px] min-h-[44px] text-text-muted hover:text-danger focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 rounded transition-colors duration-150 cursor-pointer mr-1"
               >
                 <Trash2 size={14} aria-hidden="true" />
               </button>
@@ -150,12 +150,12 @@ export default function ProjectSidebar({
           ))}
         </div>
 
-        <hr className="my-3 border-zinc-200" />
+        <hr className="my-3 border-border" />
 
         {/* Labels link */}
         <Link
           href="/labels"
-          className={`flex items-center gap-2 w-full text-left text-sm px-4 py-2 transition-colors duration-150 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-600 ${
+          className={`flex items-center gap-2 w-full text-left text-sm px-4 py-2 transition-colors duration-150 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent ${
             pathname === "/labels" ? activeNavClass : inactiveNavClass
           }`}
         >
@@ -166,7 +166,7 @@ export default function ProjectSidebar({
         {/* Habits link */}
         <Link
           href="/habits"
-          className={`flex items-center gap-2 w-full text-left text-sm px-4 py-2 transition-colors duration-150 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-600 ${
+          className={`flex items-center gap-2 w-full text-left text-sm px-4 py-2 transition-colors duration-150 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent ${
             pathname === "/habits" ? activeNavClass : inactiveNavClass
           }`}
         >
@@ -174,7 +174,7 @@ export default function ProjectSidebar({
           Habits
         </Link>
 
-        <hr className="my-3 border-zinc-200" />
+        <hr className="my-3 border-border" />
 
         {/* Inline new project input */}
         {showNewInput && (
@@ -192,12 +192,12 @@ export default function ProjectSidebar({
                 }
               }}
               placeholder="Project name"
-              className="flex-1 px-3 py-2 border border-zinc-200 rounded-md text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent"
+              className="flex-1 px-3 py-2 border border-border rounded-md text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
             />
             <button
               onClick={handleCreate}
               disabled={!newProjectName.trim()}
-              className="px-2 py-2 text-xs bg-zinc-900 text-white rounded-md hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-1"
+              className="px-2 py-2 text-xs bg-primary text-white rounded-md hover:bg-primary-hover disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1"
             >
               Save
             </button>
@@ -210,7 +210,7 @@ export default function ProjectSidebar({
             setShowNewInput((prev) => !prev);
             setNewProjectName("");
           }}
-          className="mt-3 mx-4 flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-900 cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-1 rounded"
+          className="mt-3 mx-4 flex items-center gap-1 text-sm text-text-muted hover:text-text-primary cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 rounded"
         >
           <Plus size={16} aria-hidden="true" />
           Add project
@@ -260,11 +260,11 @@ function EditProjectModal({
       onClick={onCancel}
     >
       <div
-        className="bg-white rounded-lg p-6 w-full max-w-sm mx-4 shadow-lg"
+        className="bg-surface rounded-lg p-6 w-full max-w-sm mx-4 shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
         <h2
-          className="text-base font-semibold text-zinc-900 mb-4"
+          className="text-base font-semibold text-text-primary mb-4"
           style={{ fontFamily: "var(--font-space-grotesk), sans-serif" }}
         >
           Edit Project
@@ -278,19 +278,19 @@ function EditProjectModal({
             if (e.key === "Enter" && name.trim()) onSave(name.trim());
             if (e.key === "Escape") onCancel();
           }}
-          className="w-full px-3 py-2 border border-zinc-200 rounded-md text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent mb-4"
+          className="w-full px-3 py-2 border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent mb-4"
         />
         <div className="flex gap-2 justify-end">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-sm text-zinc-600 hover:text-zinc-900 border border-zinc-200 rounded-md cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-1"
+            className="px-4 py-2 text-sm text-zinc-600 hover:text-text-primary border border-border rounded-md cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1"
           >
             Cancel
           </button>
           <button
             onClick={() => name.trim() && onSave(name.trim())}
             disabled={!name.trim()}
-            className="px-4 py-2 text-sm bg-zinc-900 text-white rounded-md hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-1"
+            className="px-4 py-2 text-sm bg-primary text-white rounded-md hover:bg-primary-hover disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1"
           >
             Save
           </button>
@@ -321,11 +321,11 @@ function DeleteProjectDialog({
       onClick={onCancel}
     >
       <div
-        className="bg-white rounded-lg p-6 w-full max-w-sm mx-4 shadow-lg"
+        className="bg-surface rounded-lg p-6 w-full max-w-sm mx-4 shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
         <h2
-          className="text-base font-semibold text-zinc-900 mb-2"
+          className="text-base font-semibold text-text-primary mb-2"
           style={{ fontFamily: "var(--font-space-grotesk), sans-serif" }}
         >
           Delete project?
@@ -337,14 +337,14 @@ function DeleteProjectDialog({
         <div className="flex gap-2 justify-end">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-sm text-zinc-600 hover:text-zinc-900 border border-zinc-200 rounded-md cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-1"
+            className="px-4 py-2 text-sm text-zinc-600 hover:text-text-primary border border-border rounded-md cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
             disabled={isPending}
-            className="px-4 py-2 text-sm bg-zinc-900 text-white rounded-md hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-1"
+            className="px-4 py-2 text-sm bg-primary text-white rounded-md hover:bg-primary-hover disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1"
           >
             Delete
           </button>

@@ -45,7 +45,7 @@ export default function AssignProjectButton({ taskId, currentProjectId, projects
         onChange={(e) => handleChange(e.target.value)}
         disabled={pending}
         aria-label="Assign to project"
-        className="px-3 py-2 border border-zinc-200 rounded-md text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-shadow duration-150 cursor-pointer bg-white disabled:opacity-50 disabled:cursor-not-allowed"
+        className="px-3 py-2 border border-border rounded-md text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-shadow duration-150 cursor-pointer bg-surface disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <option value="inbox">Inbox</option>
         {projects.map((p) => (
@@ -55,7 +55,7 @@ export default function AssignProjectButton({ taskId, currentProjectId, projects
         ))}
       </select>
       {error && (
-        <p className="text-sm text-red-500" role="alert">
+        <p className="text-sm text-danger" role="alert">
           {error}
         </p>
       )}

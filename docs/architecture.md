@@ -53,7 +53,7 @@ Tasklog/
 │       ├── Data/                  EF Core DbContext
 │       ├── Migrations/            EF Core schema migrations
 │       ├── Models/                Data model classes
-│       ├── Services/              Pure domain helpers (RecurrenceRule - parse/validate/advance RRULE, v2.14.0; HabitStreak - consecutive-days streak from check-in dates, v2.16.0)
+│       ├── Services/              Pure domain helpers (RecurrenceRule - parse/validate/advance RRULE + OccursOn schedule membership, v2.14.0/#73; HabitStreak - schedule-aware streak from check-in dates, v2.16.0/#73)
 │       ├── Properties/            Launch settings (ports)
 │       ├── Program.cs             App startup and service registration
 │       ├── appsettings.json       Config (connection string, logging)
@@ -108,9 +108,13 @@ Tasklog/
 │       │   ├── PriorityDot.tsx    Small colored priority dot (P1-P3) next to a task title (v2.10.5)
 │       │   ├── RecurrencePicker.tsx  Recurrence builder (none/daily/weekly/monthly + nth-weekday/interval/Ends) on the add/edit forms (Client Component, v2.14.0+)
 │       │   ├── RecurringBadge.tsx Repeat glyph + human label for recurring tasks (v2.14.0)
-│       │   ├── QuickAddInput.tsx  Todoist-style quick-add title field: inline token highlight overlay + #/@ autosuggest + removable captured chips (Client Component, v2.15.0)
-│       │   ├── HabitsClient.tsx   Habits view: fetch + poll habits, optimistic done-today toggle (Client Component, v2.16.0)
-│       │   └── HabitCard.tsx      One habit: streak (flame + count), last-7-days dot row, big done-today toggle (v2.16.0)
+│       │   ├── QuickAddInput.tsx  Quick-add title field: inline token highlight overlay + #/@/! autosuggest; Escape/tap un-recognizes a token (#73). v2.15.0+
+│       │   ├── TaskSheet.tsx      Chip-driven create+edit sheet (modal/bottom-sheet); chips derived from the title, Escape-to-dismiss; replaces AddTaskForm+EditTaskModal (#73)
+│       │   ├── BoardView/BoardCard.tsx  Board renderer: columns from groupTasksForBoard (lib/board.ts) + the rich card (#73)
+│       │   ├── TaskDoneControl.tsx One done-control for list+card+board: complete checkbox, or a daily check-in toggle for a habit (habits are never completed) (#73)
+│       │   ├── HabitsPanel.tsx    Right-side habits panel beside the task list, shares habit state with ProjectLayout (#73)
+│       │   ├── HabitsClient.tsx   Full /habits view: fetch + poll habits, optimistic done-today toggle (Client Component, v2.16.0)
+│       │   └── HabitCard.tsx      One habit: schedule label, streak (flame + count), last-7-days dot row, done-today toggle (v2.16.0/#73)
 │       │   (list is representative - other components: TaskCard, FilterPanel, LabelsClient, etc.)
 │       └── lib/
 │           ├── api.ts             Typed API call functions (used by both server and client)

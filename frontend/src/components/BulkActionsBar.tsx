@@ -70,10 +70,10 @@ export default function BulkActionsBar({
       ref={barRef}
       role="region"
       aria-label="Bulk actions"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-zinc-200 bg-white shadow-[0_-2px_8px_rgba(0,0,0,0.06)]"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface shadow-[0_-2px_8px_rgba(0,0,0,0.06)]"
     >
       <div className="mx-auto max-w-5xl px-4 py-3 flex flex-wrap items-center gap-2">
-        <span className="text-sm font-medium text-zinc-700 mr-1">
+        <span className="text-sm font-medium text-text-primary mr-1">
           {busy && <Loader2 size={14} className="inline mr-1 animate-spin" aria-hidden="true" />}
           {count} selected
         </span>
@@ -91,7 +91,7 @@ export default function BulkActionsBar({
           type="button"
           onClick={onUncomplete}
           disabled={busy}
-          className={`${actionBtn} text-zinc-600 hover:bg-zinc-100 focus:ring-zinc-500`}
+          className={`${actionBtn} text-zinc-600 hover:bg-surface-raised focus:ring-accent`}
         >
           <Undo2 size={16} aria-hidden="true" /> Reopen
         </button>
@@ -104,14 +104,14 @@ export default function BulkActionsBar({
             disabled={busy}
             aria-haspopup="true"
             aria-expanded={openMenu === "project"}
-            className={`${actionBtn} text-zinc-600 hover:bg-zinc-100 focus:ring-zinc-500`}
+            className={`${actionBtn} text-zinc-600 hover:bg-surface-raised focus:ring-accent`}
           >
             <FolderInput size={16} aria-hidden="true" /> Move to project
           </button>
           {openMenu === "project" && (
             <div
               role="menu"
-              className="absolute left-0 bottom-full mb-1 w-48 max-h-64 overflow-y-auto bg-white border border-zinc-200 rounded-md shadow-md py-1"
+              className="absolute left-0 bottom-full mb-1 w-48 max-h-64 overflow-y-auto bg-surface border border-border rounded-md shadow-md py-1"
             >
               <button
                 role="menuitem"
@@ -119,7 +119,7 @@ export default function BulkActionsBar({
                   setOpenMenu(null);
                   onMoveToProject(null);
                 }}
-                className="block w-full text-left px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50 focus:outline-none focus:bg-zinc-50 cursor-pointer"
+                className="block w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-surface-raised focus:outline-none focus:bg-surface-raised cursor-pointer"
               >
                 Inbox
               </button>
@@ -131,7 +131,7 @@ export default function BulkActionsBar({
                     setOpenMenu(null);
                     onMoveToProject(p.id);
                   }}
-                  className="block w-full text-left px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50 focus:outline-none focus:bg-zinc-50 cursor-pointer"
+                  className="block w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-surface-raised focus:outline-none focus:bg-surface-raised cursor-pointer"
                 >
                   {p.name}
                 </button>
@@ -148,7 +148,7 @@ export default function BulkActionsBar({
             disabled={busy}
             aria-haspopup="true"
             aria-expanded={openMenu === "deadline"}
-            className={`${actionBtn} text-zinc-600 hover:bg-zinc-100 focus:ring-zinc-500`}
+            className={`${actionBtn} text-zinc-600 hover:bg-surface-raised focus:ring-accent`}
           >
             <CalendarClock size={16} aria-hidden="true" /> Set deadline
           </button>
@@ -173,14 +173,14 @@ export default function BulkActionsBar({
             disabled={busy}
             aria-haspopup="true"
             aria-expanded={openMenu === "priority"}
-            className={`${actionBtn} text-zinc-600 hover:bg-zinc-100 focus:ring-zinc-500`}
+            className={`${actionBtn} text-zinc-600 hover:bg-surface-raised focus:ring-accent`}
           >
             <Flag size={16} aria-hidden="true" /> Set priority
           </button>
           {openMenu === "priority" && (
             <div
               role="menu"
-              className="absolute left-0 bottom-full mb-1 w-40 bg-white border border-zinc-200 rounded-md shadow-md py-1"
+              className="absolute left-0 bottom-full mb-1 w-40 bg-surface border border-border rounded-md shadow-md py-1"
             >
               {PRIORITY_OPTIONS.map(({ value, meta }) => (
                 <button
@@ -190,7 +190,7 @@ export default function BulkActionsBar({
                     setOpenMenu(null);
                     onSetPriority(value);
                   }}
-                  className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50 focus:outline-none focus:bg-zinc-50 cursor-pointer"
+                  className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-text-primary hover:bg-surface-raised focus:outline-none focus:bg-surface-raised cursor-pointer"
                 >
                   <span
                     className="inline-block w-2 h-2 rounded-full shrink-0"
@@ -210,7 +210,7 @@ export default function BulkActionsBar({
           onClick={onCancel}
           disabled={busy}
           aria-label="Cancel selection"
-          className={`${actionBtn} text-zinc-500 hover:bg-zinc-100 focus:ring-zinc-500 sm:ml-auto`}
+          className={`${actionBtn} text-text-muted hover:bg-surface-raised focus:ring-accent sm:ml-auto`}
         >
           <X size={16} aria-hidden="true" /> Cancel
         </button>

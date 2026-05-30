@@ -32,7 +32,7 @@ export default function CompleteTaskButton({ taskId, taskTitle, isCompleted }: P
 
   const colorClasses = isCompleted
     ? "text-green-700 border border-green-200 hover:bg-green-50 focus:ring-green-500"
-    : "text-zinc-700 border border-zinc-200 hover:bg-zinc-50 focus:ring-zinc-500";
+    : "text-text-primary border border-border hover:bg-surface-raised focus:ring-accent";
 
   return (
     <div>
@@ -52,7 +52,7 @@ export default function CompleteTaskButton({ taskId, taskTitle, isCompleted }: P
         {loading ? "Saving..." : label}
       </button>
       {error && (
-        <p className="mt-2 text-sm text-red-500" role="alert">
+        <p className="mt-2 text-sm text-danger" role="alert">
           {error}
         </p>
       )}
