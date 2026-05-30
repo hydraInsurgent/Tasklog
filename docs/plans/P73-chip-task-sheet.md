@@ -1,6 +1,6 @@
 # Feature Implementation Plan: UI uplift (tokens + chip sheet + board views)
 
-**Overall Progress:** `90%` (built; staged for the user's single review - deploy/ship pending)
+**Overall Progress:** `100%` (built + reviewed by the user on the LAN dev server; shipping. Habits v2 Step 2 - frequency + deadline-decouple - deferred to a separate feature.)
 
 **Tracking issue:** [#73](https://github.com/hydraInsurgent/Tasklog/issues/73)
 **Branch:** `feature/chip-task-sheet-#73`
@@ -83,10 +83,10 @@ Design tokens, component specs, mockups, and accessibility rules: [UI-SPEC-P73-c
 - [x] 🟩 **Step 5 [UI]: Docs + CHANGELOG** `[sequential]` → depends on: Steps 1-4
   - [x] 🟩 5.x `CHANGELOG.md` (Unreleased section), `architecture.md` (services + components), `product-design.md` (habits not completable / board / schedules), `coverage.md` (counts 250/131/97). NOT done (left for the user / proper /document at ship): `engineering-guidelines.md` deep update + reconciling the global `UI-SPEC.md` colors.
 
-- [ ] 🟥 **Step 6 [UI]: Deploy + smoke + ship** `[sequential]` → depends on: Step 5 - LEFT FOR THE USER (review first; not shipping this round per the user's instruction)
-  - [ ] 🟥 6.1 Review the staged diff; then deploy + confirm no data change (frontend-only, no migration). NOTE: the existing completed "drinking water" habit should be un-completed (Show completed → untick) since habits are no longer completable.
-  - [ ] 🟥 6.2 Live smoke: create/edit via the sheet, board toggle + group-by + per-view persistence, habit check-in inline + panel, schedule streak.
-  - [ ] 🟥 6.3 `/ship` (MINOR bump).
+- [x] 🟩 **Step 6 [UI]: Ship** `[sequential]` → depends on: Step 5
+  - [x] 🟩 6.1 User reviewed the full staged diff + validated on the LAN dev server (mobile + desktop) across several iterations.
+  - [x] 🟩 6.2 Live validation done by the user on the dev server: chip sheet create/edit, `!` priority, Escape/tap dismiss, board toggle + group-by + per-view persistence, habit check-in (turns green) + move-from-day, mobile habits drawer, schedule-aware streak + "not due today".
+  - [x] 🟩 6.3 `/ship` (MINOR bump, v2.17.0). Production-phone deploy is a post-merge op (frontend-only, no migration); the doppel release-package CI remains the user's separate WIP.
 
 ## Outcomes
 
