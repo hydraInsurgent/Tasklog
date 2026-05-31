@@ -70,6 +70,12 @@ export default function TaskSheet({ task, projects, allLabels, defaultProjectId,
   const [selectedLabelIds, setSelectedLabelIds] = useState<number[]>(task ? task.labels.map((l) => l.id) : []);
   const [recurrence, setRecurrence] = useState<string | null>(task?.recurrence ?? null);
   const [isHabit, setIsHabit] = useState(task?.isHabit ?? false);
+  // Habit schedule mode (#75). A habit is scheduled EITHER on specific days (recurrence)
+  // OR "x times a week" (weeklyTarget) - never both. The mode drives which value is saved.
+  const [scheduleMode, setScheduleMode] = useState<"days" | "frequency">(
+    task?.weeklyTarget != null ? "frequency" : "days",
+  );
+  const [weeklyTarget, setWeeklyTarget] = useState<number>(task?.weeklyTarget ?? 3);
   // Token keys the user dismissed with Escape (keep as literal text, do not parse).
   // Pruned whenever the title changes so editing the span lets it re-match.
   const [ignored, setIgnored] = useState<Set<string>>(new Set());
@@ -228,9 +234,16 @@ export default function TaskSheet({ task, projects, allLabels, defaultProjectId,
     setSaving(true);
     try {
       let finalDeadline = p.deadline ?? deadline ?? undefined;
-      const finalRecurrence = p.recurrence ?? (finalDeadline ? recurrence ?? undefined : undefined);
-      // A recurrence needs a deadline anchor - default to today if none was given.
-      if (finalRecurrence && !finalDeadline) finalDeadline = resolvePreset("today") ?? undefined;
+
+      // Habit schedule (#75): a frequency habit sends weeklyTarget and NO recurrence; a
+      // specific-days habit (or any non-habit recurring task) sends recurrence. A habit's
+      // recurrence needs no deadline anchor; a non-habit recurring task still does.
+      const frequencyMode = isHabit && scheduleMode === "frequency";
+      const finalWeeklyTarget = frequencyMode ? weeklyTarget : undefined;
+      const finalRecurrence = frequencyMode
+        ? undefined
+        : p.recurrence ?? ((finalDeadline || isHabit) ? recurrence ?? undefined : undefined);
+      if (finalRecurrence && !finalDeadline && !isHabit) finalDeadline = resolvePreset("today") ?? undefined;
       const finalPriority = p.priority ?? priority;
 
       // Project: a typed #project (known or new) wins and resolve-or-creates; else the chip.
@@ -254,6 +267,7 @@ export default function TaskSheet({ task, projects, allLabels, defaultProjectId,
         description.trim() || undefined,
         finalRecurrence,
         isHabit,
+        finalWeeklyTarget,
       );
       if (labelIds.length > 0) created = await setTaskLabels(created.id, labelIds);
       onSaved(created);
@@ -283,12 +297,20 @@ export default function TaskSheet({ task, projects, allLabels, defaultProjectId,
       : null;
     const oldDeadline = t.deadline ? t.deadline.slice(0, 19) : null;
 
+    // Habit schedule (#75): a frequency habit carries weeklyTarget and clears recurrence; a
+    // specific-days habit (or non-habit) carries recurrence and clears weeklyTarget. The two
+    // sides are never both values in one PATCH, so the backend's both-mode guard never trips.
+    const frequencyMode = isHabit && scheduleMode === "frequency";
+    const newWeeklyTarget = frequencyMode ? weeklyTarget : null;
+    const weeklyTargetChanged = newWeeklyTarget !== (t.weeklyTarget ?? null);
+    // A habit's recurrence needs no deadline anchor; a non-habit recurring task does.
+    const newRecurrence = frequencyMode ? null : (newDeadline || isHabit) ? recurrence : null;
+
     const titleChanged = trimmed !== t.title;
     const deadlineChanged = newDeadline !== oldDeadline;
     const priorityChanged = priority !== t.priority;
     const newDescription = description.trim() || null;
     const descriptionChanged = newDescription !== (t.description ?? null);
-    const newRecurrence = newDeadline ? recurrence : null; // recurrence needs a deadline
     const recurrenceChanged = newRecurrence !== (t.recurrence ?? null);
     const isHabitChanged = isHabit !== t.isHabit;
     const projectChanged = projectId !== t.projectId;
@@ -297,7 +319,7 @@ export default function TaskSheet({ task, projects, allLabels, defaultProjectId,
 
     if (
       !titleChanged && !deadlineChanged && !priorityChanged && !descriptionChanged &&
-      !recurrenceChanged && !isHabitChanged && !projectChanged && !labelsChanged
+      !recurrenceChanged && !weeklyTargetChanged && !isHabitChanged && !projectChanged && !labelsChanged
     ) {
       onClose();
       return;
@@ -305,7 +327,7 @@ export default function TaskSheet({ task, projects, allLabels, defaultProjectId,
 
     setSaving(true);
     try {
-      if (titleChanged || deadlineChanged || priorityChanged || descriptionChanged || recurrenceChanged || isHabitChanged) {
+      if (titleChanged || deadlineChanged || priorityChanged || descriptionChanged || recurrenceChanged || weeklyTargetChanged || isHabitChanged) {
         const body: {
           title?: string;
           deadline?: string | null;
@@ -313,6 +335,7 @@ export default function TaskSheet({ task, projects, allLabels, defaultProjectId,
           description?: string | null;
           recurrence?: string | null;
           isHabit?: boolean;
+          weeklyTarget?: number | null;
         } = {};
         if (titleChanged) body.title = trimmed;
         // Send the deadline whenever recurrence is being set, so the backend sees
@@ -320,8 +343,10 @@ export default function TaskSheet({ task, projects, allLabels, defaultProjectId,
         if (deadlineChanged || (recurrenceChanged && newRecurrence)) body.deadline = newDeadline;
         if (priorityChanged) body.priority = priority;
         if (descriptionChanged) body.description = newDescription;
-        if (recurrenceChanged) body.recurrence = newRecurrence;
+        // isHabit before recurrence/weeklyTarget mirrors the backend's processing order.
         if (isHabitChanged) body.isHabit = isHabit;
+        if (recurrenceChanged) body.recurrence = newRecurrence;
+        if (weeklyTargetChanged) body.weeklyTarget = newWeeklyTarget;
         await updateTask(t.id, body);
       }
       if (projectChanged) await assignTaskProject(t.id, projectId);
@@ -341,7 +366,13 @@ export default function TaskSheet({ task, projects, allLabels, defaultProjectId,
   const projectValue = effProjectName;
   const labelValue =
     effLabelNames.length === 1 ? effLabelNames[0] : effLabelNames.length > 1 ? `${effLabelNames.length} labels` : undefined;
-  const recurrenceValue = effRecurrence ? describeRecurrence(effRecurrence) : undefined;
+  // The schedule chip: for a frequency habit show "Nx / week"; otherwise the recurrence label.
+  const recurrenceValue =
+    isHabit && scheduleMode === "frequency"
+      ? `${weeklyTarget}x / week`
+      : effRecurrence
+        ? describeRecurrence(effRecurrence)
+        : undefined;
 
   const panelClasses = isDesktop
     ? "bg-surface rounded-lg shadow-xl w-full max-w-lg flex flex-col max-h-[85vh] tl-pop"
@@ -410,17 +441,20 @@ export default function TaskSheet({ task, projects, allLabels, defaultProjectId,
               )}
             </div>
 
-            {/* Chip row */}
+            {/* Chip row. A habit has no due date (its schedule lives in the Repeat chip), so
+                the Due chip is hidden when "Track as a daily habit" is on (#75). */}
             <div className="flex flex-wrap gap-2">
-              <Chip
-                chipRef={dueRef}
-                icon={<Calendar size={16} aria-hidden="true" />}
-                label="Due date"
-                value={dueValue}
-                active={openPicker === "due"}
-                disabled={saving}
-                onClick={() => setOpenPicker(openPicker === "due" ? null : "due")}
-              />
+              {!isHabit && (
+                <Chip
+                  chipRef={dueRef}
+                  icon={<Calendar size={16} aria-hidden="true" />}
+                  label="Due date"
+                  value={dueValue}
+                  active={openPicker === "due"}
+                  disabled={saving}
+                  onClick={() => setOpenPicker(openPicker === "due" ? null : "due")}
+                />
+              )}
               <Chip
                 chipRef={priorityRef}
                 icon={<Flag size={16} aria-hidden="true" />}
@@ -451,7 +485,7 @@ export default function TaskSheet({ task, projects, allLabels, defaultProjectId,
               <Chip
                 chipRef={recurrenceRef}
                 icon={<Repeat size={16} aria-hidden="true" />}
-                label="Repeat"
+                label={isHabit ? "Schedule" : "Repeat"}
                 value={recurrenceValue}
                 active={openPicker === "recurrence"}
                 disabled={saving}
@@ -560,17 +594,95 @@ export default function TaskSheet({ task, projects, allLabels, defaultProjectId,
       <PickerSheet
         open={openPicker === "recurrence"}
         triggerRef={recurrenceRef}
-        title="Repeat"
+        title={isHabit ? "Schedule" : "Repeat"}
         onClose={() => setOpenPicker(null)}
       >
-        <RecurrencePicker
-          value={effRecurrence}
-          onChange={(r) => {
-            setRecurrence(r);
-            clearTokenOfType("recurrence");
-          }}
-          deadline={effDeadline ?? undefined}
-        />
+        {isHabit ? (
+          // Habit schedule: pick ONE mode. Specific days reuses the recurrence builder
+          // (un-gated - a habit needs no deadline); x-times-a-week is a 1-7 stepper.
+          <div className="space-y-4">
+            <div className="flex gap-2" role="group" aria-label="Schedule mode">
+              <button
+                type="button"
+                onClick={() => setScheduleMode("days")}
+                className={`flex-1 px-3 py-1.5 text-sm rounded-md border transition-colors duration-150 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent ${
+                  scheduleMode === "days"
+                    ? "bg-primary text-white border-primary"
+                    : "border-border text-text-muted hover:text-text-primary"
+                }`}
+              >
+                Specific days
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  // Switching to frequency clears any specific-days recurrence (and its token).
+                  setRecurrence(null);
+                  clearTokenOfType("recurrence");
+                  setScheduleMode("frequency");
+                }}
+                className={`flex-1 px-3 py-1.5 text-sm rounded-md border transition-colors duration-150 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent ${
+                  scheduleMode === "frequency"
+                    ? "bg-primary text-white border-primary"
+                    : "border-border text-text-muted hover:text-text-primary"
+                }`}
+              >
+                x times a week
+              </button>
+            </div>
+
+            {scheduleMode === "days" ? (
+              <RecurrencePicker
+                value={effRecurrence}
+                onChange={(r) => {
+                  setRecurrence(r);
+                  clearTokenOfType("recurrence");
+                }}
+                deadline={effDeadline ?? undefined}
+                isHabit
+              />
+            ) : (
+              <div>
+                <p className="text-sm text-text-muted mb-2">How many times per week?</p>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setWeeklyTarget((n) => Math.max(1, n - 1))}
+                    disabled={weeklyTarget <= 1}
+                    aria-label="Fewer times per week"
+                    className="flex items-center justify-center w-9 h-9 rounded-md border border-border text-text-primary hover:bg-surface-raised disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer"
+                  >
+                    -
+                  </button>
+                  <span className="min-w-[6ch] text-center text-sm font-medium text-text-primary" aria-live="polite">
+                    {weeklyTarget}x / week
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setWeeklyTarget((n) => Math.min(7, n + 1))}
+                    disabled={weeklyTarget >= 7}
+                    aria-label="More times per week"
+                    className="flex items-center justify-center w-9 h-9 rounded-md border border-border text-text-primary hover:bg-surface-raised disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer"
+                  >
+                    +
+                  </button>
+                </div>
+                <p className="mt-2 text-xs text-text-muted">
+                  Check in on any days - the streak counts weeks you hit the target.
+                </p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <RecurrencePicker
+            value={effRecurrence}
+            onChange={(r) => {
+              setRecurrence(r);
+              clearTokenOfType("recurrence");
+            }}
+            deadline={effDeadline ?? undefined}
+          />
+        )}
       </PickerSheet>
     </div>
   );

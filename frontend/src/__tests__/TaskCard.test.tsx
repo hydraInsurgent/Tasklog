@@ -21,6 +21,7 @@ const baseTask: Task = {
   seriesId: null,
   isRecurring: false,
   isHabit: false,
+  weeklyTarget: null,
 }
 
 const projects: Project[] = [

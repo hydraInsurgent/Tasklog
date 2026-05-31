@@ -35,6 +35,7 @@ describe('Task.dueStatus shape (server-computed, pass-through)', () => {
       seriesId: null,
       isRecurring: false,
       isHabit: false,
+      weeklyTarget: null,
     };
     assert.ok(allowed.includes(sample.dueStatus));
     assert.equal(sample.priority, 4);
@@ -210,6 +211,27 @@ describe('recurrence wire contract', () => {
     };
     assert.equal(t.isRecurring, true);
     assert.equal(t.recurrence, 'FREQ=DAILY');
+  });
+});
+
+// Habit frequency ("x times a week", #75): weeklyTarget is an int on the wire, mutually
+// exclusive with recurrence (the backend enforces that; the client just serializes it).
+describe('weeklyTarget wire contract', () => {
+  test('create body carries weeklyTarget for a frequency habit', () => {
+    assert.equal(
+      JSON.stringify({ title: 'Gym', isHabit: true, weeklyTarget: 3 }),
+      '{"title":"Gym","isHabit":true,"weeklyTarget":3}',
+    );
+  });
+  test('update body sets weeklyTarget', () => {
+    assert.equal(JSON.stringify({ weeklyTarget: 4 }), '{"weeklyTarget":4}');
+  });
+  test('update body null drops the weekly target', () => {
+    assert.equal(JSON.stringify({ weeklyTarget: null }), '{"weeklyTarget":null}');
+  });
+  test('Task carries weeklyTarget', () => {
+    const t: Pick<Task, 'weeklyTarget' | 'isHabit'> = { weeklyTarget: 3, isHabit: true };
+    assert.equal(t.weeklyTarget, 3);
   });
 });
 

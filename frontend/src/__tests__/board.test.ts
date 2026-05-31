@@ -24,6 +24,7 @@ function task(overrides: Partial<Task> = {}): Task {
     seriesId: null,
     isRecurring: false,
     isHabit: false,
+    weeklyTarget: null,
     ...overrides,
   }
 }

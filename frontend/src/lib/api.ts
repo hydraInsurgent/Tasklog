@@ -62,6 +62,9 @@ export interface Task {
   isRecurring: boolean;
   // Whether this task is tracked as a daily habit (shown on the Habits view with a streak).
   isHabit: boolean;
+  // "x times a week" habit frequency target (1-7), or null when the habit is scheduled on
+  // specific days (recurrence) / daily, or is not a habit. Mutually exclusive with recurrence.
+  weeklyTarget: number | null;
   // Timestamped comments. Present on getTask (detail); absent on the list.
   comments?: Comment[];
 }
@@ -81,15 +84,28 @@ export interface CheckIn {
   taskId: number;
 }
 
+// One week's status for a frequency habit's coloured cell strip (oldest first .. current).
+export interface WeekStatus {
+  weekStart: string; // ISO date of that week's Monday
+  count: number;     // distinct days checked in that week
+  status: "met" | "partial" | "none"; // green / yellow / grey
+}
+
 // The /api/habits response: a habit task plus its computed check-in stats.
 export interface Habit {
   task: Task;
-  // Consecutive days checked in, counting back from today (grace through yesterday).
+  // The current streak. Unit-aware: DAYS for a specific-days / daily habit, WEEKS for a
+  // frequency habit (task.weeklyTarget != null tells you which). Counts back from today.
   currentStreak: number;
   // Whether today's check-in is already logged.
   doneToday: boolean;
   // Recent check-in dates (newest first), enough for the last-7-days dot row.
   recentCheckIns: string[]; // ISO date strings
+  // Frequency-habit fields (null for specific-days / daily habits):
+  // the weekly target, how many days done in the current week, and the recent week strip.
+  weeklyTarget: number | null;
+  thisWeekCount: number | null;
+  recentWeeks: WeekStatus[] | null;
 }
 
 // GET /api/tasks - fetch all tasks ordered by creation date (newest first).
@@ -114,12 +130,13 @@ export async function createTask(
   priority?: number,
   description?: string,
   recurrence?: string,
-  isHabit?: boolean
+  isHabit?: boolean,
+  weeklyTarget?: number
 ): Promise<Task> {
   const res = await fetch(`${getApiUrl()}/api/tasks`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title, deadline: deadline ?? null, projectId: projectId ?? null, priority, description, recurrence, isHabit }),
+    body: JSON.stringify({ title, deadline: deadline ?? null, projectId: projectId ?? null, priority, description, recurrence, isHabit, weeklyTarget }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
@@ -147,6 +164,7 @@ export async function updateTask(
     description?: string | null;
     recurrence?: string | null;
     isHabit?: boolean;
+    weeklyTarget?: number | null;
   },
 ): Promise<Task> {
   const res = await fetch(`${getApiUrl()}/api/tasks/${id}`, {

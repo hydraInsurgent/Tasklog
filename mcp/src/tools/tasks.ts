@@ -234,12 +234,24 @@ export function registerTaskTools(server: McpServer): void {
               'Habits view with a streak and gets daily check-ins via ' +
               'log_habit_checkin). Omit or false for an ordinary task.',
           ),
+        weeklyTarget: z
+          .number()
+          .int()
+          .min(1)
+          .max(7)
+          .optional()
+          .describe(
+            'Habit frequency: target check-ins per calendar week (1-7), e.g. 3 for ' +
+              '"3 times a week". Only valid when isHabit is true. A habit is scheduled ' +
+              'EITHER on specific days (recurrence) OR by a weekly target, never both - ' +
+              'passing both is rejected. Omit for a specific-days or plain daily habit.',
+          ),
       },
     },
-    async ({ title, deadline, projectId, priority, description, recurrence, isHabit }) =>
+    async ({ title, deadline, projectId, priority, description, recurrence, isHabit, weeklyTarget }) =>
       runTool(
         'create_task',
-        () => api.createTask({ title, deadline, projectId, priority, description, recurrence, isHabit }),
+        () => api.createTask({ title, deadline, projectId, priority, description, recurrence, isHabit, weeklyTarget }),
         (t) =>
           `Created task #${t.id}: "${t.title}"` +
           (t.deadline ? ` (due ${t.deadline})` : '') +
@@ -311,11 +323,23 @@ export function registerTaskTools(server: McpServer): void {
             'true to track the task as a daily habit, false to stop tracking it ' +
               'as one. Omit to leave it unchanged. (Past check-ins are kept.)',
           ),
+        weeklyTarget: z
+          .number()
+          .int()
+          .min(1)
+          .max(7)
+          .nullable()
+          .optional()
+          .describe(
+            'Set the "x times a week" habit frequency (1-7, habits only). Setting it ' +
+              'clears any specific-days recurrence (the two modes are mutually exclusive); ' +
+              'pass null to drop the weekly target. Omit to leave it unchanged.',
+          ),
       },
     },
-    async ({ id, title, deadline, priority, description, recurrence, isHabit }) => {
+    async ({ id, title, deadline, priority, description, recurrence, isHabit, weeklyTarget }) => {
       // Build the PATCH body preserving the keep/clear/set distinction:
-      // undefined = omit (keep), null = clear (deadline/description/recurrence), value = set.
+      // undefined = omit (keep), null = clear (deadline/description/recurrence/weeklyTarget), value = set.
       const body: {
         title?: string;
         deadline?: string | null;
@@ -323,6 +347,7 @@ export function registerTaskTools(server: McpServer): void {
         description?: string | null;
         recurrence?: string | null;
         isHabit?: boolean;
+        weeklyTarget?: number | null;
       } = {};
       if (title !== undefined) body.title = title;
       if (deadline !== undefined) body.deadline = deadline;
@@ -330,6 +355,7 @@ export function registerTaskTools(server: McpServer): void {
       if (description !== undefined) body.description = description;
       if (recurrence !== undefined) body.recurrence = recurrence;
       if (isHabit !== undefined) body.isHabit = isHabit;
+      if (weeklyTarget !== undefined) body.weeklyTarget = weeklyTarget;
       return runTool('update_task', () => api.updateTask(id, body));
     },
   );

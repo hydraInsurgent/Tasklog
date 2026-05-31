@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| _(none active)_ | | | |
+| P75-habits-v2-step2.md | #75 | feature/habits-v2-step2-#75 | In Progress |
 
 ---
 
@@ -32,7 +32,7 @@ Future features - not yet started. Add GitHub issue number when created.
 
 | # | Title | Priority | Notes |
 |---|-------|----------|-------|
-| - | Habits v2 Step 2: frequency ("x times a week") + decouple deadline from a habit's schedule (hide Due chip for habits, recurrence-without-deadline) | medium | deferred from #73; backend RecurrenceRule.OccursOn already supports schedules |
+| - | Habit combined schedule mode: a weekly count AND restricted days ("3 times among Mon/Wed/Fri"); also "x times a month" period + per-habit minimum floor | low | parked from #75; #75 ships two distinct modes (specific-days OR x-times-a-week), this combines them |
 | - | Dark mode (tokens already in place from #73 - add a `.dark` block) | low | #73 made it a drop-in |
 | - | Habits calendar heatmap (GitHub-style) | low | check-in data already supports it |
 | #25 | Guard against invalid date strings in format.ts | low | from #22 review |

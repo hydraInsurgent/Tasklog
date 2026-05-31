@@ -1824,4 +1824,178 @@ public class TasksControllerTests
         next.Deadline.Value.Day.Should().BeInRange(15, 21);
         next.Recurrence.Should().Be("FREQ=MONTHLY;BYDAY=3TH");
     }
+
+    // --- Habits v2 Step 2 (#75): deadline decoupling + weekly frequency target ---
+
+    [Fact]
+    public async Task Create_HabitRecurrenceWithoutDeadline_IsAllowed()
+    {
+        using var context = CreateContext();
+        var controller = new TasksController(context);
+
+        // A habit can carry a schedule with no deadline anchor (unlike an ordinary task).
+        var result = await controller.Create(
+            new CreateTaskRequest("Meditate", null, null, Recurrence: "FREQ=WEEKLY;BYDAY=MO,WE", IsHabit: true));
+
+        var task = result.Should().BeOfType<CreatedAtActionResult>().Subject.Value.Should().BeOfType<TaskModel>().Subject;
+        task.Recurrence.Should().Be("FREQ=WEEKLY;BYDAY=MO,WE");
+        task.Deadline.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Create_WeeklyTargetOnHabit_IsStored()
+    {
+        using var context = CreateContext();
+        var controller = new TasksController(context);
+
+        var result = await controller.Create(
+            new CreateTaskRequest("Gym", null, null, IsHabit: true, WeeklyTarget: 3));
+
+        var task = result.Should().BeOfType<CreatedAtActionResult>().Subject.Value.Should().BeOfType<TaskModel>().Subject;
+        task.WeeklyTarget.Should().Be(3);
+        task.Recurrence.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Create_WeeklyTargetOnNonHabit_Returns400()
+    {
+        using var context = CreateContext();
+        var controller = new TasksController(context);
+
+        var result = await controller.Create(new CreateTaskRequest("Task", null, null, WeeklyTarget: 3));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(8)]
+    public async Task Create_WeeklyTargetOutOfRange_Returns400(int target)
+    {
+        using var context = CreateContext();
+        var controller = new TasksController(context);
+
+        var result = await controller.Create(
+            new CreateTaskRequest("Gym", null, null, IsHabit: true, WeeklyTarget: target));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task Create_WeeklyTargetAndRecurrenceTogether_Returns400()
+    {
+        using var context = CreateContext();
+        var controller = new TasksController(context);
+
+        var result = await controller.Create(
+            new CreateTaskRequest("Gym", null, null, Recurrence: "FREQ=DAILY", IsHabit: true, WeeklyTarget: 3));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task Update_SetWeeklyTarget_ClearsRecurrence()
+    {
+        using var context = CreateContext();
+        var task = new TaskModel { Title = "Gym", CreatedAt = DateTime.Now, IsHabit = true, Recurrence = "FREQ=WEEKLY;BYDAY=MO", SeriesId = Guid.NewGuid() };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.Update(task.Id, Json("{\"weeklyTarget\": 4}"));
+
+        var updated = result.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeOfType<TaskModel>().Subject;
+        updated.WeeklyTarget.Should().Be(4);
+        updated.Recurrence.Should().BeNull();
+        updated.SeriesId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Update_SetRecurrence_ClearsWeeklyTarget()
+    {
+        using var context = CreateContext();
+        var task = new TaskModel { Title = "Gym", CreatedAt = DateTime.Now, IsHabit = true, WeeklyTarget = 3 };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.Update(task.Id, Json("{\"recurrence\": \"FREQ=WEEKLY;BYDAY=TU\"}"));
+
+        var updated = result.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeOfType<TaskModel>().Subject;
+        updated.Recurrence.Should().Be("FREQ=WEEKLY;BYDAY=TU");
+        updated.WeeklyTarget.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Update_HabitRecurrenceWithoutDeadline_IsAllowed()
+    {
+        using var context = CreateContext();
+        var task = new TaskModel { Title = "Meditate", CreatedAt = DateTime.Now, IsHabit = true };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.Update(task.Id, Json("{\"recurrence\": \"FREQ=DAILY\"}"));
+
+        var updated = result.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeOfType<TaskModel>().Subject;
+        updated.Recurrence.Should().Be("FREQ=DAILY");
+    }
+
+    [Fact]
+    public async Task Update_RecurrenceWithoutDeadlineOnNonHabit_StillReturns400()
+    {
+        using var context = CreateContext();
+        var task = new TaskModel { Title = "Task", CreatedAt = DateTime.Now, IsHabit = false };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.Update(task.Id, Json("{\"recurrence\": \"FREQ=DAILY\"}"));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task Update_WeeklyTargetOnNonHabit_Returns400()
+    {
+        using var context = CreateContext();
+        var task = new TaskModel { Title = "Task", CreatedAt = DateTime.Now, IsHabit = false };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.Update(task.Id, Json("{\"weeklyTarget\": 3}"));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task Update_BothModesInOnePatch_Returns400()
+    {
+        using var context = CreateContext();
+        var task = new TaskModel { Title = "Gym", CreatedAt = DateTime.Now, IsHabit = true };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.Update(task.Id, Json("{\"recurrence\": \"FREQ=DAILY\", \"weeklyTarget\": 3}"));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task Update_TurningHabitOff_ClearsWeeklyTarget()
+    {
+        using var context = CreateContext();
+        var task = new TaskModel { Title = "Gym", CreatedAt = DateTime.Now, IsHabit = true, WeeklyTarget = 3 };
+        context.Tasks.Add(task);
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.Update(task.Id, Json("{\"isHabit\": false}"));
+
+        var updated = result.Should().BeOfType<OkObjectResult>().Subject.Value.Should().BeOfType<TaskModel>().Subject;
+        updated.IsHabit.Should().BeFalse();
+        updated.WeeklyTarget.Should().BeNull();
+    }
 }
