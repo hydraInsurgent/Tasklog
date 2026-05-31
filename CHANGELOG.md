@@ -2,6 +2,24 @@
 
 ---
 
+## v2.18.0 - Habits v2 Step 2 (frequency + deadline-free schedules)
+*May 2026*
+
+### Added
+
+- **"X times a week" habits** (#75) - a habit's schedule can now be a weekly **frequency** ("go to the gym 3x a week") instead of fixed days. Pick the mode in the habit's Schedule chip: **Specific days** (the existing "every Tue & Thu") or **x times a week** (a 1-7 stepper). A frequency habit is checkable any day; its card shows **"n/x this week"**, a **week-based streak**, and a strip of recent weeks coloured green (target met), yellow (showed up but under target), or grey (missed). The streak counts consecutive weeks you showed up at least once - hitting the full target turns the week green, but a yellow week still keeps the streak alive; only a fully missed week breaks it.
+- Claude can set the frequency over the connector: `create_task` / `update_task` accept a `weeklyTarget` (1-7).
+
+### Changed
+
+- **Habits no longer need a deadline to have a schedule** (#75). A habit's recurrence is its check-in pattern, not a due date, so the **Due chip is hidden for habits** and you can set a schedule with no deadline. (Ordinary recurring *tasks* still need a deadline - it's the anchor they advance from on completion.)
+
+### Notes
+
+- Small database migration: one nullable `WeeklyTarget` column; existing habits are untouched and stay on the specific-days/daily model. A habit is one mode or the other (specific-days OR a weekly target), never both. Deferred to a later pass: a combined "x times among chosen days" mode, an "x times a month" period, and the calendar heatmap.
+
+---
+
 ## v2.17.0 - UI uplift (tokens + chip sheet + board) + Habits v2
 *May 2026*
 
