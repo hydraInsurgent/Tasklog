@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| P75-habits-v2-step2.md | #75 | feature/habits-v2-step2-#75 | In Progress |
+| _(none active)_ | | | |
 
 ---
 
@@ -80,6 +80,7 @@ Recently completed work (keep last 10):
 
 | # | Title | Type | Closed |
 |---|-------|------|--------|
+| #75 | Habits v2 Step 2: x-times-a-week frequency + deadline-free habit schedules (v2.18.0) | feature | 2026-05-31 |
 | #73 | UI uplift: design tokens + chip-driven sheet + board view + Habits v2 Step 1 (v2.17.0) | feature | 2026-05-30 |
 | #74 | Habit tracking (IsHabit + daily check-ins + streaks) (v2.16.0) - completes the recurring+habits program | feature | 2026-05-28 |
 | #72 | Natural-language quick-add (Todoist-style title parsing) (v2.15.0) | feature | 2026-05-27 |
@@ -89,8 +90,6 @@ Recently completed work (keep last 10):
 | #68 | Deadline time-of-day (v2.12.0) | feature | 2026-05-27 |
 | #67 | Task description field (v2.11.0) | feature | 2026-05-27 |
 | #66 | Agent ergonomics (bulk_set_priority + name resolution) (v2.10.7) | feature | 2026-05-27 |
-| #65 | list_tasks query completeness (createdAt filter, sort, limit) (v2.10.6) | feature | 2026-05-27 |
-| #64 | Task priority (Todoist P1-P4) (v2.10.5) | feature | 2026-05-27 |
 
 ---
 
