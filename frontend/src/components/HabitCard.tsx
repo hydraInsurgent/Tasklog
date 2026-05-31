@@ -24,6 +24,41 @@ const WEEK_CELL_CLASS: Record<string, string> = {
   none: "bg-border",
 };
 
+// The check-in toggle, shared by the frequency and specific-days cards (they differ only
+// in the not-done label). Amber primary when not done, green when checked in for the day.
+function CheckInButton({
+  doneToday,
+  pending,
+  onClick,
+  notDoneLabel,
+}: {
+  doneToday: boolean;
+  pending: boolean;
+  onClick: () => void;
+  notDoneLabel: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={pending}
+      aria-pressed={doneToday}
+      className={`flex items-center justify-center gap-2 w-full px-4 py-2 min-h-[44px] text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 cursor-pointer ${
+        doneToday
+          ? "bg-green-600 text-white hover:bg-green-700 focus:ring-green-600"
+          : "bg-primary text-white hover:bg-primary-hover focus:ring-accent"
+      }`}
+    >
+      {pending ? (
+        <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+      ) : doneToday ? (
+        <Check size={16} aria-hidden="true" />
+      ) : null}
+      {doneToday ? "Done today" : notDoneLabel}
+    </button>
+  );
+}
+
 export default function HabitCard({ habit, onToggle, pending }: Props) {
   const { task, currentStreak, doneToday } = habit;
 
@@ -76,24 +111,7 @@ export default function HabitCard({ habit, onToggle, pending }: Props) {
         </div>
 
         {/* Check-in toggle - available any day for a frequency habit. */}
-        <button
-          type="button"
-          onClick={() => onToggle(habit)}
-          disabled={pending}
-          aria-pressed={doneToday}
-          className={`flex items-center justify-center gap-2 w-full px-4 py-2 min-h-[44px] text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 cursor-pointer ${
-            doneToday
-              ? "bg-green-600 text-white hover:bg-green-700 focus:ring-green-600"
-              : "bg-primary text-white hover:bg-primary-hover focus:ring-accent"
-          }`}
-        >
-          {pending ? (
-            <Loader2 size={16} className="animate-spin" aria-hidden="true" />
-          ) : doneToday ? (
-            <Check size={16} aria-hidden="true" />
-          ) : null}
-          {doneToday ? "Done today" : "Check in today"}
-        </button>
+        <CheckInButton doneToday={doneToday} pending={pending} onClick={() => onToggle(habit)} notDoneLabel="Check in today" />
       </div>
     );
   }
@@ -162,24 +180,7 @@ export default function HabitCard({ habit, onToggle, pending }: Props) {
 
       {/* Done-today toggle - only on a scheduled day; otherwise show when it's next due. */}
       {dueToday ? (
-        <button
-          type="button"
-          onClick={() => onToggle(habit)}
-          disabled={pending}
-          aria-pressed={doneToday}
-          className={`flex items-center justify-center gap-2 w-full px-4 py-2 min-h-[44px] text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 cursor-pointer ${
-            doneToday
-              ? "bg-green-600 text-white hover:bg-green-700 focus:ring-green-600"
-              : "bg-primary text-white hover:bg-primary-hover focus:ring-accent"
-          }`}
-        >
-          {pending ? (
-            <Loader2 size={16} className="animate-spin" aria-hidden="true" />
-          ) : doneToday ? (
-            <Check size={16} aria-hidden="true" />
-          ) : null}
-          {doneToday ? "Done today" : "Mark done today"}
-        </button>
+        <CheckInButton doneToday={doneToday} pending={pending} onClick={() => onToggle(habit)} notDoneLabel="Mark done today" />
       ) : (
         <div className="w-full px-4 py-2 min-h-[44px] flex items-center justify-center text-sm text-text-muted bg-surface-raised rounded-md">
           Not due today{next ? ` · next ${WEEKDAY_SHORT[next.getDay()]}` : ""}

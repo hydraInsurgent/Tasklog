@@ -45,9 +45,10 @@ namespace Tasklog.Api.Controllers
             {
                 var dates = task.CheckIns.Select(c => c.CheckInDate.Date).ToList();
 
-                // A frequency habit ("x times a week") has a different streak (consecutive
-                // weeks, not scheduled days) and carries weekly-progress fields. A specific-
-                // days / daily habit uses the schedule-aware day streak and leaves them null.
+                // Frequency habits ("x times a week") are the special case handled first: a
+                // different streak (consecutive weeks, not scheduled days) plus weekly-progress
+                // fields. The fall-through is the default specific-days / daily habit, which
+                // uses the schedule-aware day streak and leaves the frequency fields null.
                 if (task.WeeklyTarget is int target)
                 {
                     return new HabitResponse(
