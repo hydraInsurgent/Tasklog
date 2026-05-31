@@ -19,6 +19,7 @@ const habitTask: Task = {
   seriesId: null,
   isRecurring: false,
   isHabit: true,
+  weeklyTarget: null,
 }
 
 function makeHabit(overrides: Partial<Habit> = {}): Habit {
@@ -27,6 +28,9 @@ function makeHabit(overrides: Partial<Habit> = {}): Habit {
     currentStreak: 3,
     doneToday: false,
     recentCheckIns: [],
+    weeklyTarget: null,
+    thisWeekCount: null,
+    recentWeeks: null,
     ...overrides,
   }
 }
@@ -73,5 +77,37 @@ describe('HabitCard', () => {
   it('disables the toggle while a check-in is pending', () => {
     render(<HabitCard habit={makeHabit()} onToggle={jest.fn()} pending={true} />)
     expect(screen.getByRole('button')).toBeDisabled()
+  })
+
+  // --- Frequency habits ("x times a week", #75) ---
+
+  function makeFrequencyHabit(overrides: Partial<Habit> = {}): Habit {
+    return {
+      task: { ...habitTask, weeklyTarget: 3 },
+      currentStreak: 2,
+      doneToday: false,
+      recentCheckIns: [],
+      weeklyTarget: 3,
+      thisWeekCount: 1,
+      recentWeeks: [
+        { weekStart: '2026-05-04', count: 3, status: 'met' },
+        { weekStart: '2026-05-11', count: 1, status: 'partial' },
+        { weekStart: '2026-05-18', count: 0, status: 'none' },
+      ],
+      ...overrides,
+    }
+  }
+
+  it('renders a frequency habit with weekly progress, target, and a WEEK streak', () => {
+    render(<HabitCard habit={makeFrequencyHabit()} onToggle={jest.fn()} pending={false} />)
+    expect(screen.getByText('Meditate')).toBeInTheDocument()
+    expect(screen.getByText('3x per week')).toBeInTheDocument()
+    expect(screen.getByText('1/3')).toBeInTheDocument()
+    expect(screen.getByText('2 weeks')).toBeInTheDocument()
+  })
+
+  it('offers a check-in (not "mark done today") any day for a frequency habit', () => {
+    render(<HabitCard habit={makeFrequencyHabit({ doneToday: false })} onToggle={jest.fn()} pending={false} />)
+    expect(screen.getByRole('button', { name: /check in/i })).toBeInTheDocument()
   })
 })

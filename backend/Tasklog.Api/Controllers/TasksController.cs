@@ -195,14 +195,32 @@ namespace Tasklog.Api.Controllers
             if (descError is not null)
                 return BadRequest(new { message = descError });
 
-            // Recurrence is optional. When present it requires a deadline (the anchor the
-            // rule advances from) and must be a rule the core can expand; we store the
+            var isHabit = request.IsHabit ?? false;
+
+            // WeeklyTarget is the "x times a week" habit frequency. It is habits-only, on the
+            // 1-7 scale, and mutually exclusive with a specific-days Recurrence (a habit is
+            // scheduled one way or the other - see the two-mode model in #75).
+            if (request.WeeklyTarget is int wt)
+            {
+                if (!isHabit)
+                    return BadRequest(new { message = "Only a habit can have a weekly frequency target." });
+                if (wt < 1 || wt > 7)
+                    return BadRequest(new { message = "Weekly target must be between 1 and 7." });
+                if (!string.IsNullOrWhiteSpace(request.Recurrence))
+                    return BadRequest(new { message = "A habit is scheduled on specific days OR a weekly target, not both." });
+            }
+
+            // Recurrence is optional. It must be a rule the core can expand; we store the
             // canonical serialized form and stamp a fresh SeriesId so future occurrences link.
+            // A recurring TASK requires a deadline (the anchor the rule advances from on
+            // completion), but a HABIT does not: its recurrence is only ever read as a
+            // day-pattern (OccursOn) and it never spawns, so it can carry a schedule with no
+            // deadline (#75).
             string? recurrence = null;
             Guid? seriesId = null;
             if (!string.IsNullOrWhiteSpace(request.Recurrence))
             {
-                if (request.Deadline is null)
+                if (request.Deadline is null && !isHabit)
                     return BadRequest(new { message = "A recurring task needs a deadline to repeat from." });
                 if (!RecurrenceRule.TryParse(request.Recurrence, out var rule, out var ruleError))
                     return BadRequest(new { message = ruleError });
@@ -221,7 +239,8 @@ namespace Tasklog.Api.Controllers
                 Priority = priority,
                 Recurrence = recurrence,
                 SeriesId = seriesId,
-                IsHabit = request.IsHabit ?? false
+                IsHabit = isHabit,
+                WeeklyTarget = request.WeeklyTarget
             };
 
             _context.Tasks.Add(task);
@@ -307,11 +326,33 @@ namespace Tasklog.Api.Controllers
                 task.Priority = p;
             }
 
+            // isHabit: present + bool toggles whether the task is a habit. Absent leaves it.
+            // Processed BEFORE recurrence/weeklyTarget so the effective habit state is known
+            // when the deadline gate is evaluated below. Turning a habit off also clears its
+            // weekly frequency target (a non-habit cannot be a frequency habit).
+            if (body.TryGetProperty("isHabit", out var habitEl))
+            {
+                if (habitEl.ValueKind != JsonValueKind.True && habitEl.ValueKind != JsonValueKind.False)
+                    return BadRequest(new { message = "isHabit must be a boolean." });
+                task.IsHabit = habitEl.GetBoolean();
+                if (!task.IsHabit) task.WeeklyTarget = null;
+            }
+
+            // A habit is scheduled on specific days (recurrence) OR a weekly target, never
+            // both - reject a PATCH that tries to set both modes in one request.
+            var settingRecurrence = body.TryGetProperty("recurrence", out var recurrenceEl)
+                && recurrenceEl.ValueKind == JsonValueKind.String;
+            var settingWeeklyTarget = body.TryGetProperty("weeklyTarget", out var weeklyEl)
+                && weeklyEl.ValueKind == JsonValueKind.Number;
+            if (settingRecurrence && settingWeeklyTarget)
+                return BadRequest(new { message = "A habit is scheduled on specific days OR a weekly target, not both." });
+
             // recurrence: present + null clears it (task stops repeating; SeriesId nulled);
-            // present + string sets/replaces it (validated; requires the task to have a
-            // deadline - which may have just been set above in this same PATCH; a SeriesId
-            // is assigned if the task wasn't already recurring). Absent leaves it unchanged.
-            if (body.TryGetProperty("recurrence", out var recurrenceEl))
+            // present + string sets/replaces it (validated). A recurring TASK requires a
+            // deadline (possibly set in this same PATCH); a HABIT does not - it can carry a
+            // deadline-free schedule (#75). Setting a recurrence clears any weekly target
+            // (the two modes are mutually exclusive). Absent leaves it unchanged.
+            if (body.TryGetProperty("recurrence", out recurrenceEl))
             {
                 if (recurrenceEl.ValueKind == JsonValueKind.Null)
                 {
@@ -320,12 +361,13 @@ namespace Tasklog.Api.Controllers
                 }
                 else if (recurrenceEl.ValueKind == JsonValueKind.String)
                 {
-                    if (task.Deadline is null)
+                    if (task.Deadline is null && !task.IsHabit)
                         return BadRequest(new { message = "A recurring task needs a deadline to repeat from." });
                     if (!RecurrenceRule.TryParse(recurrenceEl.GetString(), out var rule, out var ruleError))
                         return BadRequest(new { message = ruleError });
                     task.Recurrence = rule!.Serialize();
                     task.SeriesId ??= Guid.NewGuid();
+                    task.WeeklyTarget = null;
                 }
                 else
                 {
@@ -333,12 +375,29 @@ namespace Tasklog.Api.Controllers
                 }
             }
 
-            // isHabit: present + bool toggles whether the task is a habit. Absent leaves it.
-            if (body.TryGetProperty("isHabit", out var habitEl))
+            // weeklyTarget: present + null clears it; present + number (1-7) sets the "x times
+            // a week" frequency (habits only) and clears any specific-days recurrence. Absent
+            // leaves it unchanged.
+            if (body.TryGetProperty("weeklyTarget", out weeklyEl))
             {
-                if (habitEl.ValueKind != JsonValueKind.True && habitEl.ValueKind != JsonValueKind.False)
-                    return BadRequest(new { message = "isHabit must be a boolean." });
-                task.IsHabit = habitEl.GetBoolean();
+                if (weeklyEl.ValueKind == JsonValueKind.Null)
+                {
+                    task.WeeklyTarget = null;
+                }
+                else if (weeklyEl.ValueKind == JsonValueKind.Number && weeklyEl.TryGetInt32(out var wt))
+                {
+                    if (wt < 1 || wt > 7)
+                        return BadRequest(new { message = "Weekly target must be between 1 and 7." });
+                    if (!task.IsHabit)
+                        return BadRequest(new { message = "Only a habit can have a weekly frequency target." });
+                    task.WeeklyTarget = wt;
+                    task.Recurrence = null;
+                    task.SeriesId = null;
+                }
+                else
+                {
+                    return BadRequest(new { message = "Weekly target must be a number (1-7) or null." });
+                }
             }
 
             await _context.SaveChangesAsync();
@@ -676,8 +735,10 @@ namespace Tasklog.Api.Controllers
 
     // Request body shape for task creation. Priority is optional (defaults to 4 = none);
     // Description is optional free text (null/blank = none); Recurrence is an optional
-    // RRULE-shaped string (requires a Deadline to anchor the repeat).
-    public record CreateTaskRequest(string Title, DateTime? Deadline, int? ProjectId, int? Priority = null, string? Description = null, string? Recurrence = null, bool? IsHabit = null);
+    // RRULE-shaped string (requires a Deadline to anchor the repeat, UNLESS the task is a
+    // habit); WeeklyTarget is an optional "x times a week" frequency (1-7, habits only,
+    // mutually exclusive with Recurrence).
+    public record CreateTaskRequest(string Title, DateTime? Deadline, int? ProjectId, int? Priority = null, string? Description = null, string? Recurrence = null, bool? IsHabit = null, int? WeeklyTarget = null);
 
     // Request body shape for toggling task completion.
     public record CompleteTaskRequest(bool IsCompleted);

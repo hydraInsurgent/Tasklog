@@ -18,6 +18,10 @@ interface Props {
   onChange: (rule: string | null) => void;
   deadline?: string; // ISO; seeds weekday / day-of-month defaults and gates the picker
   disabled?: boolean;
+  // When true, the picker is a habit's schedule: it needs no deadline anchor (a habit's
+  // recurrence is only ever read as a day-pattern and never spawns), so the controls are
+  // enabled even with no deadline (#75).
+  isHabit?: boolean;
 }
 
 type Mode = "none" | "daily" | "weekly" | "monthly";
@@ -138,10 +142,13 @@ function buildRule(c: Cfg): string | null {
   return rule;
 }
 
-export default function RecurrencePicker({ value, onChange, deadline, disabled }: Props) {
+export default function RecurrencePicker({ value, onChange, deadline, disabled, isHabit }: Props) {
   const [cfg, setCfg] = useState<Cfg>(() => parseRule(value, deadline));
+  // A habit needs no deadline to schedule; an ordinary recurring task does (the deadline is
+  // the anchor it advances from). `scheduleEnabled` gates the controls accordingly.
   const hasDeadline = !!deadline;
-  const controlsDisabled = disabled || !hasDeadline;
+  const scheduleEnabled = hasDeadline || !!isHabit;
+  const controlsDisabled = disabled || !scheduleEnabled;
 
   // Merge a patch into the config and emit the rebuilt rule.
   function update(patch: Partial<Cfg>) {
@@ -183,12 +190,12 @@ export default function RecurrencePicker({ value, onChange, deadline, disabled }
         <option value="monthly">Monthly</option>
       </select>
 
-      {!hasDeadline && (
+      {!scheduleEnabled && (
         <p className="mt-1 text-xs text-text-muted">Set a deadline to make this task repeat.</p>
       )}
 
       {/* Daily: interval. */}
-      {hasDeadline && cfg.mode === "daily" && (
+      {scheduleEnabled && cfg.mode === "daily" && (
         <div className="mt-2 flex items-center gap-2 text-sm text-text-primary">
           <span>Every</span>
           <input
@@ -201,7 +208,7 @@ export default function RecurrencePicker({ value, onChange, deadline, disabled }
       )}
 
       {/* Weekly: interval + weekday chips. */}
-      {hasDeadline && cfg.mode === "weekly" && (
+      {scheduleEnabled && cfg.mode === "weekly" && (
         <div className="mt-2 space-y-2">
           <div className="flex items-center gap-2 text-sm text-text-primary">
             <span>Every</span>
@@ -232,7 +239,7 @@ export default function RecurrencePicker({ value, onChange, deadline, disabled }
       )}
 
       {/* Monthly: interval + day-of-month | nth-weekday | last-day. */}
-      {hasDeadline && cfg.mode === "monthly" && (
+      {scheduleEnabled && cfg.mode === "monthly" && (
         <div className="mt-2 space-y-2">
           <div className="flex items-center gap-2 text-sm text-text-primary">
             <span>Every</span>
@@ -284,7 +291,7 @@ export default function RecurrencePicker({ value, onChange, deadline, disabled }
       )}
 
       {/* Ends (shared across daily/weekly/monthly). */}
-      {hasDeadline && cfg.mode !== "none" && (
+      {scheduleEnabled && cfg.mode !== "none" && (
         <div className="mt-2 space-y-2">
           <select
             aria-label="Ends" value={cfg.endKind} disabled={disabled}

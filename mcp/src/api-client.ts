@@ -52,6 +52,9 @@ export interface Task {
   isRecurring: boolean;
   // Whether this task is tracked as a daily habit (gets check-ins + a streak).
   isHabit: boolean;
+  // "x times a week" habit frequency target (1-7), or null if the habit is scheduled on
+  // specific days (recurrence) / daily, or is not a habit. Mutually exclusive with recurrence.
+  weeklyTarget: number | null;
   // Timestamped comments. Present on get_task (single task); absent on list_tasks.
   comments?: Comment[];
 }
@@ -195,6 +198,7 @@ export const createTask = (body: {
   description?: string;
   recurrence?: string;
   isHabit?: boolean;
+  weeklyTarget?: number;
 }): Promise<Task> =>
   request('/api/tasks', { method: 'POST', body: JSON.stringify(body) });
 
@@ -214,6 +218,7 @@ export const updateTask = (
     description?: string | null;
     recurrence?: string | null;
     isHabit?: boolean;
+    weeklyTarget?: number | null;
   },
 ): Promise<Task> =>
   request(`/api/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(body) });

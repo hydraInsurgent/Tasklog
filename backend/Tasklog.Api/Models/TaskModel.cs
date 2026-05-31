@@ -50,6 +50,14 @@ namespace Tasklog.Api.Models
         // and existing rows migrate to false without needing HasDefaultValue (unlike Priority).
         public bool IsHabit { get; set; }
 
+        // Weekly frequency target for a habit ("x times a week"). Null = not a frequency
+        // habit (the habit is scheduled on specific days via Recurrence, or is plain daily).
+        // 1-7 = the target number of check-ins per calendar week (Mon-Sun). A frequency habit
+        // and a specific-days recurrence are mutually exclusive: setting one clears the other
+        // (enforced in the controller). Nullable int defaults to null (CLR zero is null), so
+        // existing rows migrate to null with no HasDefaultValue needed - like IsHabit.
+        public int? WeeklyTarget { get; set; }
+
         // Daily check-ins for this habit. [JsonIgnore] so they never bloat ordinary task
         // responses - they are loaded + projected only by the /api/habits endpoint. The nav
         // exists for the cascade FK and that query's .Include.

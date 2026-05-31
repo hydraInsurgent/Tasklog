@@ -1,6 +1,6 @@
 # Habits v2 Step 2 - Plan (#75)
 
-**Overall Progress:** `0%`
+**Overall Progress:** `100%`
 
 ## TLDR
 Two intertwined habit-scheduling improvements, shipped together.
@@ -27,41 +27,50 @@ Two intertwined habit-scheduling improvements, shipped together.
 
 ## Tasks
 
-- [ ] 🟥 **Step 1: Backend data model + migration** `[sequential]` → delivers: `WeeklyTarget` column
-  - [ ] 🟥 Add `public int? WeeklyTarget { get; set; }` to `Models/TaskModel.cs` (with an XML comment: null = not a frequency habit; 1-7 = times per calendar week)
-  - [ ] 🟥 Generate the EF migration (`dotnet ef migrations add AddHabitWeeklyTarget`); verify it adds a nullable column with NO default (existing rows → null)
-  - [ ] 🟥 Apply / verify the migration runs clean against the dev DB
+- [x] 🟩 **Step 1: Backend data model + migration** `[sequential]` → delivers: `WeeklyTarget` column
+  - [x] 🟩 Add `public int? WeeklyTarget { get; set; }` to `Models/TaskModel.cs` (with an XML comment: null = not a frequency habit; 1-7 = times per calendar week)
+  - [x] 🟩 Generate the EF migration (`AddHabitWeeklyTarget`); verified nullable column, NO default (existing rows → null)
+  - [x] 🟩 Applied the migration clean against the dev DB
 
-- [ ] 🟥 **Step 2: Backend TasksController - decouple deadline + frequency validation** `[sequential]` → depends on: Step 1
-  - [ ] 🟥 POST create: relax the "recurring task needs a deadline" check so it only fires when `!IsHabit`; a habit may set `recurrence` with no deadline (parse + serialize as today)
-  - [ ] 🟥 POST create: accept `weeklyTarget`; validate `IsHabit` is true when set, range `1..7`, and reject setting both `weeklyTarget` and `recurrence` (400); setting `weeklyTarget` leaves `Recurrence`/`SeriesId` null
-  - [ ] 🟥 PATCH update: same deadline relaxation, computing the EFFECTIVE `IsHabit` (apply the body's `isHabit` first so a same-PATCH habit toggle is respected)
-  - [ ] 🟥 PATCH update: present-key handling for `weeklyTarget` (omit=keep, `null`=clear, value=set); setting a value clears `Recurrence`+`SeriesId`; setting `recurrence` clears `WeeklyTarget`; `weeklyTarget` on a non-habit / out of 1-7 → 400
-  - [ ] 🟥 Confirm spawn-on-complete is untouched (it already requires both a deadline and a recurrence, which a frequency habit never has)
+- [x] 🟩 **Step 2: Backend TasksController - decouple deadline + frequency validation** `[sequential]` → depends on: Step 1
+  - [x] 🟩 POST create: deadline check now only fires when `!isHabit`; a habit may set `recurrence` with no deadline
+  - [x] 🟩 POST create: accept `weeklyTarget`; validates habits-only, range `1..7`, and rejects both `weeklyTarget` + `recurrence` (400)
+  - [x] 🟩 PATCH update: same deadline relaxation; `isHabit` moved BEFORE recurrence so the effective habit state gates it (turning habit off clears WeeklyTarget)
+  - [x] 🟩 PATCH update: present-key `weeklyTarget` (omit=keep, null=clear, value=set); each mode clears the other; both-in-one-PATCH → 400; non-habit / out of 1-7 → 400
+  - [x] 🟩 Spawn-on-complete untouched (still requires deadline + recurrence, which a frequency habit never has)
 
-- [ ] 🟥 **Step 3: Backend frequency streak helper + HabitsController** `[parallel]` → delivers: frequency-aware habit responses (independent file from Step 2; both depend only on Step 1)
-  - [ ] 🟥 New `Services/HabitFrequency.cs` (pure, parameterized by `today`): `WeekStart(date)` (Monday), `ThisWeekCount(checkIns, today)`, `WeekStreak(checkIns, today)` (consecutive weeks with >= 1 check-in, current-week grace), `RecentWeeks(checkIns, today, target, n)` -> list of `{ weekStart, count, status }` where status = met/partial/none
-  - [ ] 🟥 Extend `HabitResponse` with `WeeklyTarget` (int?), `ThisWeekCount` (int?), `RecentWeeks` (list?, null for non-frequency habits)
-  - [ ] 🟥 In `HabitsController`: when `task.WeeklyTarget` is set, compute `CurrentStreak` via `HabitFrequency.WeekStreak` and populate the frequency fields; otherwise keep the existing `HabitStreak.CurrentStreak` path and leave frequency fields null
+- [x] 🟩 **Step 3: Backend frequency streak helper + HabitsController** `[parallel]` → delivers: frequency-aware habit responses
+  - [x] 🟩 New `Services/HabitFrequency.cs` (pure): `WeekStart` (Monday), `ThisWeekCount`, `WeekStreak` (consecutive weeks >= 1 check-in, current-week grace), `RecentWeeks` -> `WeekStatus { weekStart, count, status }` met/partial/none
+  - [x] 🟩 Extended `HabitResponse` with `WeeklyTarget`, `ThisWeekCount`, `RecentWeeks` (null for non-frequency habits); `CurrentStreak` is unit-aware
+  - [x] 🟩 HabitsController branches on `task.WeeklyTarget`: week-streak + frequency fields for frequency habits, existing day-streak path otherwise. Backend builds clean.
 
-- [ ] 🟥 **Step 4: MCP - weeklyTarget on create/update** `[sequential]` → depends on: Step 2
-  - [ ] 🟥 Add optional `weeklyTarget` to the `create_task` / `update_task` Zod schemas (1-7) and to `api-client.ts` request bodies
-  - [ ] 🟥 Update tool descriptions to note the two habit modes (specific-days recurrence vs weeklyTarget) and that they are mutually exclusive
+- [x] 🟩 **Step 4: MCP - weeklyTarget on create/update** `[sequential]` → depends on: Step 2
+  - [x] 🟩 Added optional `weeklyTarget` (1-7) to `create_task` / `update_task` Zod schemas + `api-client.ts` (Task interface, createTask, updateTask bodies)
+  - [x] 🟩 Tool descriptions note the two mutually-exclusive habit modes. MCP builds clean (tsc).
 
-- [ ] 🟥 **Step 5: Frontend - api types + Part 1 decouple UI** `[sequential]` → depends on: Steps 2, 3
-  - [ ] 🟥 `lib/api.ts`: add `weeklyTarget: number | null` to `Task`; add the frequency fields to `Habit` (`weeklyTarget`, `thisWeekCount`, `recentWeeks`); thread `weeklyTarget` through `createTask`/`updateTask`
-  - [ ] 🟥 `TaskSheet.tsx`: hide the Due chip when `isHabit` is on
-  - [ ] 🟥 `RecurrencePicker.tsx`: un-gate controls when it is a habit (controls disabled only when `!hasDeadline && !isHabit`); hide the "Set a deadline to make this task repeat" hint for habits
+- [x] 🟩 **Step 5: Frontend - api types + Part 1 decouple UI** `[sequential]` → depends on: Steps 2, 3
+  - [x] 🟩 `lib/api.ts`: added `weeklyTarget` to `Task`; added `WeekStatus` + frequency fields to `Habit`; threaded `weeklyTarget` through `createTask`/`updateTask`
+  - [x] 🟩 `TaskSheet.tsx`: Due chip hidden when `isHabit` is on
+  - [x] 🟩 `RecurrencePicker.tsx`: added `isHabit` prop -> `scheduleEnabled = hasDeadline || isHabit` un-gates controls + hides the deadline hint for habits
 
-- [ ] 🟥 **Step 6: Frontend - Part 2 frequency picker + card** `[sequential]` → depends on: Step 5
-  - [ ] 🟥 `TaskSheet.tsx`: when `isHabit`, the schedule picker offers two modes - "Specific days" (existing RecurrencePicker) and "x times a week" (a 1-7 stepper); selecting one clears the other (send `recurrence`/`weeklyTarget` accordingly on save)
-  - [ ] 🟥 `HabitCard.tsx`: when `weeklyTarget != null`, render the frequency view - "n/x this week", a week-streak flame, and a row of recent-week cells coloured green/yellow/grey (reuse `--color-success/warning` + a muted token); otherwise the existing day-pattern view
-  - [ ] 🟥 `TaskDoneControl.tsx`: confirm a frequency habit (recurrence null) shows the interactive check-in every day and leaves the day's list after today's check-in (should already hold via `occursOn(null)` = true; add a label "n/x this week" if helpful)
+- [x] 🟩 **Step 6: Frontend - Part 2 frequency picker + card** `[sequential]` → depends on: Step 5
+  - [x] 🟩 `TaskSheet.tsx`: habit schedule chip is a two-mode picker (Specific days / x-times-a-week stepper); save sends `recurrence` XOR `weeklyTarget` so the backend both-mode guard never trips
+  - [x] 🟩 `HabitCard.tsx`: frequency branch renders "n/x this week", a week-streak flame, and the coloured week strip (success/warning/border tokens); day-pattern view unchanged
+  - [x] 🟩 `TaskDoneControl.tsx`: confirmed no change needed - frequency habit has null recurrence so `occursOn` = true makes check-in interactive every day; existing `isDoneForToday` filter removes it once checked in
 
-- [ ] 🟥 **Step 7: Tests + verification** `[sequential]` → depends on: Steps 1-6
-  - [ ] 🟥 Backend unit tests: `HabitFrequency` (week boundary, this-week count, streak grace, green/yellow/grey classification) + TasksController validation (deadline-free habit recurrence, weeklyTarget range, mode exclusivity, non-habit rejection)
-  - [ ] 🟥 MCP test for the new `weeklyTarget` field; frontend test for the two-mode picker + frequency HabitCard
-  - [ ] 🟥 Run all three suites green; manual smoke: create a frequency habit, check in, see progress + streak; create a deadline-free specific-days habit
+- [x] 🟩 **Step 7: Tests + verification** `[sequential]` → depends on: Steps 1-6
+  - [x] 🟩 Backend: new `HabitFrequencyTests` (7) + `TasksControllerTests` validation (13) - deadline-free habit recurrence, weeklyTarget range, mode exclusivity, non-habit rejection, turn-off clears target
+  - [x] 🟩 MCP `weeklyTarget` wire-contract block (4); frontend HabitCard frequency tests (2)
+  - [x] 🟩 All suites green: backend 270, frontend 138, MCP 101. API smoke: created a deadline-free 3x/week habit, checked in, `/api/habits` returned weeklyTarget/thisWeekCount/currentStreak(week)/recentWeeks correctly
 
 ## Outcomes
-<!-- Fill in after execution: decision-relevant deltas only. -->
+
+Built as planned, no deviations from the design.
+
+- **Data model:** one nullable `WeeklyTarget` column (migration `AddHabitWeeklyTarget`); existing rows -> null, no `HasDefaultValue` needed.
+- **Backend contract:** deadline gate relaxed for habits only (POST + PATCH); `weeklyTarget` validated habits-only, 1-7, mutually exclusive with recurrence; PATCH processes `isHabit` before recurrence/weeklyTarget so the effective habit state gates the deadline rule, and each mode clears the other (the both-in-one-PATCH case 400s). Spawn-on-complete untouched.
+- **Streak:** new pure `Services/HabitFrequency.cs` (WeekStart Monday, ThisWeekCount, WeekStreak with current-week grace, RecentWeeks met/partial/none). `HabitResponse.CurrentStreak` is unit-aware (weeks for frequency, days otherwise); added `WeeklyTarget`/`ThisWeekCount`/`RecentWeeks` (null for non-frequency habits).
+- **Frontend:** Due chip hidden for habits; `RecurrencePicker` gains `isHabit` to un-gate without a deadline; `TaskSheet` schedule chip is a two-mode picker (Specific days / x-times-a-week stepper) whose save sends recurrence XOR weeklyTarget; `HabitCard` frequency branch shows "n/x this week" + a coloured week strip (success/warning/border tokens) + a week-streak. `TaskDoneControl` needed no change (frequency habit has null recurrence -> `occursOn` true -> checkable daily).
+- **MCP:** `create_task`/`update_task` gained `weeklyTarget` (1-7).
+- **Decision held:** combined "count + chosen days" and "x per month" stayed out of scope (backlogged). No new engineering pattern; new column and helper follow existing precedents.
+- **Tests:** backend 250 -> 270, frontend 136 -> 138, MCP 97 -> 101. Live API smoke confirmed the deadline-free frequency-habit flow.

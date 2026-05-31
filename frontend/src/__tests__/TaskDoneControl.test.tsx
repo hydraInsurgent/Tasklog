@@ -20,10 +20,11 @@ function task(overrides: Partial<Task> = {}): Task {
     seriesId: null,
     isRecurring: false,
     isHabit: false,
+    weeklyTarget: null,
     ...overrides,
   }
 }
-const habit = (doneToday: boolean): Habit => ({ task: task({ isHabit: true }), currentStreak: 0, doneToday, recentCheckIns: [] })
+const habit = (doneToday: boolean): Habit => ({ task: task({ isHabit: true }), currentStreak: 0, doneToday, recentCheckIns: [], weeklyTarget: null, thisWeekCount: null, recentWeeks: null })
 
 describe('TaskDoneControl', () => {
   it('renders a completion checkbox for a normal task and fires onComplete', async () => {
