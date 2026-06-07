@@ -80,6 +80,7 @@ Recently completed work (keep last 10):
 
 | # | Title | Type | Closed |
 |---|-------|------|--------|
+| #76 | Fix: frequency habit check-in showed stale weekly progress (optimistic update) (v2.18.1) | bug | 2026-06-01 |
 | #75 | Habits v2 Step 2: x-times-a-week frequency + deadline-free habit schedules (v2.18.0) | feature | 2026-05-31 |
 | #73 | UI uplift: design tokens + chip-driven sheet + board view + Habits v2 Step 1 (v2.17.0) | feature | 2026-05-30 |
 | #74 | Habit tracking (IsHabit + daily check-ins + streaks) (v2.16.0) - completes the recurring+habits program | feature | 2026-05-28 |
@@ -89,7 +90,6 @@ Recently completed work (keep last 10):
 | #69 | Task comments + completion-log foundation (v2.13.0) | feature | 2026-05-27 |
 | #68 | Deadline time-of-day (v2.12.0) | feature | 2026-05-27 |
 | #67 | Task description field (v2.11.0) | feature | 2026-05-27 |
-| #66 | Agent ergonomics (bulk_set_priority + name resolution) (v2.10.7) | feature | 2026-05-27 |
 
 ---
 
