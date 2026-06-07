@@ -2,6 +2,15 @@
 
 ---
 
+## v2.18.1 - Fix: frequency habit check-in progress
+*June 2026*
+
+### Fixed
+
+- Checking in an "x times a week" habit now updates its **"n/x this week"** count and the current-week strip cell immediately. Previously the streak flame moved but the weekly progress stayed stale (and the week cell stayed grey) until the next background refresh - and a second check-in in the same week could briefly show the wrong streak. The optimistic update is now frequency-aware (#76).
+
+---
+
 ## v2.18.0 - Habits v2 Step 2 (frequency + deadline-free schedules)
 *May 2026*
 

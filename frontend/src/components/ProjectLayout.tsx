@@ -14,6 +14,7 @@ import {
   Project,
   Habit,
 } from "@/lib/api";
+import { applyOptimisticCheckIn } from "@/lib/habits";
 import ProjectSidebar from "./ProjectSidebar";
 import TasksClient from "./TasksClient";
 import HabitsPanel from "./HabitsPanel";
@@ -160,18 +161,10 @@ export default function ProjectLayout() {
     const current = habitsRef.current.find((h) => h.task.id === taskId);
     const markingDone = !(current?.doneToday ?? false);
     const key = todayKey();
+    // The shared helper keeps day-pattern and frequency habits consistent in the optimistic
+    // flash (frequency: weekly count + current-week cell + threshold-based week streak) (#76).
     setHabits((prev) =>
-      prev.map((h) => {
-        if (h.task.id !== taskId) return h;
-        return {
-          ...h,
-          doneToday: markingDone,
-          currentStreak: Math.max(0, h.currentStreak + (markingDone ? 1 : -1)),
-          recentCheckIns: markingDone
-            ? [key, ...h.recentCheckIns]
-            : h.recentCheckIns.filter((d) => d.slice(0, 10) !== key),
-        };
-      }),
+      prev.map((h) => (h.task.id === taskId ? applyOptimisticCheckIn(h, markingDone, key) : h)),
     );
     setPendingCheckIns((prev) => new Set(prev).add(taskId));
     try {

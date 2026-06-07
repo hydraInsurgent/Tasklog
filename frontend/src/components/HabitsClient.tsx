@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { usePolling } from "@/hooks/usePolling";
 import { CheckCircle, XCircle, Loader2, Flame } from "lucide-react";
 import { getHabits, addCheckIn, removeCheckIn, Habit } from "@/lib/api";
+import { applyOptimisticCheckIn } from "@/lib/habits";
 import HabitCard from "./HabitCard";
 
 type Feedback = { type: "success" | "error"; message: string } | null;
@@ -50,10 +51,9 @@ export default function HabitsClient() {
     setTimeout(() => setFeedback(null), 4000);
   }
 
-  // Toggle today's check-in for a habit, optimistically. Marking done bumps the
-  // streak by one and fills today's dot; undoing reverses both. The streak delta
-  // is always +/-1: the server counts consecutive days back from today (grace
-  // through yesterday), so adding/removing today shifts the run by exactly one.
+  // Toggle today's check-in for a habit, optimistically. The shared helper handles both
+  // habit kinds: a day streak shifts by +/-1, while a frequency habit moves its weekly
+  // count + current-week cell and only shifts its week streak on the 0<->1 threshold (#76).
   async function handleToggle(habit: Habit) {
     const id = habit.task.id;
     if (pendingIds.has(id)) return;
@@ -62,18 +62,7 @@ export default function HabitsClient() {
 
     // Optimistic update.
     setHabits((prev) =>
-      prev.map((h) =>
-        h.task.id === id
-          ? {
-              ...h,
-              doneToday: markingDone,
-              currentStreak: Math.max(0, h.currentStreak + (markingDone ? 1 : -1)),
-              recentCheckIns: markingDone
-                ? [key, ...h.recentCheckIns]
-                : h.recentCheckIns.filter((d) => d.slice(0, 10) !== key),
-            }
-          : h,
-      ),
+      prev.map((h) => (h.task.id === id ? applyOptimisticCheckIn(h, markingDone, key) : h)),
     );
     setPendingIds((prev) => new Set(prev).add(id));
 
