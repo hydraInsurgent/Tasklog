@@ -3,8 +3,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Pencil, Trash2, Plus, Tag, Flame } from "lucide-react";
-import { Project } from "@/lib/api";
+import { Pencil, Trash2, Plus, Tag } from "lucide-react";
+import { Project, Habit } from "@/lib/api";
+import SidebarHabits from "./SidebarHabits";
 
 interface Props {
   projects: Project[];
@@ -13,6 +14,10 @@ interface Props {
   onCreateProject: (name: string) => Promise<void>;
   onEditProject: (id: number, name: string) => Promise<void>;
   onDeleteProject: (id: number) => Promise<void>;
+  // Habits shown as a compact check-in section below "Add project" (#76).
+  habits?: Habit[];
+  pendingCheckIns?: Set<number>;
+  onCheckInToggle?: (taskId: number) => void;
 }
 
 // Shared classes for nav items.
@@ -28,6 +33,9 @@ export default function ProjectSidebar({
   onCreateProject,
   onEditProject,
   onDeleteProject,
+  habits,
+  pendingCheckIns,
+  onCheckInToggle,
 }: Props) {
   const pathname = usePathname();
   const [showNewInput, setShowNewInput] = useState(false);
@@ -152,7 +160,7 @@ export default function ProjectSidebar({
 
         <hr className="my-3 border-border" />
 
-        {/* Labels link */}
+        {/* Labels link (Habits now live as a check-in section below "Add project", #76) */}
         <Link
           href="/labels"
           className={`flex items-center gap-2 w-full text-left text-sm px-4 py-2 transition-colors duration-150 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent ${
@@ -161,17 +169,6 @@ export default function ProjectSidebar({
         >
           <Tag size={16} aria-hidden="true" />
           Labels
-        </Link>
-
-        {/* Habits link */}
-        <Link
-          href="/habits"
-          className={`flex items-center gap-2 w-full text-left text-sm px-4 py-2 transition-colors duration-150 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent ${
-            pathname === "/habits" ? activeNavClass : inactiveNavClass
-          }`}
-        >
-          <Flame size={16} aria-hidden="true" />
-          Habits
         </Link>
 
         <hr className="my-3 border-border" />
@@ -215,6 +212,18 @@ export default function ProjectSidebar({
           <Plus size={16} aria-hidden="true" />
           Add project
         </button>
+
+        {/* Habits: compact due-today check-in section (#76). */}
+        {onCheckInToggle && habits && habits.length > 0 && (
+          <>
+            <hr className="my-3 border-border" />
+            <SidebarHabits
+              habits={habits}
+              pendingCheckIns={pendingCheckIns ?? new Set()}
+              onCheckInToggle={onCheckInToggle}
+            />
+          </>
+        )}
       </nav>
 
       {/* Edit modal */}

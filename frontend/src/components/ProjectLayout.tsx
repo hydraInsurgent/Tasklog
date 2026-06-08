@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { usePolling } from "@/hooks/usePolling";
-import { Menu, Plus, X, Flame } from "lucide-react";
+import { Menu, Plus, X } from "lucide-react";
 import {
   getProjects,
   createProject,
@@ -17,7 +17,6 @@ import {
 import { applyOptimisticCheckIn } from "@/lib/habits";
 import ProjectSidebar from "./ProjectSidebar";
 import TasksClient from "./TasksClient";
-import HabitsPanel from "./HabitsPanel";
 import { EMPTY_FILTER, type FilterState } from "./FilterPanel";
 
 // Feedback shown briefly after a project action.
@@ -101,8 +100,6 @@ export default function ProjectLayout() {
     }
   });
   const [drawerOpen, setDrawerOpen] = useState(false);
-  // Right-side habits drawer (mobile/tablet, where the inline panel is hidden).
-  const [habitsDrawerOpen, setHabitsDrawerOpen] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
 
   function showFeedback(type: "success" | "error", message: string) {
@@ -235,6 +232,10 @@ export default function ProjectLayout() {
     onCreateProject: handleCreateProject,
     onEditProject: handleEditProject,
     onDeleteProject: handleDeleteProject,
+    // Habits render as a compact check-in section below "Add project" (#76).
+    habits,
+    pendingCheckIns,
+    onCheckInToggle: handleCheckInToggle,
   };
 
   // Habit lookup by task id, for the list's inline badge + check-in on habit rows.
@@ -266,26 +267,14 @@ export default function ProjectLayout() {
           >
             <Menu size={20} aria-hidden="true" />
           </button>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setCreating(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-medium rounded-md hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 transition-colors duration-150 cursor-pointer"
-            >
-              <Plus size={16} aria-hidden="true" />
-              Add Task
-            </button>
-            {habits.length > 0 && (
-              <button
-                onClick={() => setHabitsDrawerOpen(true)}
-                aria-label="Open habits"
-                title="Habits"
-                className="flex items-center justify-center p-3 text-amber-500 hover:text-amber-600 border border-border rounded-md bg-surface cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1"
-              >
-                <Flame size={20} aria-hidden="true" />
-              </button>
-            )}
-          </div>
+          <button
+            type="button"
+            onClick={() => setCreating(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-medium rounded-md hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 transition-colors duration-150 cursor-pointer"
+          >
+            <Plus size={16} aria-hidden="true" />
+            Add Task
+          </button>
         </div>
 
         {/* Feedback from project operations (create/rename/delete errors). */}
@@ -298,36 +287,24 @@ export default function ProjectLayout() {
           </div>
         )}
 
-        {/* Tasks + (desktop) a right-side Habits panel sharing one habit state. */}
-        <div className="flex gap-6 items-start">
-          <div className="flex-1 min-w-0">
-            <TasksClient
-              activeView={activeView}
-              projects={projects}
-              filterState={filterState}
-              onFilterChange={setFilterState}
-              creating={creating}
-              onCreatingChange={setCreating}
-              viewMode={viewConfig.mode}
-              groupBy={viewConfig.groupBy}
-              onViewModeChange={(mode) => setViewConfig({ mode })}
-              onGroupByChange={(groupBy) => setViewConfig({ groupBy })}
-              habitsByTaskId={habitsByTaskId}
-              pendingCheckIns={pendingCheckIns}
-              onCheckInToggle={handleCheckInToggle}
-              onHabitsChanged={refreshHabits}
-            />
-          </div>
-          {habits.length > 0 && (
-            <aside className="hidden lg:block w-72 shrink-0">
-              <HabitsPanel
-                habits={habits}
-                pendingCheckIns={pendingCheckIns}
-                onCheckInToggle={handleCheckInToggle}
-              />
-            </aside>
-          )}
-        </div>
+        {/* Tasks. Habits live in the left sidebar now (a compact check-in section below
+            "Add project"), so the task list gets the full width here (#76). */}
+        <TasksClient
+          activeView={activeView}
+          projects={projects}
+          filterState={filterState}
+          onFilterChange={setFilterState}
+          creating={creating}
+          onCreatingChange={setCreating}
+          viewMode={viewConfig.mode}
+          groupBy={viewConfig.groupBy}
+          onViewModeChange={(mode) => setViewConfig({ mode })}
+          onGroupByChange={(groupBy) => setViewConfig({ groupBy })}
+          habitsByTaskId={habitsByTaskId}
+          pendingCheckIns={pendingCheckIns}
+          onCheckInToggle={handleCheckInToggle}
+          onHabitsChanged={refreshHabits}
+        />
       </div>
 
       {/* Mobile drawer backdrop */}
@@ -360,39 +337,6 @@ export default function ProjectLayout() {
         ) : (
           <ProjectSidebar {...sidebarProps} />
         )}
-      </div>
-
-      {/* The habits drawer is opened from a flame button in the TasksClient toolbar
-          (passed down as onOpenHabits) - cleaner than a floating edge tab. */}
-
-      {/* Habits drawer backdrop */}
-      {habitsDrawerOpen && (
-        <div
-          className="fixed inset-0 bg-black/40 z-40 lg:hidden"
-          onClick={() => setHabitsDrawerOpen(false)}
-          aria-hidden="true"
-        />
-      )}
-
-      {/* Right habits drawer panel (mobile/tablet). Shares habit state, so checking in
-          here updates the inline habit rows too. */}
-      <div
-        className={`fixed inset-y-0 right-0 z-50 w-80 max-w-[85vw] bg-bg border-l border-border flex flex-col lg:hidden transition-transform duration-200 ${
-          habitsDrawerOpen ? "translate-x-0" : "translate-x-full"
-        }`}
-      >
-        <div className="flex items-center justify-end px-3 py-3 border-b border-border">
-          <button
-            onClick={() => setHabitsDrawerOpen(false)}
-            aria-label="Close habits"
-            className="flex items-center justify-center p-2 text-zinc-600 hover:text-text-primary cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 rounded"
-          >
-            <X size={20} aria-hidden="true" />
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-4">
-          <HabitsPanel habits={habits} pendingCheckIns={pendingCheckIns} onCheckInToggle={handleCheckInToggle} />
-        </div>
       </div>
     </div>
   );
