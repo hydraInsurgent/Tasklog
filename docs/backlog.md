@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| _(none active)_ | | | |
+| P77-time-tracking.md | #77 | feature/time-tracking-#77 | In Progress |
 
 ---
 
