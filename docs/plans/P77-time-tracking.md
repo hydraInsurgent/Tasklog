@@ -1,6 +1,6 @@
 # Time Tracking - Plan (#77)
 
-**Overall Progress:** `0%`
+**Overall Progress:** `100%`
 
 ## TLDR
 Toggl-style time tracking tied to each task. A per-task play/stop control logs work intervals; a floating bar shows the running timer with live elapsed time; a timeline dashboard (`/time`) renders those intervals as project-colored blocks on a vertical hour axis, with a day/week toggle, date navigation, and click-to-add / click-to-edit. Time entries are stored as start/stop intervals (one row each), and projects gain a color so blocks are colored.
@@ -78,44 +78,54 @@ Toggl-style time tracking tied to each task. A per-task play/stop control logs w
 
 ## Tasks
 
-- [ ] 🟥 **Step 1: Backend schema - TimeEntry + Project.Color + migration** `[sequential]` → delivers: the data model both backend slices build on
-  - [ ] 🟥 `Models/TimeEntry.cs`: `Id`, `TaskId` (FK, cascade), `StartedAt`, `EndedAt` (nullable = running), `CreatedAt`; nav back to task. `[NotMapped] DurationSeconds` getter (EndedAt ?? now - StartedAt) for response convenience
-  - [ ] 🟥 Add `Color` (string, nullable hex like `#RRGGBB`) to `Models/Project.cs`
-  - [ ] 🟥 DbContext: `DbSet<TimeEntry>`; index on `EndedAt` (active lookup) + `TaskId`
-  - [ ] 🟥 One EF migration (`AddTimeTrackingAndProjectColor`); verify nullable column + new table, existing rows unaffected; apply to dev DB
+- [x] 🟩 **Step 1: Backend schema - TimeEntry + Project.Color + migration** `[sequential]` → delivers: the data model both backend slices build on
+  - [x] 🟩 `Models/TimeEntry.cs`: Id, TaskId (FK cascade), StartedAt, EndedAt (null=running), CreatedAt, [JsonIgnore] back-nav, `[NotMapped] DurationSeconds`
+  - [x] 🟩 Added nullable `Color` to `Models/Project.cs`
+  - [x] 🟩 DbContext: `DbSet<TimeEntry>` + cascade config + index on EndedAt + TaskId
+  - [x] 🟩 Migration `AddTimeTrackingAndProjectColor` (new table + nullable Color column) applied to dev DB
 
-- [ ] 🟥 **Step 2: Backend - TimeEntriesController + TimeSummary helper** `[parallel]` → delivers: the time-tracking API (depends on Step 1; independent file from Step 3)
-  - [ ] 🟥 `Services/TimeSummary.cs` (pure): duration of an interval (open => to `now`), group intervals into per-day totals over a date range, split a midnight-crossing interval into per-day minutes
-  - [ ] 🟥 `TimeEntriesController`: `POST /api/time-entries/start {taskId}` (auto-stops any running entry first, then opens a new one), `POST /api/time-entries/{id}/stop`, `POST /api/time-entries` (manual add `{taskId, startedAt, endedAt}`, 400 if end<=start), `PATCH /api/time-entries/{id}` (edit start/end), `DELETE /api/time-entries/{id}`, `GET /api/time-entries?from&to` (range, for the timeline), `GET /api/time-entries/active` (the running one or null)
-  - [ ] 🟥 Validation: task must exist; only one running entry ever; edit/manual require end>start
+- [x] 🟩 **Step 2: Backend - TimeEntriesController** `[parallel]` → delivers: the time-tracking API
+  - [x] 🟩 DEVIATION: dropped the backend `TimeSummary` helper - the timeline is the only consumer and it needs raw entries to render blocks anyway, so per-day/split math lives FRONTEND (`lib/time.ts`, Step 7). Backend stays thin (CRUD + range query); no dead code.
+  - [x] 🟩 `TimeEntriesController`: `start` (auto-stops any running, then opens), `{id}/stop` (idempotent), `POST` manual add (400 end<=start), `PATCH {id}` (edit bounds, present-key), `DELETE {id}`, `GET ?from&to` (OVERLAP filter so overnight timers show), `GET /active`. Responses projected with taskTitle + projectColor (self-contained timeline)
+  - [x] 🟩 Validation: task exists (404); single running invariant via StopAllRunning on start; edit/manual require end>start
 
-- [ ] 🟥 **Step 3: Backend - Project color** `[parallel]` → delivers: project create/edit carries a color (depends on Step 1; independent file from Step 2)
-  - [ ] 🟥 `ProjectsController` create + update accept optional `color` (validate `#RRGGBB` or null); responses include it
-  - [ ] 🟥 Confirm project responses everywhere serialize `Color`
+- [x] 🟩 **Step 3: Backend - Project color** `[parallel]` → delivers: project create/edit carries a color
+  - [x] 🟩 `ProjectsController` create + rename accept optional `color` (validated `#RRGGBB` or null); `Project.Color` serializes on all project responses. Backend builds clean.
 
-- [ ] 🟥 **Step 4: Frontend - api layer + duration helper** `[sequential]` → depends on: Steps 2, 3
-  - [ ] 🟥 `lib/api.ts`: `TimeEntry` type; `startTimer(taskId)`, `stopTimer(id)`, `addTimeEntry(...)`, `updateTimeEntry(id, {startedAt?, endedAt?})`, `deleteTimeEntry(id)`, `getTimeEntries(from, to)`, `getActiveTimeEntry()`; add `color` to `Project` + thread through `createProject`/`renameProject`
-  - [ ] 🟥 `lib/format.ts`: `formatDuration(seconds)` -> "1h 23m" / "12m" / "0:42"; `formatClock(seconds)` -> "H:MM:SS" for the live bar
+- [x] 🟩 **Step 4: Frontend - api layer + duration helper** `[sequential]` → depends on: Steps 2, 3
+  - [x] 🟩 `lib/api.ts`: `TimeEntry` type + `startTimer`/`stopTimer`/`addTimeEntry`/`updateTimeEntry`/`deleteTimeEntry`/`getTimeEntries`/`getActiveTimeEntry`; `color` on `Project` + threaded through `createProject`/`renameProject`
+  - [x] 🟩 `lib/format.ts`: `formatDuration(seconds)` ("1h 23m"/"23m") + `formatClock(seconds)` ("H:MM:SS"); project-literal test fixtures updated for the new `color` field; typecheck clean
 
-- [ ] 🟥 **Step 5: Frontend - live timer (context + bar + per-task control)** `[UI]` `[parallel]` → delivers: start/stop anywhere + a live floating bar (depends on Step 4; parallel with Step 6)
-  - [ ] 🟥 `TimeTrackingContext`: holds the active entry + `nowMs` (1s `setInterval`, runs only while active); `start(taskId)` (optimistic, calls api, auto-stop handled server-side), `stop()`; rehydrates via `getActiveTimeEntry()` on mount
-  - [ ] 🟥 `TimerControl` component (play when idle / stop + live elapsed when running) wired into the task list rows, `TaskCard`, board card, and the task detail page
-  - [ ] 🟥 `TrackingBar` (fixed bottom): running task title + live `formatClock` elapsed + stop button; renders nothing when idle; mount the provider + bar in the app layout
+- [x] 🟩 **Step 5: Frontend - live timer (context + bar + per-task control)** `[UI]` `[parallel]` → delivers: start/stop anywhere + a live floating bar
+  - [x] 🟩 `contexts/TimeTrackingContext.tsx`: active entry + `nowMs` (1s interval only while active) + start/stop (auto-stop server-side) + rehydrate via `getActiveTimeEntry()` on mount; an in-flight ref guards double-clicks
+  - [x] 🟩 `TimerControl` (hover-reveal Play / green Stop + live `formatClock`; `alwaysVisible` for the detail page) wired into list rows (tr now `group`), `TaskCard`, `BoardCard`, detail page
+  - [x] 🟩 `TrackingBar` (mobile full-width / desktop pill) mounted with the provider in `layout.tsx`; nothing when idle
 
-- [ ] 🟥 **Step 6: Frontend - project color UI + nav** `[UI]` `[parallel]` → delivers: pick a project color + reach the timeline (depends on Step 4; parallel with Step 5)
-  - [ ] 🟥 Curated color palette + a small swatch picker on project create + the Edit Project modal (`ProjectSidebar`); show a project color dot in the sidebar and on the board/grouping
-  - [ ] 🟥 A "Time" nav link (sidebar) to `/time`
+- [x] 🟩 **Step 6: Frontend - project color UI + nav** `[UI]` `[parallel]` → delivers: pick a project color + reach the timeline
+  - [x] 🟩 `ProjectColorPicker` (16 curated swatches + None + `react-colorful` custom hex) on project create + Edit Project modal; color dot in sidebar rows + board project-column headers (`BoardColumn.accentColor`)
+  - [x] 🟩 "Time" nav link (Clock) to `/time` in the sidebar; create/edit handlers thread `color` through. Typecheck clean.
 
-- [ ] 🟥 **Step 7: Frontend - timeline dashboard `/time`** `[UI]` `[sequential]` → depends on: Steps 4, 5, 6
-  - [ ] 🟥 `/time` page: day ⇄ week toggle, date arrows + a date jump, "today" reset
-  - [ ] 🟥 Hour-grid timeline: vertical 00:00-23:00 axis, day column(s), project-colored blocks (`top`/`height` from interval math), description + time on the block, today tint, red "now" line, the running entry as a live-growing block; midnight-crossing intervals split across columns
-  - [ ] 🟥 Click empty slot -> add-entry form (pick task; start/end prefilled from the slot); click a block -> edit start/end/task or delete
-  - [ ] 🟥 Per-day total header + a per-task breakdown for the visible range (via `TimeSummary`-shaped client math)
+- [x] 🟩 **Step 7: Frontend - timeline dashboard `/time`** `[UI]` `[sequential]` → depends on: Steps 4, 5, 6
+  - [x] 🟩 `app/time/page.tsx` (shell) + `TimelineView`: day/week toggle (mobile forces day), `< Today >` + date jump
+  - [x] 🟩 Hour-grid timeline: 00:00-23:00 axis, day column(s), project-colored blocks (top/height from `lib/time` math; pastel fill + 3px saturated edge), description + time, today tint, red now-line, running entry grows live (off the context tick), midnight split per column
+  - [x] 🟩 Click empty slot -> inline add popover (task picker + start/end prefilled +30m); click a block -> edit/delete (running entry is bar-controlled)
+  - [x] 🟩 Per-range total header + "By task" breakdown via `lib/time` (`dayTotalSeconds`/`perTaskTotals`)
 
-- [ ] 🟥 **Step 8: Tests + verification** `[sequential]` → depends on: Steps 1-7
-  - [ ] 🟥 Backend: `TimeSummary` (duration of open interval, per-day grouping, midnight split) + `TimeEntriesController` (auto-stop-on-start, single-running invariant, manual end<=start 400, edit/delete) + project-color validation
-  - [ ] 🟥 Frontend: `formatDuration`/`formatClock`; timeline block-position math; a context start/stop test
-  - [ ] 🟥 All suites green; browser smoke (Playwright): start a timer (bar appears + ticks), start a second task (first auto-stops), open `/time` and see the blocks in day + week, add + edit + delete an entry
+- [x] 🟩 **Step 8: Tests + verification** `[sequential]` → depends on: Steps 1-7
+  - [x] 🟩 Backend: `TimeEntriesControllerTests` (auto-stop-on-start, single-running, manual end<=start 400, edit/delete, overlap range) + project-color validation tests. 285 pass (was 270).
+  - [x] 🟩 Frontend: `lib/time` math (`daySegment`/split/min-height/`secondsOnDay`/`perTaskTotals`/`mondayOf`/`dayColumns`) + `formatDuration`/`formatClock`. 155 pass (was 143). MCP untouched (101).
+  - [x] 🟩 Browser smoke (Playwright): start timer -> bar; start 2nd task -> 1st auto-stops (server confirmed single running); `/time` renders blocks in week + day; add popover opens prefilled; stop clears the bar; 0 console errors. Screenshots captured.
 
 ## Outcomes
-<!-- Fill in after execution: decision-relevant deltas only. -->
+
+Built as planned. Deltas/decisions made during execution:
+
+- **Backend `TimeSummary` helper dropped** - the timeline (the only consumer) needs raw entries to render blocks anyway, so the per-day/split/total math lives in the **frontend `lib/time.ts`** (pure, unit-tested). Backend stays thin: CRUD + an overlap range query. No dead code.
+- **`/api/time-entries/active` returns 204 when idle** (ASP.NET serializes `Ok(null)` as No Content); `getActiveTimeEntry` handles 204/empty body -> null.
+- **`useTimeTracking` degrades to a no-op default outside its provider** (instead of throwing) so component unit tests (TaskCard/BoardCard) render in isolation. The provider is mounted at the app root, so real usage always gets the live value.
+- **TrackingBar desktop pill moved to bottom-LEFT** - the browser smoke caught it colliding with the user's Doppel widget (bottom-right), which intercepted the stop click. Mobile stays full-width bottom.
+- **New runtime dep `react-colorful`** (~3KB, zero-dep) for the project color custom-hex picker - 2nd frontend runtime dep after chrono-node; scoped to the picker.
+- **`Project.Color` sub-feature** shipped alongside (needed for block colors): nullable column, curated 16-swatch palette + custom hex, sidebar/board color dots.
+- **New frontend pattern:** a 1-second-tick context (`TimeTrackingContext`) distinct from `usePolling`'s 30s background refresh - to note in engineering-guidelines at `/document`.
+- **Tests:** backend 270 -> 285, frontend 143 -> 155; MCP untouched at 101 (time tools deferred). Browser smoke verified start/auto-stop/bar + timeline (week+day) + add popover + stop, 0 console errors.
+- **Carries the unreleased #76 sidebar commit** (this branch was cut after it), so they ship together.

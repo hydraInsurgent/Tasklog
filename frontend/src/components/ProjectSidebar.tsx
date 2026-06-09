@@ -3,16 +3,17 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Pencil, Trash2, Plus, Tag } from "lucide-react";
+import { Pencil, Trash2, Plus, Tag, Clock } from "lucide-react";
 import { Project, Habit } from "@/lib/api";
 import SidebarHabits from "./SidebarHabits";
+import ProjectColorPicker from "./ProjectColorPicker";
 
 interface Props {
   projects: Project[];
   activeView: "all" | "inbox" | number;
   onSelectView: (view: "all" | "inbox" | number) => void;
-  onCreateProject: (name: string) => Promise<void>;
-  onEditProject: (id: number, name: string) => Promise<void>;
+  onCreateProject: (name: string, color?: string | null) => Promise<void>;
+  onEditProject: (id: number, name: string, color?: string | null) => Promise<void>;
   onDeleteProject: (id: number) => Promise<void>;
   // Habits shown as a compact check-in section below "Add project" (#76).
   habits?: Habit[];
@@ -40,9 +41,11 @@ export default function ProjectSidebar({
   const pathname = usePathname();
   const [showNewInput, setShowNewInput] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
+  const [newProjectColor, setNewProjectColor] = useState<string | null>(null);
   const [editingProject, setEditingProject] = useState<{
     id: number;
     name: string;
+    color: string | null;
   } | null>(null);
   const [deletingProject, setDeletingProject] = useState<{
     id: number;
@@ -55,8 +58,9 @@ export default function ProjectSidebar({
     const trimmed = newProjectName.trim();
     if (!trimmed) return;
     try {
-      await onCreateProject(trimmed);
+      await onCreateProject(trimmed, newProjectColor);
       setNewProjectName("");
+      setNewProjectColor(null);
       setShowNewInput(false);
     } catch {
       // Parent handles feedback.
@@ -64,10 +68,10 @@ export default function ProjectSidebar({
   }
 
   // Wrap edit with pending state management.
-  async function handleEdit(id: number, name: string) {
+  async function handleEdit(id: number, name: string, color: string | null) {
     setPendingId(id);
     try {
-      await onEditProject(id, name);
+      await onEditProject(id, name, color);
       setEditingProject(null);
     } catch {
       // Parent handles feedback.
@@ -128,15 +132,21 @@ export default function ProjectSidebar({
             >
               <button
                 onClick={() => onSelectView(project.id)}
-                className="flex-1 text-left text-sm px-4 py-2 cursor-pointer"
+                className="flex-1 flex items-center gap-2 text-left text-sm px-4 py-2 cursor-pointer"
               >
+                {/* Project color dot (#77); a hollow ring when no color is set. */}
+                <span
+                  className="w-2.5 h-2.5 rounded-full shrink-0 border border-border"
+                  style={project.color ? { backgroundColor: project.color, borderColor: project.color } : undefined}
+                  aria-hidden="true"
+                />
                 {project.name}
               </button>
 
               {/* Edit button */}
               <button
                 onClick={() =>
-                  setEditingProject({ id: project.id, name: project.name })
+                  setEditingProject({ id: project.id, name: project.name, color: project.color })
                 }
                 aria-label={`Edit project: ${project.name}`}
                 className="opacity-0 group-hover:opacity-100 flex items-center justify-center min-w-[44px] min-h-[44px] text-text-muted hover:text-text-primary focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 rounded transition-colors duration-150 cursor-pointer"
@@ -171,33 +181,48 @@ export default function ProjectSidebar({
           Labels
         </Link>
 
+        {/* Time tracking timeline (#77) */}
+        <Link
+          href="/time"
+          className={`flex items-center gap-2 w-full text-left text-sm px-4 py-2 transition-colors duration-150 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent ${
+            pathname === "/time" ? activeNavClass : inactiveNavClass
+          }`}
+        >
+          <Clock size={16} aria-hidden="true" />
+          Time
+        </Link>
+
         <hr className="my-3 border-border" />
 
-        {/* Inline new project input */}
+        {/* Inline new project input + color picker (#77) */}
         {showNewInput && (
-          <div className="px-4 mt-2 flex items-center gap-2">
-            <input
-              autoFocus
-              type="text"
-              value={newProjectName}
-              onChange={(e) => setNewProjectName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleCreate();
-                if (e.key === "Escape") {
-                  setShowNewInput(false);
-                  setNewProjectName("");
-                }
-              }}
-              placeholder="Project name"
-              className="flex-1 px-3 py-2 border border-border rounded-md text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-            />
-            <button
-              onClick={handleCreate}
-              disabled={!newProjectName.trim()}
-              className="px-2 py-2 text-xs bg-primary text-white rounded-md hover:bg-primary-hover disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1"
-            >
-              Save
-            </button>
+          <div className="px-4 mt-2 space-y-2">
+            <div className="flex items-center gap-2">
+              <input
+                autoFocus
+                type="text"
+                value={newProjectName}
+                onChange={(e) => setNewProjectName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleCreate();
+                  if (e.key === "Escape") {
+                    setShowNewInput(false);
+                    setNewProjectName("");
+                    setNewProjectColor(null);
+                  }
+                }}
+                placeholder="Project name"
+                className="flex-1 px-3 py-2 border border-border rounded-md text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+              />
+              <button
+                onClick={handleCreate}
+                disabled={!newProjectName.trim()}
+                className="px-2 py-2 text-xs bg-primary text-white rounded-md hover:bg-primary-hover disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1"
+              >
+                Save
+              </button>
+            </div>
+            <ProjectColorPicker value={newProjectColor} onChange={setNewProjectColor} />
           </div>
         )}
 
@@ -230,7 +255,7 @@ export default function ProjectSidebar({
       {editingProject && (
         <EditProjectModal
           project={editingProject}
-          onSave={(name) => handleEdit(editingProject.id, name)}
+          onSave={(name, color) => handleEdit(editingProject.id, name, color)}
           onCancel={() => setEditingProject(null)}
         />
       )}
@@ -257,11 +282,12 @@ function EditProjectModal({
   onSave,
   onCancel,
 }: {
-  project: { id: number; name: string };
-  onSave: (name: string) => void;
+  project: { id: number; name: string; color: string | null };
+  onSave: (name: string, color: string | null) => void;
   onCancel: () => void;
 }) {
   const [name, setName] = useState(project.name);
+  const [color, setColor] = useState<string | null>(project.color);
 
   return (
     <div
@@ -284,11 +310,16 @@ function EditProjectModal({
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && name.trim()) onSave(name.trim());
+            if (e.key === "Enter" && name.trim()) onSave(name.trim(), color);
             if (e.key === "Escape") onCancel();
           }}
           className="w-full px-3 py-2 border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent mb-4"
         />
+        {/* Project color (#77) */}
+        <div className="mb-4">
+          <p className="text-xs font-medium text-text-muted mb-2">Color</p>
+          <ProjectColorPicker value={color} onChange={setColor} />
+        </div>
         <div className="flex gap-2 justify-end">
           <button
             onClick={onCancel}
@@ -297,7 +328,7 @@ function EditProjectModal({
             Cancel
           </button>
           <button
-            onClick={() => name.trim() && onSave(name.trim())}
+            onClick={() => name.trim() && onSave(name.trim(), color)}
             disabled={!name.trim()}
             className="px-4 py-2 text-sm bg-primary text-white rounded-md hover:bg-primary-hover disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1"
           >

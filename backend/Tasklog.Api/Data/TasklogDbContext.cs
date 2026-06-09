@@ -12,6 +12,7 @@ namespace Tasklog.Api.Data
         public DbSet<Label> Labels => Set<Label>();
         public DbSet<TaskComment> Comments => Set<TaskComment>();
         public DbSet<CheckIn> CheckIns => Set<CheckIn>();
+        public DbSet<TimeEntry> TimeEntries => Set<TimeEntry>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -46,6 +47,17 @@ namespace Tasklog.Api.Data
             modelBuilder.Entity<CheckIn>()
                 .HasIndex(c => new { c.TaskId, c.CheckInDate })
                 .IsUnique();
+
+            // Time-tracking intervals cascade-delete with the task. Index on EndedAt makes
+            // "find the running timer" (EndedAt == null) cheap; index on TaskId speeds the
+            // per-task totals + the timeline's date-range scan (#77).
+            modelBuilder.Entity<TimeEntry>()
+                .HasOne(e => e.Task)
+                .WithMany(t => t.TimeEntries)
+                .HasForeignKey(e => e.TaskId)
+                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<TimeEntry>().HasIndex(e => e.EndedAt);
+            modelBuilder.Entity<TimeEntry>().HasIndex(e => e.TaskId);
         }
     }
 }

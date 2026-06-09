@@ -9,6 +9,8 @@ export interface BoardColumn {
   label: string;
   // Token color class for the column header accent bar (e.g. "bg-danger").
   accent: string;
+  // For project columns: the project's own color hex, rendered inline over `accent` (#77).
+  accentColor?: string;
   tasks: Task[];
 }
 
@@ -63,7 +65,7 @@ export function groupTasksForBoard(tasks: Task[], groupBy: GroupBy, projects: Pr
   if (inbox.length > 0) cols.push({ key: "inbox", label: "Inbox", accent: "bg-text-muted", tasks: inbox });
   for (const p of projects) {
     const ts = sorted.filter((t) => t.projectId === p.id);
-    if (ts.length > 0) cols.push({ key: `proj-${p.id}`, label: p.name, accent: "bg-accent", tasks: ts });
+    if (ts.length > 0) cols.push({ key: `proj-${p.id}`, label: p.name, accent: "bg-accent", accentColor: p.color ?? undefined, tasks: ts });
   }
   return cols;
 }

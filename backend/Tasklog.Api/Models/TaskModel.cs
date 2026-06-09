@@ -64,6 +64,12 @@ namespace Tasklog.Api.Models
         [JsonIgnore]
         public ICollection<CheckIn> CheckIns { get; set; } = new List<CheckIn>();
 
+        // Tracked work intervals for this task (#77). [JsonIgnore] so they never bloat task
+        // responses - they are read via the /api/time-entries endpoints. The nav exists for
+        // the cascade FK.
+        [JsonIgnore]
+        public ICollection<TimeEntry> TimeEntries { get; set; } = new List<TimeEntry>();
+
         // Read-only convenience flag: whether this task repeats. [NotMapped] so EF ignores
         // it (it is derived from Recurrence) while System.Text.Json still serializes it,
         // mirroring DueStatus - clients get `isRecurring` on every task with no extra wiring.

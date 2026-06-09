@@ -9,6 +9,7 @@ import { formatDate, formatDeadline, deadlineColorClass, projectName, labelColor
 import TaskCard from "./TaskCard";
 import TaskSheet from "./TaskSheet";
 import TaskDoneControl from "./TaskDoneControl";
+import TimerControl from "./TimerControl";
 import BoardView from "./BoardView";
 import DeadlinePopover from "./DeadlinePopover";
 import BulkActionsBar from "./BulkActionsBar";
@@ -623,7 +624,7 @@ export default function TasksClient({
                   return (
                     <tr
                       key={task.id}
-                      className={`hover:bg-surface-raised transition-colors duration-150${
+                      className={`group hover:bg-surface-raised transition-colors duration-150${
                         isHiding ? " transition-all duration-300 opacity-0 translate-y-1" : ""
                       }${isCompletedAndVisible ? " opacity-50" : ""}`}
                     >
@@ -738,9 +739,10 @@ export default function TasksClient({
                         )}
                       </td>
 
-                      {/* Edit + Delete actions */}
+                      {/* Edit + Delete actions (+ a hover-reveal timer play/stop, #77) */}
                       <td className="px-6 py-4">
-                        <div className="flex items-center">
+                        <div className="flex items-center gap-1">
+                          <TimerControl task={task} />
                           <button
                             onClick={() => setEditingTask(task)}
                             aria-label={`Edit task: ${task.title}`}

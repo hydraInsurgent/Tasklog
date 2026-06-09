@@ -22,6 +22,9 @@ function getApiUrl(): string {
 export interface Project {
   id: number;
   name: string;
+  // Optional display color, a "#RRGGBB" hex string or null (#77). Drives timeline block
+  // colors and a sidebar dot.
+  color: string | null;
   createdAt: string; // ISO 8601 datetime string
 }
 
@@ -276,23 +279,24 @@ export async function getProjects(): Promise<Project[]> {
   return res.json();
 }
 
-// POST /api/projects - create a new project. Returns the created project.
-export async function createProject(name: string): Promise<Project> {
+// POST /api/projects - create a new project (with optional color). Returns it.
+export async function createProject(name: string, color?: string | null): Promise<Project> {
   const res = await fetch(`${getApiUrl()}/api/projects`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, color: color ?? null }),
   });
   if (!res.ok) throw new Error("Failed to create project.");
   return res.json();
 }
 
-// PATCH /api/projects/:id - rename a project. Returns the updated project.
-export async function renameProject(id: number, name: string): Promise<Project> {
+// PATCH /api/projects/:id - rename a project and/or set its color. A non-null color sets it;
+// null leaves the existing color unchanged (clearing isn't an exposed flow). Returns it.
+export async function renameProject(id: number, name: string, color?: string | null): Promise<Project> {
   const res = await fetch(`${getApiUrl()}/api/projects/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, color: color ?? null }),
   });
   if (!res.ok) throw new Error(`Failed to rename project ${id}.`);
   return res.json();
@@ -364,4 +368,91 @@ export async function updateLabel(id: number, name: string, colorIndex: number):
 export async function deleteLabel(id: number): Promise<void> {
   const res = await fetch(`${getApiUrl()}/api/labels/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error(`Failed to delete label ${id}.`);
+}
+
+// --- Time tracking (#77) ---------------------------------------------------
+
+// One tracked interval, as returned by the time-entry endpoints. Denormalized with the
+// task title + project color so the timeline can render a block without a second lookup.
+// endedAt null = the entry is still running. Times are local ISO strings.
+export interface TimeEntry {
+  id: number;
+  taskId: number;
+  taskTitle: string;
+  projectId: number | null;
+  projectColor: string | null;
+  startedAt: string;
+  endedAt: string | null;
+  durationSeconds: number;
+}
+
+async function timeEntryOrThrow(res: Response, fallback: string): Promise<TimeEntry> {
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.message ?? fallback);
+  }
+  return res.json();
+}
+
+// GET /api/time-entries?from&to - entries overlapping the [from, to) window (ISO strings).
+export async function getTimeEntries(from: string, to: string): Promise<TimeEntry[]> {
+  const qs = `?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+  const res = await fetch(`${getApiUrl()}/api/time-entries${qs}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Failed to fetch time entries.");
+  return res.json();
+}
+
+// GET /api/time-entries/active - the running entry, or null. A 204 (and an empty body) both
+// mean "no timer running" - guard against them so res.json() doesn't choke on no content.
+export async function getActiveTimeEntry(): Promise<TimeEntry | null> {
+  const res = await fetch(`${getApiUrl()}/api/time-entries/active`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Failed to fetch the active timer.");
+  if (res.status === 204) return null;
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
+// POST /api/time-entries/start - start tracking a task (auto-stops any running timer).
+export async function startTimer(taskId: number): Promise<TimeEntry> {
+  const res = await fetch(`${getApiUrl()}/api/time-entries/start`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ taskId }),
+  });
+  return timeEntryOrThrow(res, "Failed to start the timer.");
+}
+
+// POST /api/time-entries/:id/stop - stop a running entry.
+export async function stopTimer(id: number): Promise<TimeEntry> {
+  const res = await fetch(`${getApiUrl()}/api/time-entries/${id}/stop`, { method: "POST" });
+  return timeEntryOrThrow(res, "Failed to stop the timer.");
+}
+
+// POST /api/time-entries - log a manual (retroactive) interval. Times are ISO strings.
+export async function addTimeEntry(taskId: number, startedAt: string, endedAt: string): Promise<TimeEntry> {
+  const res = await fetch(`${getApiUrl()}/api/time-entries`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ taskId, startedAt, endedAt }),
+  });
+  return timeEntryOrThrow(res, "Failed to add the time entry.");
+}
+
+// PATCH /api/time-entries/:id - edit an entry's start and/or end (ISO strings).
+export async function updateTimeEntry(
+  id: number,
+  fields: { startedAt?: string; endedAt?: string },
+): Promise<TimeEntry> {
+  const res = await fetch(`${getApiUrl()}/api/time-entries/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(fields),
+  });
+  return timeEntryOrThrow(res, "Failed to update the time entry.");
+}
+
+// DELETE /api/time-entries/:id - delete a logged interval.
+export async function deleteTimeEntry(id: number): Promise<void> {
+  const res = await fetch(`${getApiUrl()}/api/time-entries/${id}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(`Failed to delete time entry ${id}.`);
 }

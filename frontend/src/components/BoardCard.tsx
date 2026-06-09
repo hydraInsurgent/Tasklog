@@ -9,6 +9,7 @@ import { Trash2, Loader2, Flame } from "lucide-react";
 import { Task, Project, Habit } from "@/lib/api";
 import { priorityMeta, formatDeadline, deadlineColorClass, labelColor } from "@/lib/format";
 import TaskDoneControl from "./TaskDoneControl";
+import TimerControl from "./TimerControl";
 import RecurringBadge from "./RecurringBadge";
 
 // Background tint by due urgency (only while not completed). Overdue red, today amber.
@@ -82,6 +83,10 @@ export default function BoardCard({
             {meta.label}
           </span>
         )}
+        {/* Timer play/stop (#77) - hover-reveal (running stays visible). */}
+        <span className="shrink-0">
+          <TimerControl task={task} />
+        </span>
       </div>
 
       {/* Row 2: habit/recurring glyphs + labels + deadline */}

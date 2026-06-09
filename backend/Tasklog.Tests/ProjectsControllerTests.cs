@@ -173,4 +173,47 @@ public class ProjectsControllerTests
         context.Tasks.Should().HaveCount(1);
         context.Tasks.Single().Title.Should().Be("Inbox task");
     }
+
+    // --- Color (#77) ---
+
+    [Fact]
+    public async Task Create_WithValidColor_StoresIt()
+    {
+        using var context = CreateContext();
+        var controller = new ProjectsController(context);
+
+        var result = await controller.Create(new ProjectNameRequest("Work", "#3B82F6"));
+
+        var project = result.Should().BeOfType<CreatedAtActionResult>().Subject
+            .Value.Should().BeOfType<Project>().Subject;
+        project.Color.Should().Be("#3B82F6");
+    }
+
+    [Theory]
+    [InlineData("blue")]
+    [InlineData("#FFF")]
+    [InlineData("#1234ZZ")]
+    public async Task Create_WithInvalidColor_Returns400(string color)
+    {
+        using var context = CreateContext();
+        var controller = new ProjectsController(context);
+
+        var result = await controller.Create(new ProjectNameRequest("Work", color));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task Rename_WithColor_UpdatesColor()
+    {
+        using var context = CreateContext();
+        var project = new Project { Name = "Work", CreatedAt = DateTime.UtcNow };
+        context.Projects.Add(project);
+        await context.SaveChangesAsync();
+        var controller = new ProjectsController(context);
+
+        await controller.Rename(project.Id, new ProjectNameRequest("Work", "#22C55E"));
+
+        (await context.Projects.FindAsync(project.Id))!.Color.Should().Be("#22C55E");
+    }
 }

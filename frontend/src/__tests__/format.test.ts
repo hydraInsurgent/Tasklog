@@ -1,4 +1,22 @@
-import { deadlineColorClass, formatDate, formatDeadline, hasTimeComponent, projectName, priorityMeta, PRIORITY_OPTIONS, describeRecurrence, lastNDays } from '@/lib/format'
+import { deadlineColorClass, formatDate, formatDeadline, hasTimeComponent, projectName, priorityMeta, PRIORITY_OPTIONS, describeRecurrence, lastNDays, formatDuration, formatClock } from '@/lib/format'
+
+describe('formatDuration', () => {
+  it('formats hours and minutes', () => {
+    expect(formatDuration(0)).toBe('0m')
+    expect(formatDuration(23 * 60)).toBe('23m')
+    expect(formatDuration(3600)).toBe('1h')
+    expect(formatDuration(83 * 60)).toBe('1h 23m')
+    expect(formatDuration(59)).toBe('0m') // sub-minute rounds down
+  })
+})
+
+describe('formatClock', () => {
+  it('formats a live clock', () => {
+    expect(formatClock(0)).toBe('0:00')
+    expect(formatClock(65)).toBe('1:05')
+    expect(formatClock(3661)).toBe('1:01:01')
+  })
+})
 
 describe('deadlineColorClass', () => {
   beforeEach(() => {

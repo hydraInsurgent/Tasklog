@@ -9,6 +9,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import DeleteTaskButton from "@/components/DeleteTaskButton";
 import CompleteTaskButton from "@/components/CompleteTaskButton";
+import TimerControl from "@/components/TimerControl";
 import AssignProjectButton from "@/components/AssignProjectButton";
 import AssignLabelsButton from "@/components/AssignLabelsButton";
 import TaskComments from "@/components/TaskComments";
@@ -160,13 +161,14 @@ export default async function TaskDetailPage({ params }: PageProps) {
           </div>
         </dl>
 
-        {/* Complete/incomplete toggle and delete actions. Both are Client Components. */}
+        {/* Complete/incomplete toggle, timer, and delete actions. All Client Components. */}
         <div className="px-6 py-5 border-t border-border flex items-center gap-3">
           <CompleteTaskButton
             taskId={task.id}
             taskTitle={task.title}
             isCompleted={task.isCompleted}
           />
+          <TimerControl task={task} alwaysVisible />
           <DeleteTaskButton taskId={task.id} taskTitle={task.title} />
         </div>
 
