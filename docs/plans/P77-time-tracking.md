@@ -33,6 +33,49 @@ Toggl-style time tracking tied to each task. A per-task play/stop control logs w
 
 <!-- GUIDELINES CHECK: New table (TimeEntry) + new column (Project.Color) - migrations follow existing precedents. New pure helper TimeSummary follows the RecurrenceRule/HabitStreak precedent (no new pattern). NEW frontend pattern: a 1s-tick context (documented in Decision 7) - to be added to engineering-guidelines at /document. NO service layer introduced. PRODUCT SCOPE: time tracking + project colors expand product-design.md (a new capability + a dashboard) - flagged; to be documented at /document. -->
 
+## UI Decisions
+
+> Design tokens and global rules inherited from [UI-SPEC.md](../../UI-SPEC.md). Light mode only (dark deferred). Only feature-specific decisions are recorded here. Visual reference: `docs/research/toggl-timeline-design-2026-06-08.md`.
+
+### Timeline dashboard (`/time`)
+- **Geometry:** absolutely-positioned blocks in an hour grid. `pxPerMin = 0.8` (1 hour = 48px), so `top = startMinutesFromMidnight * 0.8`, `height = max(18, durationMin * 0.8)`. The 18px floor is the tiny-block min height.
+- **Hour axis:** left gutter ~48px; hour labels (`00:00`-`23:00`) in `text-muted` 12px at each hour line; 1px `border-muted` gridline per hour. Opens scrolled to ~07:00; the full 24h scrolls inside its own container (NOT the page).
+- **Blocks:** fill = project color at low alpha + a 3px saturated left edge in the full color (inline `style` with the project hex: `borderLeftColor: hex`, `backgroundColor: hex + '22'`). No-project/Inbox = neutral `border`/`text-muted`. Show description (bold `text-primary`) + `start-end` time; blocks under ~32px show title only with full detail on **hover tooltip**. Click -> the entry popover (edit) with Delete.
+- **Today tint:** today's column background `surface-raised`. **Now line:** 2px `danger` line + a 6px `danger` dot at the left, today column only.
+- **Day/week toggle:** segmented control reusing the #73 list/board toggle style. Week = Mon-Sun columns; Day = single column. **Mobile (<640px) forces Day** with left/right day arrows. Date nav: `< >` arrows + "Today" reset + a date label that opens a date jump.
+- **Midnight-crossing entry:** split into per-day segments, each column clamped to 00:00/24:00.
+
+### Per-task play/stop control (`TimerControl`)
+- **Placement:** hover-reveal on the **right** of a list row near edit/delete; persistent on the currently-running task. Also on `TaskCard`, board card, detail page.
+- **Idle:** Lucide `Play`, `text-muted` -> `accent` on hover, 44px tap target, `aria-label="Start timer for <task>"`.
+- **Running:** Lucide `Square` in `success` green + live `mm:ss` text beside it (icon + text + color), `aria-label="Stop timer"`. Spinner + disabled during the request.
+
+### Floating tracking bar (`TrackingBar`)
+- Fixed bottom; **mobile** full-width with safe-area padding, **desktop** floating pill bottom-right. Clock icon + running task title (truncated) + live `H:MM:SS` (`formatClock`) + a `danger` stop button. Nothing when idle. 150ms fade-in; respects `prefers-reduced-motion`.
+
+### Project color picker
+- **Palette + custom:** popover with ~16 curated muted swatches (not the 10-color label VIBGYOR) + a **Custom** swatch opening **`react-colorful`** (`HexColorPicker`, ~3KB zero-dep) for any hex. Selected = a dot. On project create + Edit Project modal.
+- Project color dot in sidebar project rows + board group headers/cards. Default (none) = neutral.
+
+### Add / edit entry (inline popover)
+- Click empty slot -> popover at the slot: searchable **task** select, **start** + **end** time inputs (prefilled clicked-hour -> +30m), Save / Cancel. Inline `end > start` validation below the field. Click a block opens the same popover prefilled + **Delete**. `<label>`s on all fields.
+
+### UX Rules in scope for this feature
+- [ ] `color-contrast` (CRITICAL) - block text on pastel fill, muted hour labels, elapsed text all >= 4.5:1.
+- [ ] `focus-states` (CRITICAL) - play/stop, toggle, arrows, swatches, popover fields, focusable blocks show the accent ring.
+- [ ] `touch-targets` (CRITICAL) - play/stop, bar-stop, arrows, swatches >= 44px.
+- [ ] `aria-labels` (CRITICAL) - icon-only play/stop/arrows/now get labels.
+- [ ] `loading-states` (HIGH) - timeline fetch + start/stop feedback.
+- [ ] `form-labels` (HIGH) - add-entry popover task/start/end have labels.
+- [ ] `error-placement` (HIGH) - `end <= start` shows inline in the popover.
+- [ ] `color-not-only-indicator` (HIGH) - running = icon + elapsed text, not color alone; blocks carry text.
+- [ ] `no-horizontal-scroll` (HIGH) - week columns scroll inside the timeline container, never the page.
+- [ ] `disable-during-async` (MEDIUM) - start/stop/save disabled in flight.
+- [ ] `cursor-pointer` (MEDIUM) - blocks, swatches, slots clickable.
+- [ ] `animation-duration` (MEDIUM) - 150ms hover/fade; the 1s elapsed tick is data, not animation.
+- [ ] `responsive-breakpoints` (MEDIUM) - timeline at 320/640/768/1024; week->day collapse at 640.
+- [ ] `consistent-icon-sizing` (MEDIUM) - 16px inline (block/bar), 20px buttons.
+
 ## Tasks
 
 - [ ] 🟥 **Step 1: Backend schema - TimeEntry + Project.Color + migration** `[sequential]` → delivers: the data model both backend slices build on
@@ -54,16 +97,16 @@ Toggl-style time tracking tied to each task. A per-task play/stop control logs w
   - [ ] 🟥 `lib/api.ts`: `TimeEntry` type; `startTimer(taskId)`, `stopTimer(id)`, `addTimeEntry(...)`, `updateTimeEntry(id, {startedAt?, endedAt?})`, `deleteTimeEntry(id)`, `getTimeEntries(from, to)`, `getActiveTimeEntry()`; add `color` to `Project` + thread through `createProject`/`renameProject`
   - [ ] 🟥 `lib/format.ts`: `formatDuration(seconds)` -> "1h 23m" / "12m" / "0:42"; `formatClock(seconds)` -> "H:MM:SS" for the live bar
 
-- [ ] 🟥 **Step 5: Frontend - live timer (context + bar + per-task control)** `[parallel]` → delivers: start/stop anywhere + a live floating bar (depends on Step 4; parallel with Step 6)
+- [ ] 🟥 **Step 5: Frontend - live timer (context + bar + per-task control)** `[UI]` `[parallel]` → delivers: start/stop anywhere + a live floating bar (depends on Step 4; parallel with Step 6)
   - [ ] 🟥 `TimeTrackingContext`: holds the active entry + `nowMs` (1s `setInterval`, runs only while active); `start(taskId)` (optimistic, calls api, auto-stop handled server-side), `stop()`; rehydrates via `getActiveTimeEntry()` on mount
   - [ ] 🟥 `TimerControl` component (play when idle / stop + live elapsed when running) wired into the task list rows, `TaskCard`, board card, and the task detail page
   - [ ] 🟥 `TrackingBar` (fixed bottom): running task title + live `formatClock` elapsed + stop button; renders nothing when idle; mount the provider + bar in the app layout
 
-- [ ] 🟥 **Step 6: Frontend - project color UI + nav** `[parallel]` → delivers: pick a project color + reach the timeline (depends on Step 4; parallel with Step 5)
+- [ ] 🟥 **Step 6: Frontend - project color UI + nav** `[UI]` `[parallel]` → delivers: pick a project color + reach the timeline (depends on Step 4; parallel with Step 5)
   - [ ] 🟥 Curated color palette + a small swatch picker on project create + the Edit Project modal (`ProjectSidebar`); show a project color dot in the sidebar and on the board/grouping
   - [ ] 🟥 A "Time" nav link (sidebar) to `/time`
 
-- [ ] 🟥 **Step 7: Frontend - timeline dashboard `/time`** `[sequential]` → depends on: Steps 4, 5, 6
+- [ ] 🟥 **Step 7: Frontend - timeline dashboard `/time`** `[UI]` `[sequential]` → depends on: Steps 4, 5, 6
   - [ ] 🟥 `/time` page: day ⇄ week toggle, date arrows + a date jump, "today" reset
   - [ ] 🟥 Hour-grid timeline: vertical 00:00-23:00 axis, day column(s), project-colored blocks (`top`/`height` from interval math), description + time on the block, today tint, red "now" line, the running entry as a live-growing block; midnight-crossing intervals split across columns
   - [ ] 🟥 Click empty slot -> add-entry form (pick task; start/end prefilled from the slot); click a block -> edit start/end/task or delete
