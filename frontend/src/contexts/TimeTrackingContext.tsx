@@ -7,7 +7,11 @@
  * server-side; we just replace the local active entry. */
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { TimeEntry, getActiveTimeEntry, startTimer, stopTimer } from "@/lib/api";
+import { TimeEntry, createTask, getActiveTimeEntry, startTimer, stopTimer } from "@/lib/api";
+
+// Fired after quickStart creates a task so the task list (TasksClient) refetches and the
+// new task shows immediately, instead of waiting for the 30s poll.
+export const TASKS_CHANGED_EVENT = "tasklog:tasks-changed";
 
 interface TimeTrackingValue {
   active: TimeEntry | null;
@@ -17,6 +21,8 @@ interface TimeTrackingValue {
   pending: boolean;
   isRunning: (taskId: number) => boolean;
   start: (taskId: number) => Promise<void>;
+  // Quick-create an Inbox task from a typed title and immediately start tracking it (#77).
+  quickStart: (title: string) => Promise<void>;
   stop: () => Promise<void>;
 }
 
@@ -29,6 +35,7 @@ const NOOP: TimeTrackingValue = {
   pending: false,
   isRunning: () => false,
   start: async () => {},
+  quickStart: async () => {},
   stop: async () => {},
 };
 
@@ -83,6 +90,24 @@ export function TimeTrackingProvider({ children }: { children: React.ReactNode }
     }
   }, []);
 
+  // Quick-create a task (Inbox) from a title and start its timer in one step. The created
+  // task behaves like any other - it shows in the list and accrues sessions like normal.
+  const quickStart = useCallback(async (title: string) => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setPending(true);
+    try {
+      const task = await createTask(title.trim() || "Untitled");
+      const entry = await startTimer(task.id); // server auto-stops any previous timer
+      setActive(entry);
+      setNowMs(Date.now());
+      if (typeof window !== "undefined") window.dispatchEvent(new Event(TASKS_CHANGED_EVENT));
+    } finally {
+      setPending(false);
+      inFlight.current = false;
+    }
+  }, []);
+
   const stop = useCallback(async () => {
     if (inFlight.current) return;
     const current = active;
@@ -102,7 +127,7 @@ export function TimeTrackingProvider({ children }: { children: React.ReactNode }
 
   return (
     <TimeTrackingContext.Provider
-      value={{ active, elapsedSeconds, pending, isRunning, start, stop }}
+      value={{ active, elapsedSeconds, pending, isRunning, start, quickStart, stop }}
     >
       {children}
     </TimeTrackingContext.Provider>

@@ -10,6 +10,7 @@ import TaskCard from "./TaskCard";
 import TaskSheet from "./TaskSheet";
 import TaskDoneControl from "./TaskDoneControl";
 import TimerControl from "./TimerControl";
+import { TASKS_CHANGED_EVENT } from "@/contexts/TimeTrackingContext";
 import BoardView from "./BoardView";
 import DeadlinePopover from "./DeadlinePopover";
 import BulkActionsBar from "./BulkActionsBar";
@@ -112,6 +113,13 @@ export default function TasksClient({
 
   useEffect(() => {
     loadTasks();
+  }, [loadTasks]);
+
+  // Refetch when a task is quick-created from the tracking bar (#77), so it appears at once.
+  useEffect(() => {
+    const onTasksChanged = () => loadTasks();
+    window.addEventListener(TASKS_CHANGED_EVENT, onTasksChanged);
+    return () => window.removeEventListener(TASKS_CHANGED_EVENT, onTasksChanged);
   }, [loadTasks]);
 
   // Background polling: refresh tasks and labels every 30 seconds.

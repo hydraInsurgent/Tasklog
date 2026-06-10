@@ -129,3 +129,6 @@ Built as planned. Deltas/decisions made during execution:
 - **New frontend pattern:** a 1-second-tick context (`TimeTrackingContext`) distinct from `usePolling`'s 30s background refresh - to note in engineering-guidelines at `/document`.
 - **Tests:** backend 270 -> 285, frontend 143 -> 155; MCP untouched at 101 (time tools deferred). Browser smoke verified start/auto-stop/bar + timeline (week+day) + add popover + stop, 0 console errors.
 - **Carries the unreleased #76 sidebar commit** (this branch was cut after it), so they ship together.
+
+### Post-plan addition: quick-start tracking (persistent bar)
+On user request, the tracking bar is now **always present** (Toggl-style): when idle it shows a "What are you working on?" input + Start; submitting **quick-creates an Inbox task** with that title and starts its timer in one step (`TimeTrackingContext.quickStart` -> `createTask` + `startTimer`). The new task then behaves like any other - it appears in the list (a `tasklog:tasks-changed` window event makes `TasksClient` refetch immediately) and accrues further sessions via its normal per-task play control. No schema change (it's a real task, not a task-less entry - the user's chosen model). Browser-verified: type a title -> created + tracking + shows in the list with a running row -> stop returns the idle composer.
