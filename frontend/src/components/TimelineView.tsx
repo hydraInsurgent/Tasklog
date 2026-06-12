@@ -11,8 +11,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, ArrowLeft, Loader2, Trash2 } from "lucide-react";
 import {
-  TimeEntry, Task,
-  getTimeEntries, getTasks, addTimeEntry, updateTimeEntry, deleteTimeEntry,
+  TimeEntry, Task, Project,
+  getTimeEntries, getTasks, getProjects, addTimeEntry, updateTimeEntry, deleteTimeEntry,
 } from "@/lib/api";
 import { formatDuration } from "@/lib/format";
 import {
@@ -20,6 +20,7 @@ import {
   daySegment, dayTotalSeconds, perTaskTotals, clockLabel,
 } from "@/lib/time";
 import { useTimeTracking } from "@/contexts/TimeTrackingContext";
+import ColorPickerButton from "@/components/ColorPickerButton";
 
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
 const WEEKDAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -50,9 +51,18 @@ export default function TimelineView() {
   const [anchor, setAnchor] = useState<Date>(() => startOfDay(new Date()));
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [popover, setPopover] = useState<PopoverState | null>(null);
   const [formError, setFormError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [snapMode, setSnapMode] = useState<"5min" | "exact">("5min");
+  // Inbox color: no DB entity for Inbox, so persist to localStorage.
+  const [inboxColor, setInboxColor] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    const v = localStorage.getItem("tasklog:inbox-color");
+    return /^#[0-9a-fA-F]{6}$/.test(v ?? "") ? v : null;
+  });
   const [, setNowTick] = useState(0); // forces a re-render so the now-line stays current
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -70,11 +80,15 @@ export default function TimelineView() {
   const now = new Date();
   const columns = useMemo(() => dayColumns(anchor, effectiveMode), [anchor, effectiveMode]);
   const rangeFrom = columns[0];
-  const rangeTo = addDays(columns[columns.length - 1], 1);
+  // Memoized so `load`'s useCallback dep is stable across re-renders (addDays creates a new
+  // Date on every render otherwise, causing the effect to fire on every 1s tick).
+  const rangeTo = useMemo(() => addDays(columns[columns.length - 1], 1), [columns]);
 
   const load = useCallback(async () => {
     try {
-      const data = await getTimeEntries(rangeFrom.toISOString(), rangeTo.toISOString());
+      // Use local ISO strings (no Z suffix) so the range aligns with the server's local-time
+      // storage - toISOString() would shift the window by the UTC offset on non-UTC machines.
+      const data = await getTimeEntries(`${dateKey(rangeFrom)}T00:00:00`, `${dateKey(rangeTo)}T00:00:00`);
       setEntries(data);
     } catch {
       /* leave prior entries on error */
@@ -88,9 +102,10 @@ export default function TimelineView() {
     load();
   }, [load, active?.id]);
 
-  // Tasks for the add-entry picker.
+  // Tasks and projects for the add-entry picker.
   useEffect(() => {
     getTasks().then(setTasks).catch(() => {});
+    getProjects().then(setProjects).catch(() => {});
   }, []);
 
   // Keep the now-line / running block roughly current even when no timer is ticking.
@@ -109,14 +124,24 @@ export default function TimelineView() {
     setPopover(null);
   }
 
-  // Click an empty slot -> open the add popover prefilled from the clicked time (rounded to 15m).
+  function handleInboxColor(color: string | null) {
+    setInboxColor(color);
+    if (color) localStorage.setItem("tasklog:inbox-color", color);
+    else localStorage.removeItem("tasklog:inbox-color");
+  }
+
+  // Click an empty slot -> open the add popover prefilled from the clicked time.
   function handleColumnClick(e: React.MouseEvent<HTMLDivElement>, day: Date) {
     const rect = e.currentTarget.getBoundingClientRect();
     const y = e.clientY - rect.top;
-    const minutes = Math.max(0, Math.min(DAY_PX, y)) / PX_PER_MIN;
-    const rounded = Math.floor(minutes / 15) * 15;
+    const rawMin = Math.max(0, Math.min(DAY_PX, y)) / PX_PER_MIN;
+    const snap = snapMode === "5min" ? 5 : 1;
+    // Clamp to 23:59 so snapping near midnight doesn't produce a start at 24:00.
+    const rounded = Math.min(Math.round(rawMin / snap) * snap, 1439);
     const startD = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, rounded);
-    const endD = new Date(startD.getTime() + 30 * 60000);
+    // Cap end at 23:59 on the same day (a 30-min default near midnight would otherwise cross).
+    const maxEndMs = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 23, 59).getTime();
+    const endD = new Date(Math.min(startD.getTime() + 30 * 60000, maxEndMs));
     setFormError("");
     setPopover({
       day,
@@ -150,24 +175,47 @@ export default function TimelineView() {
       setFormError("End must be after start.");
       return;
     }
+    // Reject end times more than 5 minutes in the future.
+    if (new Date(endISO).getTime() > Date.now() + 5 * 60000) {
+      setFormError("End time cannot be in the future.");
+      return;
+    }
+    // Warn on overlap with any existing closed entry (not the one being edited).
+    const startMs = new Date(startISO).getTime();
+    const endMs = new Date(endISO).getTime();
+    const editId = popover.entry?.id;
+    const overlaps = entries.some((e) => {
+      if (e.id === editId || !e.endedAt) return false;
+      return startMs < new Date(e.endedAt).getTime() && endMs > new Date(e.startedAt).getTime();
+    });
+    if (overlaps) { setFormError("This entry overlaps an existing one."); return; }
+    setSaving(true);
     try {
-      if (popover.entry) await updateTimeEntry(popover.entry.id, { startedAt: startISO, endedAt: endISO });
-      else await addTimeEntry(popover.taskId as number, startISO, endISO);
+      if (popover.entry) {
+        await updateTimeEntry(popover.entry.id, { startedAt: startISO, endedAt: endISO });
+      } else {
+        await addTimeEntry(popover.taskId as number, startISO, endISO);
+      }
       setPopover(null);
       await load();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Save failed.");
+    } finally {
+      setSaving(false);
     }
   }
 
   async function removeEntry() {
     if (!popover?.entry) return;
+    setSaving(true);
     try {
       await deleteTimeEntry(popover.entry.id);
       setPopover(null);
       await load();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Delete failed.");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -247,6 +295,31 @@ export default function TimelineView() {
         </div>
       </div>
 
+      {/* Settings row: snap granularity + inbox color */}
+      <div className="flex flex-wrap items-center gap-4 py-1">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-text-muted whitespace-nowrap">Snap to</span>
+          <div className="inline-flex rounded-md border border-border overflow-hidden">
+            {(["5min", "exact"] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setSnapMode(s)}
+                className={`px-2.5 py-1 text-xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent ${
+                  snapMode === s ? "bg-primary text-white font-medium" : "bg-surface-raised text-text-primary hover:bg-border"
+                }`}
+              >
+                {s === "5min" ? "5 min" : "Exact"}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-text-muted whitespace-nowrap">Inbox color</span>
+          <ColorPickerButton value={inboxColor} onChange={handleInboxColor} size="sm" />
+        </div>
+      </div>
+
       {/* Hour grid */}
       <div className="bg-surface border border-border rounded-lg overflow-hidden">
         {/* Column headers (aligned to the gutter) */}
@@ -320,15 +393,18 @@ export default function TimelineView() {
                     {entries.map((en) => {
                       const seg = daySegment(en.startedAt, en.endedAt, day, now);
                       if (!seg) return null;
-                      const color = en.projectColor;
+                      const color = en.projectColor ?? inboxColor;
                       const running = !en.endedAt;
+                      const isSelected = popover?.entry?.id === en.id;
                       return (
                         <button
                           key={`${en.id}-${dateKey(day)}`}
                           type="button"
                           onClick={(e) => { e.stopPropagation(); openEdit(en); }}
                           title={`${en.taskTitle} · ${clockLabel(en.startedAt)}${en.endedAt ? ` - ${clockLabel(en.endedAt)}` : " (running)"}`}
-                          className="absolute left-0.5 right-0.5 overflow-hidden rounded text-left px-1.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer"
+                          className={`absolute left-0.5 right-0.5 overflow-hidden rounded text-left px-1.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer transition-shadow duration-75 ${
+                            isSelected ? "ring-2 ring-accent" : ""
+                          }`}
                           style={{
                             top: seg.topPx,
                             height: seg.heightPx,
@@ -353,7 +429,9 @@ export default function TimelineView() {
                       <EntryForm
                         state={popover}
                         tasks={tasks}
+                        projects={projects}
                         error={formError}
+                        saving={saving}
                         onChange={setPopover}
                         onSave={saveForm}
                         onDelete={removeEntry}
@@ -388,11 +466,13 @@ export default function TimelineView() {
 
 // The inline add/edit form, anchored near the clicked slot within a day column.
 function EntryForm({
-  state, tasks, error, onChange, onSave, onDelete, onCancel,
+  state, tasks, projects, error, saving, onChange, onSave, onDelete, onCancel,
 }: {
   state: PopoverState;
   tasks: Task[];
+  projects: Project[];
   error: string;
+  saving: boolean;
   onChange: (s: PopoverState) => void;
   onSave: () => void;
   onDelete: () => void;
@@ -400,10 +480,17 @@ function EntryForm({
 }) {
   // Keep the popover on-screen: clamp its top within the day.
   const top = Math.min(state.topPx, DAY_PX - 230);
+
+  // Group tasks by project for the optgroup layout.
+  const inboxTasks = tasks.filter((t) => !t.projectId);
+  const projectGroups = projects
+    .map((p) => ({ project: p, tasks: tasks.filter((t) => t.projectId === p.id) }))
+    .filter((g) => g.tasks.length > 0);
+
   return (
     <div
       onClick={(e) => e.stopPropagation()}
-      className="absolute z-20 left-1 right-1 sm:left-auto sm:w-60 bg-surface border border-border rounded-lg shadow-xl p-3 space-y-2 tl-pop"
+      className="absolute z-20 left-1 right-1 sm:left-auto sm:w-64 bg-surface border border-border rounded-lg shadow-xl p-3 space-y-2 tl-pop"
       style={{ top: Math.max(0, top) }}
     >
       <div>
@@ -414,8 +501,19 @@ function EntryForm({
           className="w-full px-2 py-1.5 text-sm border border-border rounded-md bg-surface text-text-primary focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer"
         >
           <option value="">Select a task...</option>
-          {tasks.map((t) => (
-            <option key={t.id} value={t.id}>{t.title}</option>
+          {inboxTasks.length > 0 && (
+            <optgroup label="Inbox">
+              {inboxTasks.map((t) => (
+                <option key={t.id} value={t.id}>{t.title}</option>
+              ))}
+            </optgroup>
+          )}
+          {projectGroups.map(({ project, tasks: pts }) => (
+            <optgroup key={project.id} label={project.name}>
+              {pts.map((t) => (
+                <option key={t.id} value={t.id}>{t.title}</option>
+              ))}
+            </optgroup>
           ))}
         </select>
       </div>
@@ -445,25 +543,29 @@ function EntryForm({
           <button
             type="button"
             onClick={onDelete}
+            disabled={saving}
             aria-label="Delete entry"
-            className="flex items-center justify-center w-8 h-8 text-text-muted hover:text-danger focus:outline-none focus:ring-2 focus:ring-danger rounded cursor-pointer"
+            className="flex items-center justify-center w-8 h-8 text-text-muted hover:text-danger focus:outline-none focus:ring-2 focus:ring-danger rounded cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <Trash2 size={15} aria-hidden="true" />
+            {saving ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <Trash2 size={15} aria-hidden="true" />}
           </button>
         ) : <span />}
         <div className="flex gap-2">
           <button
             type="button"
             onClick={onCancel}
-            className="px-3 py-1.5 text-sm text-text-muted hover:text-text-primary focus:outline-none focus:underline cursor-pointer"
+            disabled={saving}
+            className="px-3 py-1.5 text-sm text-text-muted hover:text-text-primary focus:outline-none focus:underline cursor-pointer disabled:opacity-40"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={onSave}
-            className="px-3 py-1.5 text-sm bg-primary text-white rounded-md hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 cursor-pointer"
+            disabled={saving}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary text-white rounded-md hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           >
+            {saving && <Loader2 size={13} className="animate-spin" aria-hidden="true" />}
             Save
           </button>
         </div>

@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { Pencil, Trash2, Plus, Tag, Clock } from "lucide-react";
 import { Project, Habit } from "@/lib/api";
 import SidebarHabits from "./SidebarHabits";
-import ProjectColorPicker from "./ProjectColorPicker";
+import ColorPickerButton from "./ColorPickerButton";
 
 interface Props {
   projects: Project[];
@@ -196,8 +196,9 @@ export default function ProjectSidebar({
 
         {/* Inline new project input + color picker (#77) */}
         {showNewInput && (
-          <div className="px-4 mt-2 space-y-2">
+          <div className="px-4 mt-2">
             <div className="flex items-center gap-2">
+              <ColorPickerButton value={newProjectColor} onChange={setNewProjectColor} size="sm" />
               <input
                 autoFocus
                 type="text"
@@ -222,7 +223,6 @@ export default function ProjectSidebar({
                 Save
               </button>
             </div>
-            <ProjectColorPicker value={newProjectColor} onChange={setNewProjectColor} />
           </div>
         )}
 
@@ -304,21 +304,19 @@ function EditProjectModal({
         >
           Edit Project
         </h2>
-        <input
-          autoFocus
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && name.trim()) onSave(name.trim(), color);
-            if (e.key === "Escape") onCancel();
-          }}
-          className="w-full px-3 py-2 border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent mb-4"
-        />
-        {/* Project color (#77) */}
-        <div className="mb-4">
-          <p className="text-xs font-medium text-text-muted mb-2">Color</p>
-          <ProjectColorPicker value={color} onChange={setColor} />
+        <div className="flex items-center gap-2 mb-4">
+          <ColorPickerButton value={color} onChange={setColor} />
+          <input
+            autoFocus
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && name.trim()) onSave(name.trim(), color);
+              if (e.key === "Escape") onCancel();
+            }}
+            className="flex-1 px-3 py-2 border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
+          />
         </div>
         <div className="flex gap-2 justify-end">
           <button

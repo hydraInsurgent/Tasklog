@@ -26,11 +26,14 @@ namespace Tasklog.Api.Controllers
         // Entries that OVERLAP the [from, to) window (so an interval started before `from`
         // but still running/ending inside it is included - e.g. a timer left running
         // overnight shows on today). Defaults to today if the range is omitted.
+        // Max range: 366 days (guard against accidentally fetching the entire history).
         [HttpGet]
         public async Task<IActionResult> List([FromQuery] DateTime? from, [FromQuery] DateTime? to)
         {
             var start = from ?? DateTime.Today;
             var end = to ?? DateTime.Today.AddDays(1);
+            if ((end - start).TotalDays > 366)
+                return BadRequest(new { message = "Date range must not exceed 366 days." });
             var now = DateTime.Now;
 
             var entries = await _context.TimeEntries
@@ -98,6 +101,8 @@ namespace Tasklog.Api.Controllers
                 return NotFound(new { message = $"Task {request.TaskId} not found." });
             if (request.EndedAt <= request.StartedAt)
                 return BadRequest(new { message = "End time must be after the start time." });
+            if (request.EndedAt > DateTime.Now.AddMinutes(5))
+                return BadRequest(new { message = "End time cannot be more than 5 minutes in the future." });
 
             var entry = new TimeEntry
             {

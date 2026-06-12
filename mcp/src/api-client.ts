@@ -315,3 +315,70 @@ export const updateLabel = (
 
 export const deleteLabel = (id: number): Promise<void> =>
   request(`/api/labels/${id}`, { method: 'DELETE' });
+
+// --- Time Entries ---
+
+export interface TimeEntry {
+  id: number;
+  taskId: number;
+  taskTitle: string;
+  projectId: number | null;
+  projectColor: string | null;
+  startedAt: string; // local ISO datetime
+  endedAt: string | null; // null = currently running
+  durationSeconds: number; // 0 while running
+}
+
+export const startTimer = (taskId: number): Promise<TimeEntry> =>
+  request('/api/time-entries/start', { method: 'POST', body: JSON.stringify({ taskId }) });
+
+export const stopTimer = (entryId: number): Promise<TimeEntry> =>
+  request(`/api/time-entries/${entryId}/stop`, { method: 'POST' });
+
+// GET /active returns 204 No Content when idle - handle separately.
+export async function getActiveTimeEntry(): Promise<TimeEntry | null> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/api/time-entries/active`, {
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (e: unknown) {
+    if (
+      typeof e === 'object' && e !== null &&
+      ((e as { name?: string }).name === 'AbortError' || (e as { name?: string }).name === 'TimeoutError')
+    ) {
+      throw new ApiError(504, 'Gateway Timeout', `Tasklog API did not respond within ${REQUEST_TIMEOUT_MS / 1000}s`);
+    }
+    throw e;
+  }
+  if (res.status === 204) return null;
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new ApiError(res.status, res.statusText, body);
+  }
+  const text = await res.text();
+  return text ? (JSON.parse(text) as TimeEntry) : null;
+}
+
+export const addTimeEntry = (
+  taskId: number,
+  startedAt: string,
+  endedAt: string,
+): Promise<TimeEntry> =>
+  request('/api/time-entries', {
+    method: 'POST',
+    body: JSON.stringify({ taskId, startedAt, endedAt }),
+  });
+
+export const listTimeEntries = (from: string, to: string): Promise<TimeEntry[]> =>
+  request(`/api/time-entries?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+
+export const updateTimeEntry = (
+  id: number,
+  body: { startedAt?: string; endedAt?: string },
+): Promise<TimeEntry> =>
+  request(`/api/time-entries/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+
+export const deleteTimeEntry = (id: number): Promise<void> =>
+  request(`/api/time-entries/${id}`, { method: 'DELETE' });

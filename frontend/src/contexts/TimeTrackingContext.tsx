@@ -96,12 +96,21 @@ export function TimeTrackingProvider({ children }: { children: React.ReactNode }
     if (inFlight.current) return;
     inFlight.current = true;
     setPending(true);
+    let taskCreated = false;
     try {
       const task = await createTask(title.trim() || "Untitled");
+      taskCreated = true;
       const entry = await startTimer(task.id); // server auto-stops any previous timer
       setActive(entry);
       setNowMs(Date.now());
       if (typeof window !== "undefined") window.dispatchEvent(new Event(TASKS_CHANGED_EVENT));
+    } catch (err) {
+      // If the task was created but the timer failed, still refresh the list so the
+      // orphaned task shows up rather than disappearing silently.
+      if (taskCreated && typeof window !== "undefined") {
+        window.dispatchEvent(new Event(TASKS_CHANGED_EVENT));
+      }
+      throw err;
     } finally {
       setPending(false);
       inFlight.current = false;

@@ -8,9 +8,11 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerTaskTools } from './tasks.js';
 import { registerProjectTools } from './projects.js';
 import { registerLabelTools } from './labels.js';
+import { registerTimeTools } from './time.js';
 
 export function registerAllTools(server: McpServer): void {
   registerTaskTools(server);
   registerProjectTools(server);
   registerLabelTools(server);
+  registerTimeTools(server);
 }

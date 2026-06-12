@@ -19,20 +19,23 @@ export const PROJECT_PALETTE = [
 interface Props {
   value: string | null;
   onChange: (color: string | null) => void;
+  // Called after a definitive palette/none selection so a parent popover can close.
+  onClose?: () => void;
 }
 
-export default function ProjectColorPicker({ value, onChange }: Props) {
+export default function ProjectColorPicker({ value, onChange, onClose }: Props) {
   const [customOpen, setCustomOpen] = useState(false);
 
   return (
     <div>
-      <div className="flex flex-wrap gap-1.5">
+      <div className="grid grid-cols-4 gap-1.5">
         {/* None */}
         <button
           type="button"
           onClick={() => {
             onChange(null);
             setCustomOpen(false);
+            onClose?.();
           }}
           aria-label="No color"
           aria-pressed={value === null}
@@ -50,6 +53,7 @@ export default function ProjectColorPicker({ value, onChange }: Props) {
             onClick={() => {
               onChange(hex);
               setCustomOpen(false);
+              onClose?.();
             }}
             aria-label={`Color ${hex}`}
             aria-pressed={value?.toLowerCase() === hex.toLowerCase()}
