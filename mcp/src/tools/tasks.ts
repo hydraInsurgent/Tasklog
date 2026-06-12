@@ -529,6 +529,135 @@ export function registerTaskTools(server: McpServer): void {
       ),
   );
 
+  server.registerTool(
+    'undo_habit_checkin',
+    {
+      title: 'Undo Habit Check-in',
+      description:
+        'Remove a habit check-in for a given day (default today). Use when the ' +
+        'user says "undo my check-in", "I didn\'t actually do it today", or ' +
+        '"remove my gym check-in". 404 if no check-in exists for that day. ' +
+        'Returns: confirmation message.',
+      inputSchema: {
+        taskId: z.number().int().positive().describe('The habit task id.'),
+        date: z
+          .string()
+          .optional()
+          .describe(
+            'ISO 8601 date (e.g. "2026-05-28") of the check-in to remove. Omit for today.',
+          ),
+      },
+    },
+    async ({ taskId, date }) =>
+      runTool(
+        'undo_habit_checkin',
+        async () => { await api.deleteCheckIn(taskId, date); return { taskId, date }; },
+        ({ taskId, date }) =>
+          `Removed check-in for habit #${taskId} on ${date ?? 'today'}.`,
+      ),
+  );
+
+  server.registerTool(
+    'get_habit_checkins',
+    {
+      title: 'Get Habit Check-ins',
+      description:
+        'List all check-in dates for a habit task, newest first. Use to see the ' +
+        'history of a specific habit or debug a streak calculation. ' +
+        'Returns: array of check-in objects { id, checkInDate, createdAt, taskId }.',
+      inputSchema: {
+        taskId: z.number().int().positive().describe('The habit task id.'),
+      },
+    },
+    async ({ taskId }) =>
+      runTool(
+        'get_habit_checkins',
+        () => api.listCheckIns(taskId),
+        (checkIns) => {
+          if (checkIns.length === 0) return `No check-ins found for task #${taskId}.`;
+          const lines = checkIns.slice(0, 20).map((c) => `  ${c.checkInDate.slice(0, 10)}`);
+          const more = checkIns.length > 20 ? `\n  ... and ${checkIns.length - 20} more` : '';
+          return `Check-ins for task #${taskId} (${checkIns.length} total):\n${lines.join('\n')}${more}`;
+        },
+      ),
+  );
+
+  server.registerTool(
+    'get_habits',
+    {
+      title: 'Get Habits',
+      description:
+        'Get all habit tasks with their current streak, done-today status, and ' +
+        'weekly progress. Use when the user asks "how are my habits?", "what\'s my ' +
+        'streak?", "did I do my habits today?". Returns richer data than list_tasks ' +
+        'because streaks are computed server-side.',
+    },
+    async () =>
+      runTool(
+        'get_habits',
+        () => api.getHabits(),
+        (habits) => {
+          if (habits.length === 0) return 'No habits set up yet. Create a task with isHabit=true.';
+          const lines = habits.map((h) => {
+            const done = h.doneToday ? 'Done today' : 'Not done today';
+            if (h.weeklyTarget !== null) {
+              const week = `${h.thisWeekCount ?? 0}/${h.weeklyTarget}x this week`;
+              return `  ${h.task.title} - ${done} | ${week} | ${h.currentStreak}-week streak`;
+            }
+            return `  ${h.task.title} - ${done} | ${h.currentStreak}-day streak`;
+          });
+          return `Habits (${habits.length}):\n${lines.join('\n')}`;
+        },
+      ),
+  );
+
+  server.registerTool(
+    'list_task_comments',
+    {
+      title: 'List Task Comments',
+      description:
+        'List comments on a task, newest first. Use when the user asks to see ' +
+        'notes or history on a task. get_task also includes comments, so prefer ' +
+        'this only when you specifically need just the comments. ' +
+        'Returns: array of { id, body, createdAt }.',
+      inputSchema: {
+        taskId: z.number().int().positive().describe('The task id.'),
+      },
+    },
+    async ({ taskId }) =>
+      runTool(
+        'list_task_comments',
+        () => api.listTaskComments(taskId),
+        (comments) => {
+          if (comments.length === 0) return `No comments on task #${taskId}.`;
+          return comments
+            .map((c) => `[${c.createdAt.slice(0, 10)}] ${c.body} (id: ${c.id})`)
+            .join('\n');
+        },
+      ),
+  );
+
+  server.registerTool(
+    'delete_task_comment',
+    {
+      title: 'Delete Task Comment',
+      description:
+        'Permanently delete a comment from a task. Use when the user asks to ' +
+        'remove a specific note or comment. Cannot be undone. ' +
+        'Returns: confirmation message.',
+      inputSchema: {
+        taskId: z.number().int().positive().describe('The task id the comment belongs to.'),
+        commentId: z.number().int().positive().describe('The comment id to delete.'),
+      },
+    },
+    async ({ taskId, commentId }) =>
+      runTool(
+        'delete_task_comment',
+        async () => { await api.deleteTaskComment(taskId, commentId); return { taskId, commentId }; },
+        ({ commentId }) => `Deleted comment #${commentId}.`,
+      ),
+  );
+
   // --- Bulk tools (act on many tasks in one transactional call) ---
 
   // A reusable schema for the task-id list shared by the bulk tools.

@@ -18,6 +18,7 @@ const API_BASE = process.env.TASKLOG_API_URL ?? 'http://localhost:5115';
 export interface Project {
   id: number;
   name: string;
+  color?: string | null;
   createdAt: string;
 }
 
@@ -256,6 +257,12 @@ export const addTaskComment = (taskId: number, body: string): Promise<Comment> =
     body: JSON.stringify({ body }),
   });
 
+export const listTaskComments = (taskId: number): Promise<Comment[]> =>
+  request(`/api/tasks/${taskId}/comments`);
+
+export const deleteTaskComment = (taskId: number, commentId: number): Promise<void> =>
+  request(`/api/tasks/${taskId}/comments/${commentId}`, { method: 'DELETE' });
+
 // Mark a habit done for a day (default today). Idempotent: logging the same day
 // twice returns the existing check-in rather than creating a duplicate. date is
 // an optional ISO date (yyyy-MM-dd); omit for today.
@@ -264,6 +271,35 @@ export const addCheckIn = (taskId: number, date?: string): Promise<CheckIn> =>
     method: 'POST',
     body: JSON.stringify(date ? { date } : {}),
   });
+
+export const listCheckIns = (taskId: number): Promise<CheckIn[]> =>
+  request(`/api/tasks/${taskId}/checkins`);
+
+// Undo a check-in for a given day (default today). 404 if no check-in exists for that day.
+export const deleteCheckIn = (taskId: number, date?: string): Promise<void> =>
+  request(`/api/tasks/${taskId}/checkins${date ? `?date=${encodeURIComponent(date)}` : ''}`, { method: 'DELETE' });
+
+// --- Habits ---
+
+export interface WeekStatus {
+  weekStart: string;
+  count: number;
+  status: string; // 'met' | 'missed' | 'in_progress'
+}
+
+// The per-habit shape from GET /api/habits: task + computed streak stats.
+// currentStreak unit is DAYS for daily/specific-days habits, WEEKS for frequency habits.
+export interface HabitSummary {
+  task: Task;
+  currentStreak: number;
+  doneToday: boolean;
+  recentCheckIns: string[];
+  weeklyTarget: number | null;
+  thisWeekCount: number | null;
+  recentWeeks: WeekStatus[] | null;
+}
+
+export const getHabits = (): Promise<HabitSummary[]> => request('/api/habits');
 
 // Bulk operations: one transactional POST applies one operation to many tasks.
 // data carries the per-operation payload (isCompleted / projectId / projectName /
@@ -288,10 +324,10 @@ export const bulkTasks = (
 
 export const listProjects = (): Promise<Project[]> => request('/api/projects');
 
-export const createProject = (body: { name: string }): Promise<Project> =>
+export const createProject = (body: { name: string; color?: string }): Promise<Project> =>
   request('/api/projects', { method: 'POST', body: JSON.stringify(body) });
 
-export const renameProject = (id: number, body: { name: string }): Promise<Project> =>
+export const renameProject = (id: number, body: { name: string; color?: string | null }): Promise<Project> =>
   request(`/api/projects/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
 
 export const deleteProject = (id: number): Promise<void> =>

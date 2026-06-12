@@ -27,16 +27,21 @@ export function registerProjectTools(server: McpServer): void {
       description:
         'Create a new project. Projects group related tasks. Use when the ' +
         'user says "make a project for X" or "start a new project Y". ' +
-        'Returns: the created project { id, name, createdAt }.',
+        'Returns: the created project { id, name, color, createdAt }.',
       inputSchema: {
         name: z
           .string()
           .min(1)
           .describe('The project name. Required, non-empty.'),
+        color: z
+          .string()
+          .regex(/^#[0-9a-fA-F]{6}$/)
+          .optional()
+          .describe('Optional hex color for the project, e.g. "#4f46e5". Omit for no color.'),
       },
     },
-    async ({ name }) =>
-      runTool('create_project', () => api.createProject({ name })),
+    async ({ name, color }) =>
+      runTool('create_project', () => api.createProject({ name, ...(color ? { color } : {}) })),
   );
 
   server.registerTool(
@@ -44,15 +49,20 @@ export function registerProjectTools(server: McpServer): void {
     {
       title: 'Rename Project',
       description:
-        'Change a project\'s name. Tasks within the project are not affected. ' +
-        'Returns: the updated project { id, name, createdAt }.',
+        'Change a project\'s name and/or color. Tasks within the project are not affected. ' +
+        'Returns: the updated project { id, name, color, createdAt }.',
       inputSchema: {
-        id: z.number().int().positive().describe('The project id to rename.'),
+        id: z.number().int().positive().describe('The project id to update.'),
         name: z.string().min(1).describe('The new project name.'),
+        color: z
+          .string()
+          .regex(/^#[0-9a-fA-F]{6}$/)
+          .optional()
+          .describe('Optional new hex color, e.g. "#4f46e5". Omit to keep the existing color.'),
       },
     },
-    async ({ id, name }) =>
-      runTool('rename_project', () => api.renameProject(id, { name })),
+    async ({ id, name, color }) =>
+      runTool('rename_project', () => api.renameProject(id, { name, ...(color !== undefined ? { color } : {}) })),
   );
 
   server.registerTool(
