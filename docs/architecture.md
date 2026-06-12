@@ -66,12 +66,15 @@ Tasklog/
 │   │   ├── server.ts              Hono HTTP entry, middleware wiring
 │   │   ├── config.ts              Env var loading + production validation
 │   │   ├── api-client.ts          Typed client for the Tasklog .NET API
-│   │   ├── tools/                 22 MCP tools wrapping every API endpoint
-│   │   │   ├── tasks.ts           13 task tools (list[+filters]/get/create/update/
-│   │   │   │                      delete/set-completion/assign-project/set-labels/add-comment +
+│   │   ├── tools/                 29 MCP tools wrapping every API endpoint
+│   │   │   ├── tasks.ts           18 task tools (list[+filters]/get/create/update/
+│   │   │   │                      delete/set-completion/assign-project/set-labels/
+│   │   │   │                      add-comment/list-comments/delete-comment +
+│   │   │   │                      log-habit-checkin/undo-habit-checkin/get-habit-checkins/get-habits +
 │   │   │   │                      bulk-set-completion/bulk-assign-to-project/bulk-set-deadline/bulk-set-priority)
-│   │   │   ├── projects.ts        4 project tools
+│   │   │   ├── projects.ts        4 project tools (create/rename accept optional color)
 │   │   │   ├── labels.ts          4 label tools
+│   │   │   ├── time.ts            7 time tools (start/stop/active/log/edit/delete/summary) (v2.19.0)
 │   │   │   ├── registry.ts        Aggregates and registers all tools
 │   │   │   └── result.ts          runTool() helper for error mapping
 │   │   └── oauth/                 OAuth 2.1 authorization server
@@ -118,6 +121,8 @@ Tasklog/
 │       │   (list is representative - other components: TaskCard, FilterPanel, LabelsClient, etc.)
 │       └── lib/
 │           ├── api.ts             Typed API call functions (used by both server and client)
+│           ├── time.ts            Pure time-tracking geometry: PX_PER_MIN, daySegment(), dayColumns(),
+│           │                      dayTotalSeconds(), perTaskTotals(), clockLabel(), dateKey(), addDays() (v2.19.0)
 │           ├── quickAdd.ts        Pure parseQuickAdd(): NL title -> {deadline, recurrence, project, labels, priority} + token spans (chrono-node for dates; recurrence/tokens hand-rolled) (v2.15.0)
 │           └── deadlinePresets.ts Pure resolvePreset() for the quick-deadline popover (v2.10.2)
 │
@@ -164,6 +169,7 @@ TasklogDatabase.db       SQLite file. Tables: Tasks, Projects, Labels, LabelTask
 Projects
   Id          INTEGER  primary key, autoincrement
   Name        TEXT     not null
+  Color       TEXT     nullable  ("#RRGGBB" hex string; null = no color. v2.19.0)
   CreatedAt   TEXT     not null  (ISO 8601 datetime string)
 
 Tasks
@@ -210,6 +216,19 @@ CheckIns  (v2.16.0 - one per habit per day)
   CreatedAt   TEXT     not null  (ISO 8601 datetime string)
   TaskId      INTEGER  not null  foreign key -> Tasks.Id  (cascade delete)
   UNIQUE (TaskId, CheckInDate)   (makes "done today" idempotent - one row per habit per day)
+
+TimeEntries  (v2.19.0 - one interval per start+stop cycle)
+  Id          INTEGER  primary key, autoincrement
+  TaskId      INTEGER  not null  foreign key -> Tasks.Id  (cascade delete)
+  StartedAt   TEXT     not null  (local ISO datetime; no timezone suffix)
+  EndedAt     TEXT     nullable  (null = currently running; set on stop or next-timer-start)
+  CreatedAt   TEXT     not null  (ISO 8601 datetime string)
+  (response-only) DurationSeconds  int  (EndedAt - StartedAt) in seconds; 0 while running. NOT a column.
+  (response-only) TaskTitle  string   denormalized from Task.Title. NOT a column.
+  (response-only) ProjectId  int?     denormalized from Task.ProjectId. NOT a column.
+  (response-only) ProjectColor  string?  denormalized from Task.Project.Color. NOT a column.
+  Single-timer invariant: at most one row has EndedAt == null at any time. POST /start auto-stops
+  any running entry before opening the new one (StopAllRunning helper).
 ```
 
 ### API endpoints
@@ -228,9 +247,16 @@ CheckIns  (v2.16.0 - one per habit per day)
 | PATCH | `/api/tasks/{id}/project` | Reassign task to a project or Inbox. Body: `{ projectId: int?, projectName?: string }`. projectName is resolved by name (case-insensitive, exact) and wins over projectId; 0/multiple matches → 400 |
 | POST | `/api/tasks/bulk` | Apply one operation to many tasks in one transaction. Body: `{ operation: "complete" \| "assignProject" \| "setDeadline" \| "setPriority", taskIds: int[], data?: { isCompleted?, projectId?, projectName?, deadline?, priority? } }`. assignProject accepts a project name (resolved, wins over id). No bulk delete. Unknown ids skipped; returns the affected tasks. 400 on empty ids / unknown op / invalid data (missing/ambiguous project name, priority out of 1-4) |
 | GET | `/api/projects` | All projects, ordered by name |
-| POST | `/api/projects` | Create project. Body: `{ name: string }`. Returns created project |
-| PATCH | `/api/projects/{id}` | Rename project. Body: `{ name: string }`. Returns updated project |
+| POST | `/api/projects` | Create project. Body: `{ name: string, color?: string }` (`color` = optional `#RRGGBB` hex). Returns created project (v2.19.0 adds color) |
+| PATCH | `/api/projects/{id}` | Rename/recolor project. Body: `{ name: string, color?: string }` (color omitted = unchanged). Returns updated project (v2.19.0 adds color) |
 | DELETE | `/api/projects/{id}` | Delete project and cascade delete all its tasks. 204 on success |
+| GET | `/api/time-entries` | Time entries overlapping `[from, to)` window. Query: `from` + `to` (local ISO datetimes, no zone). Defaults to today. Max 366-day range. Entries started before `from` but still running at `from` are included. (v2.19.0) |
+| GET | `/api/time-entries/active` | Currently running entry, or 204 No Content when idle. (v2.19.0) |
+| POST | `/api/time-entries/start` | Start a timer on a task. Body: `{ taskId }`. Auto-stops any running entry first. 404 if task not found. (v2.19.0) |
+| POST | `/api/time-entries/{id}/stop` | Stop a running entry. Idempotent: already-stopped entry returned unchanged. (v2.19.0) |
+| POST | `/api/time-entries` | Manually log a closed interval. Body: `{ taskId, startedAt, endedAt }` (local ISO, no zone). 400 if end <= start or end > now+5min. (v2.19.0) |
+| PATCH | `/api/time-entries/{id}` | Edit a closed entry's bounds. Body: `{ startedAt?, endedAt? }` (present-key). 400 if end <= start. (v2.19.0) |
+| DELETE | `/api/time-entries/{id}` | Delete a logged entry. 204 on success. (v2.19.0) |
 | GET | `/api/labels` | All labels, ordered by name |
 | POST | `/api/labels` | Create label. Body: `{ name, colorIndex }`. Returns created label |
 | PATCH | `/api/labels/{id}` | Update label name and/or color. Body: `{ name, colorIndex }`. Returns updated label |
@@ -280,7 +306,16 @@ src/app/
 
   habits/
     page.tsx           Server Component. Route: /habits. Renders <HabitsClient /> (client-fetched). (v2.16.0)
+
+  time/
+    page.tsx           Server Component. Route: /time. Renders <TimelineView /> wrapped in
+                       TimeTrackingProvider. (v2.19.0)
 ```
+
+`TimeTrackingContext` (v2.19.0) - React context provider mounted at app root in `layout.tsx`.
+Holds the single running `TimeEntry` (or null) and a `nowMs` that ticks at 1 s ONLY while active,
+so elapsed seconds are live across TrackingBar, TimerControl, and TimelineView without a separate
+polling loop. Rehydrates from `GET /api/time-entries/active` on mount.
 
 ### Component responsibilities
 
@@ -351,9 +386,33 @@ LabelsClient.tsx        Client Component.
                         - Full CRUD: fetch, create, inline rename, color picker, delete
                         - Desktop: table layout. Mobile: card list.
 
-ColorPicker.tsx         Client Component.
-                        - 10-color swatch grid popover
-                        - Used by LabelsClient for color assignment/editing
+ColorPickerButton.tsx   Client Component. (v2.19.0 - replaces ColorPicker.tsx)
+                        - Compact swatch button that opens a floating ProjectColorPicker popover
+                        - Closes on Escape, outside-click, or palette selection
+                        - Used by LabelsClient, ProjectSidebar, and TimelineView settings
+
+LabelColorButton.tsx    Client Component. (v2.19.0)
+                        - Same popover pattern but for colorIndex (0-9 label palette)
+                        - Used by LabelsClient in table rows and mobile cards
+
+TimelineView.tsx        Client Component. (v2.19.0)
+                        - Toggl-style vertical hour grid (00:00-23:00) with day columns
+                        - Day / week toggle; date nav with a date-jump picker
+                        - Entry blocks absolutely positioned by start/duration; project-colored
+                        - Click empty slot -> add popover; click block -> edit/delete popover
+                        - Snap-to-5-min / exact setting (localStorage); Inbox color picker
+                        - Running entry grows live off the TimeTrackingContext 1 s tick
+                        - Per-task totals summary below the grid
+
+TrackingBar.tsx         Client Component. (v2.19.0)
+                        - Persistent bottom-left pill on desktop, full-width on mobile
+                        - Idle: "What are you working on?" input + Start button
+                        - Running: task title + live H:MM:SS + Stop button
+                        - Quick-start: creates an Inbox task then starts its timer in one step
+
+TimerControl.tsx        Client Component. (v2.19.0)
+                        - Per-task start/stop button on each task row
+                        - Driven by TimeTrackingContext.isRunning(taskId)
 
 FilterPanel.tsx         Client Component.
                         - Popover opened from the task list header three-dot button
@@ -380,6 +439,13 @@ deleteProject(id)         DELETE /api/projects/:id        Used by ProjectLayout
 getHabits()               GET /api/habits                 Used by HabitsClient (v2.16.0)
 addCheckIn(id, date?)     POST /api/tasks/:id/checkins    Used by HabitsClient (done-today toggle) (v2.16.0)
 removeCheckIn(id, date?)  DELETE /api/tasks/:id/checkins  Used by HabitsClient (undo) (v2.16.0)
+getTimeEntries(from, to)  GET /api/time-entries           Used by TimelineView (v2.19.0)
+getActiveTimeEntry()      GET /api/time-entries/active    Used by TimeTrackingContext on mount (v2.19.0)
+startTimer(taskId)        POST /api/time-entries/start    Used by TimeTrackingContext (v2.19.0)
+stopTimer(id)             POST /api/time-entries/:id/stop Used by TimeTrackingContext (v2.19.0)
+addTimeEntry(...)         POST /api/time-entries          Used by TimelineView (manual log) (v2.19.0)
+updateTimeEntry(id, ...)  PATCH /api/time-entries/:id     Used by TimelineView (edit) (v2.19.0)
+deleteTimeEntry(id)       DELETE /api/time-entries/:id    Used by TimelineView (delete) (v2.19.0)
 ```
 
 **Known issue:** `getTask()` uses `NEXT_PUBLIC_API_URL` which resolves to `localhost`
@@ -428,7 +494,7 @@ POST /token                                     auth_code and refresh_token gran
 
 ### Tool layer
 
-22 MCP tools across three families (tasks: 14, projects: 4, labels: 4). The task family includes four bulk tools (`bulk_set_completion`, `bulk_assign_to_project`, `bulk_set_deadline`, `bulk_set_priority`) backed by the single `POST /api/tasks/bulk` endpoint, `add_task_comment` (comments are read back via `get_task`), and `log_habit_checkin` (mark a habit done for a day; idempotent; v2.16.0). `assign_task_to_project` / `bulk_assign_to_project` / `set_task_labels` accept a name as an alternative to an id (resolved server-side). `create_task` and `update_task` accept an RRULE-shaped `recurrence` string (v2.14.0), an `isHabit` flag (v2.16.0), and a `weeklyTarget` (1-7) for "x times a week" habits (v2.18.0); completing a recurring task via `set_task_completion` spawns the next occurrence server-side, so no separate recurrence tool exists. Each tool is a thin wrapper around the corresponding Tasklog `/api` endpoint via `api-client.ts`. Input schemas use Zod and are inlined per tool. The `runTool()` helper in `result.ts` converts thrown `ApiError`s into MCP `isError: true` tool results (not JSON-RPC protocol errors), so the LLM can see and react to failures.
+29 MCP tools across four families (tasks: 18, projects: 4, labels: 4, time: 7). The task family includes four bulk tools (`bulk_set_completion`, `bulk_assign_to_project`, `bulk_set_deadline`, `bulk_set_priority`) backed by the single `POST /api/tasks/bulk` endpoint; `add_task_comment`, `list_task_comments`, `delete_task_comment` (v2.19.0); `log_habit_checkin`, `undo_habit_checkin`, `get_habit_checkins` (v2.19.0); and `get_habits` (full habits dashboard with streak, done-today, weekly progress; v2.19.0). `assign_task_to_project` / `bulk_assign_to_project` / `set_task_labels` accept a name as an alternative to an id (resolved server-side). `create_task` and `update_task` accept an RRULE-shaped `recurrence` string (v2.14.0), an `isHabit` flag (v2.16.0), and a `weeklyTarget` (1-7) for "x times a week" habits (v2.18.0). `create_project` / `rename_project` accept an optional `color` hex (v2.19.0). The time family (v2.19.0) covers `start_timer`, `stop_timer`, `get_active_timer`, `log_time`, `edit_time_entry`, `delete_time_entry`, and `get_time_summary` (totals by task for a date range). Each tool is a thin wrapper around the corresponding Tasklog `/api` endpoint via `api-client.ts`. Input schemas use Zod and are inlined per tool. The `runTool()` helper in `result.ts` converts thrown `ApiError`s into MCP `isError: true` tool results (not JSON-RPC protocol errors), so the LLM can see and react to failures.
 
 The `list_tasks` tool accepts an optional filter object (project, inbox, labels, deadline range, completion, title substring) that `api-client.ts` serializes into a query string on `GET /api/tasks`. Completion is a single `set_task_completion(id, isCompleted)` tool - the earlier `complete_task` / `uncomplete_task` split was consolidated in v2.10.1.
 

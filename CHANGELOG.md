@@ -2,6 +2,32 @@
 
 ---
 
+## v2.19.0 - Time tracking + project colors
+*June 2026*
+
+### Added
+
+- **Time tracking** (#77) - track how long you spend on tasks, Toggl-style.
+  - A **persistent tracking bar** sits at the bottom-left on desktop, full-width on mobile. Type a task name and hit Start to quick-create an Inbox task and begin tracking immediately - or start a timer on any existing task from its row in the task list. The bar shows the running task title and a live H:MM:SS clock; one tap stops it.
+  - A **Toggl-style timeline** at `/time` renders a vertical hour grid with day columns (day or week view). Each tracked interval is a project-colored block - click an empty slot to log an entry, click a block to edit or delete it. Running entries grow live off the 1 s tick.
+  - **Snap-to-5-min / exact** granularity setting on the timeline page.
+  - **Inbox color picker** on the timeline page - Inbox tasks have no project color, so you can assign one that persists in localStorage.
+  - At most one timer runs at a time (server-enforced). Starting a new one auto-stops the previous.
+- **Project colors** - each project can have a hex color set when creating or editing it. The color appears as a left border on timeline blocks and as a swatch in the sidebar/modal.
+- **MCP: 9 new tools** bringing total to 29:
+  - Time tracking (7): `start_timer`, `stop_timer`, `get_active_timer`, `log_time`, `edit_time_entry`, `delete_time_entry`, `get_time_summary`
+  - Habits (2): `get_habits` (full dashboard - streak, done-today, weekly progress), `undo_habit_checkin`, `get_habit_checkins`
+  - Comments (2): `list_task_comments`, `delete_task_comment`
+  - Projects: `create_project` and `rename_project` now accept an optional `color` hex param
+
+### Notes
+
+- New `TimeEntries` table (`Tasks` 1-to-many). `Projects` table gains a nullable `Color` column.
+- `ColorPickerButton` component replaces the legacy inline `ColorPicker.tsx` - a swatch button that opens a floating popover; used in the sidebar, edit modal, and timeline settings. `LabelColorButton` is the label-specific equivalent.
+- `TimeTrackingContext` (React context) owns the single running entry and a 1 s tick that only fires while a timer is active, so live elapsed seconds render across the bar, the task row timer control, and the timeline without a separate polling loop.
+
+---
+
 ## v2.18.1 - Fix: frequency habit check-in progress
 *June 2026*
 
