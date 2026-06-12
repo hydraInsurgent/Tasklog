@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| P77-time-tracking.md | #77 | feature/time-tracking-#77 | In Progress |
+| - | - | - | - |
 
 ---
 
@@ -80,6 +80,7 @@ Recently completed work (keep last 10):
 
 | # | Title | Type | Closed |
 |---|-------|------|--------|
+| #77 | Time tracking per task + timeline dashboard + project colors (v2.19.0) | feature | 2026-06-12 |
 | #76 | Fix: frequency habit check-in showed stale weekly progress (optimistic update) (v2.18.1) | bug | 2026-06-01 |
 | #75 | Habits v2 Step 2: x-times-a-week frequency + deadline-free habit schedules (v2.18.0) | feature | 2026-05-31 |
 | #73 | UI uplift: design tokens + chip-driven sheet + board view + Habits v2 Step 1 (v2.17.0) | feature | 2026-05-30 |
@@ -103,6 +104,5 @@ Untracked ideas - not estimated, not prioritized, not committed to. Just things 
 
 - Relative time display for completed date - show "just now", "2 hours ago", "3 days ago" instead of a formatted date. CompletedAt timestamp is already stored so this would be a UI-only change.
 - Cross-device sync / live updates - changes on one device reflect on another without a manual reload.
-- Project color codes - each project could have an assigned color shown as a swatch in the sidebar and next to tasks. The Edit Project dialog is already planned as a modal, making this a natural future addition (add a color picker field).
 - Rich task detail - subtasks (checklist items under a parent task) for long-running work. (Description shipped in v2.11.0; comments shipped in v2.13.0 via the TaskComment table. Subtasks still parked here - they need a self-referencing model.)
 - Theme selection - allow the user to switch between light, dark, and high-contrast color themes. Theme changes affect overall background, header/navbar, and general UI chrome. Project colors, label colors, and other user-assigned colors remain unchanged.
