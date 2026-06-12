@@ -11,7 +11,7 @@ import {
   Label,
 } from "@/lib/api";
 import { labelColor } from "@/lib/format";
-import ColorPicker from "./ColorPicker";
+import LabelColorButton from "./LabelColorButton";
 
 // Feedback shown briefly after an action (same pattern as TasksClient).
 type Feedback = { type: "success" | "error"; message: string } | null;
@@ -28,9 +28,6 @@ export default function LabelsClient() {
   // Inline editing: which label is being renamed.
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState("");
-
-  // Inline color picking: which label's color picker is open.
-  const [colorPickerId, setColorPickerId] = useState<number | null>(null);
 
   // Track which labels have async requests in-flight for disabling.
   // Using a Set allows color-change and rename to be tracked independently.
@@ -103,7 +100,6 @@ export default function LabelsClient() {
   function startEdit(label: Label) {
     setEditingId(label.id);
     setEditingName(label.name);
-    setColorPickerId(null); // Close any open color picker.
   }
 
   // Save an inline rename. Ignores blank input; Escape cancels.
@@ -240,26 +236,11 @@ export default function LabelsClient() {
                     >
                       {/* Color swatch - clicking opens the color picker */}
                       <td className="pl-6 pr-2 py-4">
-                        <div className="relative">
-                          <button
-                            onClick={() =>
-                              setColorPickerId(
-                                colorPickerId === label.id ? null : label.id
-                              )
-                            }
-                            disabled={pendingIds.has(label.id)}
-                            aria-label={`Change color for label: ${label.name}`}
-                            className="w-5 h-5 rounded-full cursor-pointer transition-transform duration-100 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                            style={{ backgroundColor: labelColor(label.colorIndex) }}
-                          />
-                          {colorPickerId === label.id && (
-                            <ColorPicker
-                              selectedIndex={label.colorIndex}
-                              onSelect={(index) => handleColorChange(label, index)}
-                              onClose={() => setColorPickerId(null)}
-                            />
-                          )}
-                        </div>
+                        <LabelColorButton
+                          colorIndex={label.colorIndex}
+                          onChange={(index) => handleColorChange(label, index)}
+                          disabled={pendingIds.has(label.id)}
+                        />
                       </td>
 
                       {/* Label name - clicking enters inline edit mode */}
@@ -321,26 +302,11 @@ export default function LabelsClient() {
                   className="flex items-center gap-3 px-4 py-4 bg-surface"
                 >
                   {/* Color swatch */}
-                  <div className="relative shrink-0">
-                    <button
-                      onClick={() =>
-                        setColorPickerId(
-                          colorPickerId === label.id ? null : label.id
-                        )
-                      }
-                      disabled={pendingIds.has(label.id)}
-                      aria-label={`Change color for label: ${label.name}`}
-                      className="w-5 h-5 rounded-full cursor-pointer transition-transform duration-100 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                      style={{ backgroundColor: labelColor(label.colorIndex) }}
-                    />
-                    {colorPickerId === label.id && (
-                      <ColorPicker
-                        selectedIndex={label.colorIndex}
-                        onSelect={(index) => handleColorChange(label, index)}
-                        onClose={() => setColorPickerId(null)}
-                      />
-                    )}
-                  </div>
+                  <LabelColorButton
+                    colorIndex={label.colorIndex}
+                    onChange={(index) => handleColorChange(label, index)}
+                    disabled={pendingIds.has(label.id)}
+                  />
 
                   {/* Label name (inline edit on mobile too) */}
                   <div className="flex-1 min-w-0">

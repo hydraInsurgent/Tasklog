@@ -50,7 +50,11 @@ export default function BoardView({
         {columns.map((col) => (
           <section key={col.key} className="w-64 shrink-0 flex flex-col" aria-label={`${col.label} (${col.tasks.length})`}>
             <div className="flex items-center gap-2 mb-2 px-1">
-              <span className={`w-2 h-2 rounded-full ${col.accent}`} aria-hidden="true" />
+              <span
+                className={`w-2 h-2 rounded-full ${col.accentColor ? "" : col.accent}`}
+                style={col.accentColor ? { backgroundColor: col.accentColor } : undefined}
+                aria-hidden="true"
+              />
               <h3 className="font-heading text-sm font-semibold text-text-primary">{col.label}</h3>
               <span className="text-xs text-text-muted tabular-nums">{col.tasks.length}</span>
             </div>

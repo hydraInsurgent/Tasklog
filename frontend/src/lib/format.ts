@@ -218,3 +218,26 @@ export function lastNDays(
   }
   return days;
 }
+
+// --- Time tracking (#77) ---------------------------------------------------
+
+// Compact human duration for totals/blocks: "1h 23m", "23m", "0m" (and "1h" when no minutes).
+// Rounds to whole minutes; seconds under a minute show as "0m" (use formatClock for live ticking).
+export function formatDuration(seconds: number): string {
+  const totalMin = Math.floor(Math.max(0, seconds) / 60);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h === 0) return `${m}m`;
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
+}
+
+// Live clock for the running timer / tracking bar: "H:MM:SS" (or "MM:SS" under an hour).
+export function formatClock(seconds: number): string {
+  const s = Math.max(0, Math.floor(seconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  const mm = String(m).padStart(2, "0");
+  const ss = String(sec).padStart(2, "0");
+  return h > 0 ? `${h}:${mm}:${ss}` : `${m}:${ss}`;
+}

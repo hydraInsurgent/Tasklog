@@ -18,6 +18,7 @@ const API_BASE = process.env.TASKLOG_API_URL ?? 'http://localhost:5115';
 export interface Project {
   id: number;
   name: string;
+  color?: string | null;
   createdAt: string;
 }
 
@@ -256,6 +257,12 @@ export const addTaskComment = (taskId: number, body: string): Promise<Comment> =
     body: JSON.stringify({ body }),
   });
 
+export const listTaskComments = (taskId: number): Promise<Comment[]> =>
+  request(`/api/tasks/${taskId}/comments`);
+
+export const deleteTaskComment = (taskId: number, commentId: number): Promise<void> =>
+  request(`/api/tasks/${taskId}/comments/${commentId}`, { method: 'DELETE' });
+
 // Mark a habit done for a day (default today). Idempotent: logging the same day
 // twice returns the existing check-in rather than creating a duplicate. date is
 // an optional ISO date (yyyy-MM-dd); omit for today.
@@ -264,6 +271,35 @@ export const addCheckIn = (taskId: number, date?: string): Promise<CheckIn> =>
     method: 'POST',
     body: JSON.stringify(date ? { date } : {}),
   });
+
+export const listCheckIns = (taskId: number): Promise<CheckIn[]> =>
+  request(`/api/tasks/${taskId}/checkins`);
+
+// Undo a check-in for a given day (default today). 404 if no check-in exists for that day.
+export const deleteCheckIn = (taskId: number, date?: string): Promise<void> =>
+  request(`/api/tasks/${taskId}/checkins${date ? `?date=${encodeURIComponent(date)}` : ''}`, { method: 'DELETE' });
+
+// --- Habits ---
+
+export interface WeekStatus {
+  weekStart: string;
+  count: number;
+  status: string; // 'met' | 'missed' | 'in_progress'
+}
+
+// The per-habit shape from GET /api/habits: task + computed streak stats.
+// currentStreak unit is DAYS for daily/specific-days habits, WEEKS for frequency habits.
+export interface HabitSummary {
+  task: Task;
+  currentStreak: number;
+  doneToday: boolean;
+  recentCheckIns: string[];
+  weeklyTarget: number | null;
+  thisWeekCount: number | null;
+  recentWeeks: WeekStatus[] | null;
+}
+
+export const getHabits = (): Promise<HabitSummary[]> => request('/api/habits');
 
 // Bulk operations: one transactional POST applies one operation to many tasks.
 // data carries the per-operation payload (isCompleted / projectId / projectName /
@@ -288,10 +324,10 @@ export const bulkTasks = (
 
 export const listProjects = (): Promise<Project[]> => request('/api/projects');
 
-export const createProject = (body: { name: string }): Promise<Project> =>
+export const createProject = (body: { name: string; color?: string }): Promise<Project> =>
   request('/api/projects', { method: 'POST', body: JSON.stringify(body) });
 
-export const renameProject = (id: number, body: { name: string }): Promise<Project> =>
+export const renameProject = (id: number, body: { name: string; color?: string | null }): Promise<Project> =>
   request(`/api/projects/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
 
 export const deleteProject = (id: number): Promise<void> =>
@@ -315,3 +351,70 @@ export const updateLabel = (
 
 export const deleteLabel = (id: number): Promise<void> =>
   request(`/api/labels/${id}`, { method: 'DELETE' });
+
+// --- Time Entries ---
+
+export interface TimeEntry {
+  id: number;
+  taskId: number;
+  taskTitle: string;
+  projectId: number | null;
+  projectColor: string | null;
+  startedAt: string; // local ISO datetime
+  endedAt: string | null; // null = currently running
+  durationSeconds: number; // 0 while running
+}
+
+export const startTimer = (taskId: number): Promise<TimeEntry> =>
+  request('/api/time-entries/start', { method: 'POST', body: JSON.stringify({ taskId }) });
+
+export const stopTimer = (entryId: number): Promise<TimeEntry> =>
+  request(`/api/time-entries/${entryId}/stop`, { method: 'POST' });
+
+// GET /active returns 204 No Content when idle - handle separately.
+export async function getActiveTimeEntry(): Promise<TimeEntry | null> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/api/time-entries/active`, {
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (e: unknown) {
+    if (
+      typeof e === 'object' && e !== null &&
+      ((e as { name?: string }).name === 'AbortError' || (e as { name?: string }).name === 'TimeoutError')
+    ) {
+      throw new ApiError(504, 'Gateway Timeout', `Tasklog API did not respond within ${REQUEST_TIMEOUT_MS / 1000}s`);
+    }
+    throw e;
+  }
+  if (res.status === 204) return null;
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new ApiError(res.status, res.statusText, body);
+  }
+  const text = await res.text();
+  return text ? (JSON.parse(text) as TimeEntry) : null;
+}
+
+export const addTimeEntry = (
+  taskId: number,
+  startedAt: string,
+  endedAt: string,
+): Promise<TimeEntry> =>
+  request('/api/time-entries', {
+    method: 'POST',
+    body: JSON.stringify({ taskId, startedAt, endedAt }),
+  });
+
+export const listTimeEntries = (from: string, to: string): Promise<TimeEntry[]> =>
+  request(`/api/time-entries?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+
+export const updateTimeEntry = (
+  id: number,
+  body: { startedAt?: string; endedAt?: string },
+): Promise<TimeEntry> =>
+  request(`/api/time-entries/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+
+export const deleteTimeEntry = (id: number): Promise<void> =>
+  request(`/api/time-entries/${id}`, { method: 'DELETE' });

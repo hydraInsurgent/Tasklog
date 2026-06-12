@@ -100,12 +100,22 @@ A reminder or alert system would be a meaningful scope addition.
 - Bulk actions (v2.10.4): a "Select" mode on the task list lets you pick several tasks and, from a bulk-actions bar, complete/reopen them, move them to a project (or Inbox), or set/clear their deadline in one step. The same operations are available to Claude via bulk MCP tools, with bulk priority added in v2.10.7. There is no bulk delete - deletion stays one task at a time.
 - Priority (v2.10.5): each task has a priority on the Todoist P1-P4 scale (P1 = Urgent, P2 = High, P3 = Medium, P4 = None, the default). It is set on the add/edit forms, shown as a small colored dot (P1-P3), filterable, and editable/queryable via Claude. P4 tasks show no dot, keeping the default view clean.
 
+**Time tracking** (v2.19.0)
+- Any task can have time tracked against it. At most one timer runs at a time (server-enforced); starting a new one auto-stops the previous.
+- A **persistent tracking bar** sits at the bottom-left on desktop (bottom full-width on mobile): idle shows a "What are you working on?" input that quick-creates an Inbox task and starts tracking in one step; running shows the task title, live elapsed clock, and a Stop button.
+- A per-task **timer control** (play/stop button) appears on each task row.
+- A **timeline view** (`/time`) renders a Toggl-style vertical hour grid with day or week columns. Each tracked interval is a project-colored block. Click an empty slot to log a past entry; click a block to edit its times or delete it. The running entry grows live.
+- Snap-to-5-min / exact granularity setting; an Inbox color picker (localStorage) so Inbox tasks have a distinguishable color on the timeline.
+- A per-task totals breakdown shows below the grid for the visible range.
+- Time entries are never merged or edited automatically - the user has full control over the log.
+
 **Projects**
 - Projects let the user categorize tasks.
+- Each project can have an optional **hex color** (set on create or rename). The color appears as a left border on timeline blocks and as a swatch in the sidebar and project edit modal.
 - The sidebar shows All Tasks, Inbox, and each project as separate views.
 - Tasks can be assigned to a project at creation, reassigned from the task detail page, or changed in the edit modal.
 - Deleting a project also deletes all its tasks (cascade delete, always confirmed first).
-- Project names can be renamed after creation.
+- Project names (and color) can be updated after creation.
 
 **Labels**
 - Labels are user-created tags that can be applied to any task, regardless of project.
@@ -131,9 +141,14 @@ A reminder or alert system would be a meaningful scope addition.
 - Every action produces visible feedback.
 - Errors are shown clearly rather than silently ignored.
 
-**AI integration (v2.10, filtering added v2.10.1, editing added v2.10.2)**
+**AI integration (v2.10+)**
 - Tasklog is reachable from claude.ai via a Model Context Protocol custom connector.
-- The Tasklog API is exposed as 22 MCP tools (incl. four bulk tools, `add_task_comment` (v2.13.0), and `log_habit_checkin` (v2.16.0)). `list_tasks` accepts optional filters (project, inbox, labels, deadline range, creation-date range, completion, title substring, priority) plus sort + order + limit, so Claude can answer scoped questions like "what's due this week in Work", "what did I add today", or "top 5 by priority" in a single call. Completion is a single `set_task_completion(id, isCompleted)` toggle. `update_task(id, title?, deadline?, priority?, description?, recurrence?)` renames / reschedules / reprioritizes / sets recurrence without delete-and-recreate. Project/label assignment accepts a name as well as an id (v2.10.7), so Claude can "move these to Work" or "tag these urgent" without a lookup first. Claude can make a task repeat by passing an RRULE-shaped `recurrence` to `create_task`/`update_task` (v2.14.0); completing it advances the series. Claude can also mark a task a habit (`isHabit` on create/update), set its "x times a week" frequency (`weeklyTarget` 1-7, v2.18.0), and check it in for the day with `log_habit_checkin` (v2.16.0).
+- The Tasklog API is exposed as **29 MCP tools** across four families:
+  - *Tasks (18)*: list (with rich filters), get, create, update, delete, set-completion, assign-project, set-labels, add/list/delete comments, bulk complete/assign/deadline/priority, log/undo/list habit check-ins, get habits dashboard.
+  - *Projects (4)*: list, create (with optional hex color), rename (with optional color), delete.
+  - *Labels (4)*: list, create, update, delete.
+  - *Time tracking (7, v2.19.0)*: start/stop/get-active timer, manually log a closed interval, edit a logged entry, delete an entry, get time summary by task for a date range.
+- `list_tasks` accepts optional filters (project, inbox, labels, deadline range, creation-date range, completion, title substring, priority) plus sort + order + limit. `update_task` renames / reschedules / reprioritizes / sets recurrence without delete-and-recreate. `get_habits` returns per-habit streak, done-today, and weekly progress (computed server-side). `get_time_summary(from, to)` returns totals by task.
 - The connector works on claude.ai web and mobile (Pro / Max plan).
 - Connecting requires logging in with GitHub once; only the allow-listed username is permitted.
 - All tool calls execute against the same SQLite database the web UI reads from. Tasks created via Claude appear instantly in the web UI on next refresh.

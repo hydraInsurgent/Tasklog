@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Tasklog.Api.Data;
@@ -35,10 +36,13 @@ namespace Tasklog.Api.Controllers
         {
             if (string.IsNullOrWhiteSpace(request.Name))
                 return BadRequest(new { message = "Project name is required." });
+            if (!IsValidColor(request.Color))
+                return BadRequest(new { message = "Color must be a #RRGGBB hex string." });
 
             var project = new Project
             {
                 Name = request.Name.Trim(),
+                Color = request.Color,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -55,6 +59,8 @@ namespace Tasklog.Api.Controllers
         {
             if (string.IsNullOrWhiteSpace(request.Name))
                 return BadRequest(new { message = "Project name is required." });
+            if (!IsValidColor(request.Color))
+                return BadRequest(new { message = "Color must be a #RRGGBB hex string." });
 
             var project = await _context.Projects.FindAsync(id);
 
@@ -62,6 +68,9 @@ namespace Tasklog.Api.Controllers
                 return NotFound(new { message = $"Project {id} not found." });
 
             project.Name = request.Name.Trim();
+            // Color is optional; a provided value sets it. (Clearing a color isn't a flow we
+            // expose - pick another color instead - so null here leaves it unchanged.)
+            if (request.Color is not null) project.Color = request.Color;
             await _context.SaveChangesAsync();
 
             return Ok(project);
@@ -89,8 +98,12 @@ namespace Tasklog.Api.Controllers
 
             return NoContent();
         }
+
+        // A color is valid when null (no color) or a "#RRGGBB" hex string.
+        private static bool IsValidColor(string? color) =>
+            color is null || Regex.IsMatch(color, "^#[0-9a-fA-F]{6}$");
     }
 
-    // Request body for project create and rename.
-    public record ProjectNameRequest(string Name);
+    // Request body for project create and rename. Color is optional ("#RRGGBB" or null).
+    public record ProjectNameRequest(string Name, string? Color = null);
 }

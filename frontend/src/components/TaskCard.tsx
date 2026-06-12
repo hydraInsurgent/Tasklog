@@ -9,6 +9,7 @@ import DeadlinePopover from "./DeadlinePopover";
 import PriorityDot from "./PriorityDot";
 import RecurringBadge from "./RecurringBadge";
 import TaskDoneControl from "./TaskDoneControl";
+import TimerControl from "./TimerControl";
 import { occursOn } from "@/lib/recurrence";
 
 interface Props {
@@ -198,6 +199,11 @@ export default function TaskCard({
           )}
         </div>
       </div>
+
+      {/* Timer play/stop (#77). Always visible on the touch card (no hover affordance). */}
+      <span className="flex items-center shrink-0">
+        <TimerControl task={task} alwaysVisible />
+      </span>
 
       {/* Three-dot menu - opens a small dropdown with a Delete action only.
           The button itself has a 44px tap target for comfortable mobile use. */}

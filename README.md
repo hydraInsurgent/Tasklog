@@ -55,6 +55,12 @@ I wanted a task system I understood completely - one where the data, the workflo
 - Show/hide completed tasks and undo completion at any time
 - Task detail page with full status, comments, and completion history
 
+**Track your time**
+- A persistent tracking bar (bottom-left on desktop, full-width on mobile) - type a task name and hit Start to quick-create it and begin tracking immediately; one tap stops the timer
+- Per-task start/stop button on each task row; at most one timer runs at a time
+- Toggl-style timeline at `/time` - a vertical hour grid with day or week view; project-colored blocks for each interval; click to log, edit, or delete entries
+- Projects carry an optional hex color that appears as a left border on timeline blocks
+
 **Repeat and build habits**
 - Recurring tasks with Todoist-level rules - daily, every N days, weekly on chosen weekdays, monthly on a day-of-month or the "3rd Thursday" / "last day", every-other-week intervals, and end conditions (until a date or for N times). Completing one spawns the next occurrence automatically
 - Natural-language quick-add - type "Email Mark friday #Work @urgent p1 every week" and the date, repeat, project, label, and priority are parsed inline as you type
@@ -68,7 +74,7 @@ I wanted a task system I understood completely - one where the data, the workflo
 
 **Talk to your tasks via Claude (v2.10)**
 - Tasklog can be plugged into claude.ai as a custom connector (Model Context Protocol server)
-- Text Claude on web or mobile to add, complete, list, organize tasks, set recurrence, and check in habits - no app switch
+- 29 MCP tools: create/manage tasks, check in habits, start/stop timers, query time summaries, manage projects and labels - all from claude.ai web or mobile
 - Tasks created via Claude appear instantly in your Tasklog UI
 - OAuth 2.1 with GitHub upstream gates access; only your username is allowed
 - The Tasklog API itself stays LAN-only; only one tightly-scoped MCP endpoint is exposed

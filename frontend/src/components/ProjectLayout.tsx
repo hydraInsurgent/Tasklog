@@ -189,9 +189,9 @@ export default function ProjectLayout() {
     getHabits().then(setHabits).catch(() => {});
   }, []);
 
-  async function handleCreateProject(name: string) {
+  async function handleCreateProject(name: string, color?: string | null) {
     try {
-      const created = await createProject(name);
+      const created = await createProject(name, color);
       setProjects((prev) => [...prev, created]);
     } catch (err) {
       showFeedback("error", "Failed to create project. Please try again.");
@@ -199,9 +199,9 @@ export default function ProjectLayout() {
     }
   }
 
-  async function handleEditProject(id: number, name: string) {
+  async function handleEditProject(id: number, name: string, color?: string | null) {
     try {
-      const updated = await renameProject(id, name);
+      const updated = await renameProject(id, name, color);
       setProjects((prev) => prev.map((p) => (p.id === id ? updated : p)));
     } catch (err) {
       showFeedback("error", "Failed to rename project. Please try again.");
