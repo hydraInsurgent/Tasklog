@@ -263,7 +263,7 @@ export default function ProjectLayout() {
           <button
             onClick={() => setDrawerOpen(true)}
             aria-label="Open navigation"
-            className="flex items-center justify-center p-3 text-zinc-600 hover:text-text-primary border border-border rounded-md bg-surface cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1"
+            className="flex items-center justify-center p-3 text-text-muted hover:text-text-primary border border-border rounded-md bg-surface cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1"
           >
             <Menu size={20} aria-hidden="true" />
           </button>
@@ -281,7 +281,7 @@ export default function ProjectLayout() {
         {feedback && (
           <div
             role="alert"
-            className="mb-4 flex items-center gap-2 px-4 py-3 rounded-md text-sm font-medium bg-red-50 text-red-700 border border-red-200"
+            className="mb-4 flex items-center gap-2 px-4 py-3 rounded-md text-sm font-medium bg-danger-bg text-danger border border-danger/30"
           >
             {feedback.message}
           </div>
@@ -326,7 +326,7 @@ export default function ProjectLayout() {
           <button
             onClick={() => setDrawerOpen(false)}
             aria-label="Close navigation"
-            className="flex items-center justify-center p-2 text-zinc-600 hover:text-text-primary cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 rounded"
+            className="flex items-center justify-center p-2 text-text-muted hover:text-text-primary cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 rounded"
           >
             <X size={20} aria-hidden="true" />
           </button>

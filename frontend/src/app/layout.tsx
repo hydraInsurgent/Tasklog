@@ -4,16 +4,14 @@ import "./globals.css";
 import { DoppelWidget } from "@/components/DoppelWidget";
 import { TimeTrackingProvider } from "@/contexts/TimeTrackingContext";
 import TrackingBar from "@/components/TrackingBar";
+import ThemeToggle from "@/components/ThemeToggle";
 
-// Heading font: Space Grotesk (tech-startup pairing from UI spec).
-// The `variable` prop injects a CSS custom property used in globals.css.
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
   variable: "--font-space-grotesk",
   weight: ["500", "600", "700"],
 });
 
-// Body font: DM Sans (tech-startup pairing from UI spec).
 const dmSans = DM_Sans({
   subsets: ["latin"],
   variable: "--font-dm-sans",
@@ -25,38 +23,37 @@ export const metadata: Metadata = {
   description: "Personal task management",
 };
 
+// Reads localStorage before hydration to apply the saved theme class immediately,
+// preventing a flash of the wrong theme on load.
+const themeScript = `(function(){try{var t=localStorage.getItem('tasklog:theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark');}}catch(e){}})();`;
+
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      {/* Inject font CSS variables onto the body so globals.css can reference them. */}
-      <body
-        className={`${spaceGrotesk.variable} ${dmSans.variable} antialiased min-h-screen bg-surface-raised`}
-      >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
+      <body className={`${spaceGrotesk.variable} ${dmSans.variable} antialiased min-h-screen bg-bg`}>
         {/* Site header */}
-        <header className="border-b border-border bg-surface">
-          <div className="max-w-6xl mx-auto px-4 py-4">
+        <header className="sticky top-0 z-30 border-b border-border bg-surface/95 backdrop-blur-sm">
+          <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
             <a
               href="/"
-              className="font-heading text-xl font-semibold text-text-primary hover:text-accent transition-colors duration-150"
-              style={{ fontFamily: "var(--font-space-grotesk), sans-serif" }}
+              className="font-heading text-lg font-bold text-text-primary hover:text-accent transition-colors duration-150"
             >
               Tasklog
             </a>
+            <ThemeToggle />
           </div>
         </header>
 
-        {/* Page content. TimeTrackingProvider shares the running timer with every page +
-            the floating TrackingBar (#77). */}
         <TimeTrackingProvider>
-          <main className="max-w-6xl mx-auto px-4 py-8">{children}</main>
+          <main className="max-w-6xl mx-auto px-4 pt-6 pb-28">{children}</main>
           <TrackingBar />
         </TimeTrackingProvider>
 
-        {/* Doppel - Manu's digital self. Fixed bottom-right, does not affect layout. */}
         <DoppelWidget />
       </body>
     </html>

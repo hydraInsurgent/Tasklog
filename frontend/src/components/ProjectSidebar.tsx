@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Pencil, Trash2, Plus, Tag, Clock } from "lucide-react";
+import { Pencil, Trash2, Plus, Tag, Clock, Inbox, LayoutList } from "lucide-react";
 import { Project, Habit } from "@/lib/api";
 import SidebarHabits from "./SidebarHabits";
 import ColorPickerButton from "./ColorPickerButton";
@@ -21,11 +21,9 @@ interface Props {
   onCheckInToggle?: (taskId: number) => void;
 }
 
-// Shared classes for nav items.
-const activeNavClass =
-  "border-l-2 border-primary font-semibold text-text-primary bg-surface-raised";
-const inactiveNavClass =
-  "border-l-2 border-transparent text-zinc-600 hover:text-text-primary hover:bg-surface-raised";
+// Pill-style nav item classes.
+const activeNavClass = "bg-accent/10 text-accent font-semibold";
+const inactiveNavClass = "text-text-muted hover:text-text-primary hover:bg-surface-raised";
 
 export default function ProjectSidebar({
   projects,
@@ -98,41 +96,45 @@ export default function ProjectSidebar({
       {/* Sidebar nav */}
       <nav className="flex flex-col h-full py-4">
         {/* Fixed items */}
-        <button
-          onClick={() => onSelectView("all")}
-          className={`w-full text-left text-sm px-4 py-2 transition-colors duration-150 cursor-pointer ${
-            activeView === "all" ? activeNavClass : inactiveNavClass
-          }`}
-        >
-          All Tasks
-        </button>
-        <button
-          onClick={() => onSelectView("inbox")}
-          className={`w-full text-left text-sm px-4 py-2 transition-colors duration-150 cursor-pointer ${
-            activeView === "inbox" ? activeNavClass : inactiveNavClass
-          }`}
-        >
-          Inbox
-        </button>
+        <div className="px-2 space-y-0.5">
+          <button
+            onClick={() => onSelectView("all")}
+            className={`w-full text-left text-sm px-3 py-2 rounded-lg flex items-center gap-2.5 transition-colors duration-150 cursor-pointer ${
+              activeView === "all" ? activeNavClass : inactiveNavClass
+            }`}
+          >
+            <LayoutList size={15} aria-hidden="true" />
+            All Tasks
+          </button>
+          <button
+            onClick={() => onSelectView("inbox")}
+            className={`w-full text-left text-sm px-3 py-2 rounded-lg flex items-center gap-2.5 transition-colors duration-150 cursor-pointer ${
+              activeView === "inbox" ? activeNavClass : inactiveNavClass
+            }`}
+          >
+            <Inbox size={15} aria-hidden="true" />
+            Inbox
+          </button>
+        </div>
 
-        <hr className="my-3 border-border" />
+        <hr className="my-3 border-border mx-2" />
 
         {/* Projects section */}
-        <p className="px-4 mb-1 text-xs font-medium uppercase tracking-wide text-text-muted">
+        <p className="px-5 mb-1 text-xs font-semibold uppercase tracking-wider text-text-muted">
           Projects
         </p>
 
-        <div className="flex flex-col">
+        <div className="flex flex-col px-2 space-y-0.5">
           {projects.map((project) => (
             <div
               key={project.id}
-              className={`group flex items-center gap-1 transition-colors duration-150 ${
+              className={`group flex items-center gap-0.5 rounded-lg transition-colors duration-150 ${
                 activeView === project.id ? activeNavClass : inactiveNavClass
               }`}
             >
               <button
                 onClick={() => onSelectView(project.id)}
-                className="flex-1 flex items-center gap-2 text-left text-sm px-4 py-2 cursor-pointer"
+                className="flex-1 flex items-center gap-2 text-left text-sm px-3 py-2 cursor-pointer"
               >
                 {/* Project color dot (#77); a hollow ring when no color is set. */}
                 <span
@@ -168,31 +170,32 @@ export default function ProjectSidebar({
           ))}
         </div>
 
-        <hr className="my-3 border-border" />
+        <hr className="my-3 border-border mx-2" />
 
-        {/* Labels link (Habits now live as a check-in section below "Add project", #76) */}
-        <Link
-          href="/labels"
-          className={`flex items-center gap-2 w-full text-left text-sm px-4 py-2 transition-colors duration-150 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent ${
-            pathname === "/labels" ? activeNavClass : inactiveNavClass
-          }`}
-        >
-          <Tag size={16} aria-hidden="true" />
-          Labels
-        </Link>
+        {/* Labels + Time links */}
+        <div className="px-2 space-y-0.5">
+          <Link
+            href="/labels"
+            className={`flex items-center gap-2.5 w-full text-left text-sm px-3 py-2 rounded-lg transition-colors duration-150 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent ${
+              pathname === "/labels" ? activeNavClass : inactiveNavClass
+            }`}
+          >
+            <Tag size={15} aria-hidden="true" />
+            Labels
+          </Link>
 
-        {/* Time tracking timeline (#77) */}
-        <Link
-          href="/time"
-          className={`flex items-center gap-2 w-full text-left text-sm px-4 py-2 transition-colors duration-150 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent ${
-            pathname === "/time" ? activeNavClass : inactiveNavClass
-          }`}
-        >
-          <Clock size={16} aria-hidden="true" />
-          Time
-        </Link>
+          <Link
+            href="/time"
+            className={`flex items-center gap-2.5 w-full text-left text-sm px-3 py-2 rounded-lg transition-colors duration-150 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent ${
+              pathname === "/time" ? activeNavClass : inactiveNavClass
+            }`}
+          >
+            <Clock size={15} aria-hidden="true" />
+            Time
+          </Link>
+        </div>
 
-        <hr className="my-3 border-border" />
+        <hr className="my-3 border-border mx-2" />
 
         {/* Inline new project input + color picker (#77) */}
         {showNewInput && (
@@ -232,9 +235,9 @@ export default function ProjectSidebar({
             setShowNewInput((prev) => !prev);
             setNewProjectName("");
           }}
-          className="mt-3 mx-4 flex items-center gap-1 text-sm text-text-muted hover:text-text-primary cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 rounded"
+          className="mx-4 flex items-center gap-2 text-sm text-text-muted hover:text-text-primary cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 rounded-lg px-2 py-1.5"
         >
-          <Plus size={16} aria-hidden="true" />
+          <Plus size={15} aria-hidden="true" />
           Add project
         </button>
 
@@ -321,7 +324,7 @@ function EditProjectModal({
         <div className="flex gap-2 justify-end">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-sm text-zinc-600 hover:text-text-primary border border-border rounded-md cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1"
+            className="px-4 py-2 text-sm text-text-muted hover:text-text-primary border border-border rounded-md cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1"
           >
             Cancel
           </button>
@@ -368,14 +371,14 @@ function DeleteProjectDialog({
         >
           Delete project?
         </h2>
-        <p className="text-sm text-zinc-600 mb-6">
+        <p className="text-sm text-text-muted mb-6">
           Deleting <strong>{project.name}</strong> will permanently delete all
           tasks inside it. This cannot be undone.
         </p>
         <div className="flex gap-2 justify-end">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-sm text-zinc-600 hover:text-text-primary border border-border rounded-md cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1"
+            className="px-4 py-2 text-sm text-text-muted hover:text-text-primary border border-border rounded-md cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1"
           >
             Cancel
           </button>

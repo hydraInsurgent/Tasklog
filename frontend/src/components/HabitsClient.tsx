@@ -93,8 +93,8 @@ export default function HabitsClient() {
           role="alert"
           className={`flex items-center gap-2 px-4 py-3 rounded-md text-sm font-medium ${
             feedback.type === "success"
-              ? "bg-green-50 text-green-700 border border-green-200"
-              : "bg-red-50 text-red-700 border border-red-200"
+              ? "bg-success-bg text-success border border-success/30"
+              : "bg-danger-bg text-danger border border-danger/30"
           }`}
         >
           {feedback.type === "success" ? (

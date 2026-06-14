@@ -27,9 +27,22 @@ namespace Tasklog.Api.Controllers
         // but still running/ending inside it is included - e.g. a timer left running
         // overnight shows on today). Defaults to today if the range is omitted.
         // Max range: 366 days (guard against accidentally fetching the entire history).
+        //
+        // GET /api/time-entries?taskId=X
+        // All entries for a specific task, newest first. Date range is ignored in this mode.
         [HttpGet]
-        public async Task<IActionResult> List([FromQuery] DateTime? from, [FromQuery] DateTime? to)
+        public async Task<IActionResult> List([FromQuery] int? taskId, [FromQuery] DateTime? from, [FromQuery] DateTime? to)
         {
+            if (taskId.HasValue)
+            {
+                var taskEntries = await _context.TimeEntries
+                    .Include(e => e.Task!).ThenInclude(t => t.Project)
+                    .Where(e => e.TaskId == taskId.Value)
+                    .OrderByDescending(e => e.StartedAt)
+                    .ToListAsync();
+                return Ok(taskEntries.Select(Project).ToList());
+            }
+
             var start = from ?? DateTime.Today;
             var end = to ?? DateTime.Today.AddDays(1);
             if ((end - start).TotalDays > 366)

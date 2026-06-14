@@ -30,6 +30,7 @@ interface Props {
   pendingCheckIn?: boolean;
   onComplete: (id: number, isCompleted: boolean) => void;
   onCheckInToggle: (id: number) => void;
+  onOpen: (task: Task) => void;
   onEdit: (task: Task) => void;
   onDelete: (id: number) => void;
 }
@@ -42,6 +43,7 @@ export default function BoardCard({
   pendingCheckIn,
   onComplete,
   onCheckInToggle,
+  onOpen,
   onEdit,
   onDelete,
 }: Props) {
@@ -52,9 +54,9 @@ export default function BoardCard({
     <div
       role="button"
       tabIndex={0}
-      onClick={() => onEdit(task)}
+      onClick={() => onOpen(task)}
       onKeyDown={(e) => {
-        if (e.key === "Enter") onEdit(task);
+        if (e.key === "Enter") onOpen(task);
       }}
       className={`group relative rounded-lg border border-border shadow-sm hover:shadow-md ${tint} p-3 flex flex-col gap-2 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 transition-shadow duration-150 ${
         task.isCompleted ? "opacity-60" : ""

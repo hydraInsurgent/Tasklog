@@ -1,45 +1,63 @@
 @import "tailwindcss";
 
-/* Design tokens (#73).
-   Fonts: --font-space-grotesk / --font-dm-sans are injected by layout.tsx;
-   defining them in @theme makes `font-heading` / `font-body` Tailwind utilities.
-
-   Colors: semantic CSS-variable tokens promoted from the previously-hardcoded
-   zinc and blue-600 usage (see docs/plans/UI-SPEC-P73-chip-task-sheet.md). Names are
-   semantic (surface / text-primary / accent ...), so a future `.dark` block is a
-   drop-in - dark mode itself is deliberately out of scope for now (light only).
-   Use the token utilities (bg-surface, text-text-muted, border-border, text-accent,
-   bg-danger-bg, ...) instead of hardcoding hex/zinc classes. */
+/* Design tokens.
+   All Tailwind utilities use var(--color-xxx), so dark mode is a pure CSS
+   override via html.dark - no `dark:` variants needed anywhere in components.
+   Swap the palette by adding a .dark block (or any other class) below. */
 @theme {
   --font-heading: var(--font-space-grotesk), sans-serif;
   --font-body: var(--font-dm-sans), sans-serif;
 
-  /* Neutrals (zinc family) */
-  --color-bg: #fafafa;             /* zinc-50  - page background */
-  --color-surface: #ffffff;        /* white    - cards, sheet, panels */
-  --color-surface-raised: #f4f4f5; /* zinc-100 - chips, picker rows, hover, board columns */
-  --color-text-primary: #18181b;   /* zinc-900 - body + headings */
-  --color-text-muted: #71717a;     /* zinc-500 - captions, placeholders, secondary */
-  --color-border: #e4e4e7;         /* zinc-200 - input/card borders, dividers */
-  --color-border-muted: #f4f4f5;   /* zinc-100 - subtle inner dividers */
+  /* Neutrals - light mode (slate family, slightly warmer than zinc) */
+  --color-bg: #f8fafc;             /* page background */
+  --color-surface: #ffffff;        /* cards, panels, header, sidebar */
+  --color-surface-raised: #f1f5f9; /* hover states, chips, picker rows */
+  --color-text-primary: #0f172a;   /* headings + body */
+  --color-text-muted: #64748b;     /* captions, placeholders, secondary */
+  --color-border: #e2e8f0;         /* input/card borders, dividers */
+  --color-border-muted: #f1f5f9;   /* subtle inner dividers */
 
-  /* Primary action (the dark button) - distinct from text-primary so it can
-     diverge in a future dark theme. */
-  --color-primary: #18181b;        /* zinc-900 */
-  --color-primary-hover: #27272a;  /* zinc-800 */
+  /* Primary action button */
+  --color-primary: #0f172a;
+  --color-primary-hover: #1e293b;
 
-  /* Accent (links, focus rings, active chip). Blue-600 (not blue-500) for WCAG AA
-     as text/link on white. */
-  --color-accent: #2563eb;         /* blue-600 */
-  --color-accent-hover: #1d4ed8;   /* blue-700 */
+  /* Accent - blue-600 for WCAG AA on white */
+  --color-accent: #2563eb;
+  --color-accent-hover: #1d4ed8;
 
-  /* Semantic (text variants are AA-safe on white; -bg are soft tints for the board). */
-  --color-success: #16a34a;        /* green-600 */
-  --color-success-bg: #f0fdf4;     /* green-50  */
-  --color-warning: #ca8a04;        /* yellow-600 */
-  --color-warning-bg: #fefce8;     /* yellow-50  */
-  --color-danger: #dc2626;         /* red-600 */
-  --color-danger-bg: #fef2f2;      /* red-50  */
+  /* Semantic - text variants AA-safe on white; -bg are soft tints */
+  --color-success: #16a34a;
+  --color-success-bg: #f0fdf4;
+  --color-warning: #ca8a04;
+  --color-warning-bg: #fefce8;
+  --color-danger: #dc2626;
+  --color-danger-bg: #fef2f2;
+}
+
+/* Dark mode - applied when <html class="dark">.
+   Every Tailwind utility referencing var(--color-xxx) picks this up automatically
+   via CSS cascade. No component changes needed. */
+html.dark {
+  --color-bg: #111111;
+  --color-surface: #1e1e1e;
+  --color-surface-raised: #2a2a2a;
+  --color-text-primary: #f1f1f1;
+  --color-text-muted: #888888;
+  --color-border: #333333;
+  --color-border-muted: #252525;
+
+  --color-primary: #4f8cff;
+  --color-primary-hover: #3b78ff;
+
+  --color-accent: #4f8cff;
+  --color-accent-hover: #3b78ff;
+
+  --color-success: #34d399;
+  --color-success-bg: #052e16;
+  --color-warning: #fbbf24;
+  --color-warning-bg: #1c1000;
+  --color-danger: #f87171;
+  --color-danger-bg: #1c0000;
 }
 
 /* Base styles */
@@ -51,10 +69,7 @@ body {
   line-height: 1.6;
 }
 
-/* Entrance animations for overlays (sheet, pickers). Dependency-free - replaces
-   tw-animate-css's animate-in/zoom-in-95/slide-in-from-bottom, so we don't pull in
-   a new package for three keyframes. Durations stay in the 150-200ms UX band and
-   are disabled under prefers-reduced-motion. (#73) */
+/* Entrance animations for overlays (sheet, pickers). */
 @keyframes tl-pop {
   from { opacity: 0; transform: scale(0.95); }
   to   { opacity: 1; transform: scale(1); }

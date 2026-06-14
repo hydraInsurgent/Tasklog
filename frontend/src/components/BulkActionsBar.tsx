@@ -91,7 +91,7 @@ export default function BulkActionsBar({
           type="button"
           onClick={onUncomplete}
           disabled={busy}
-          className={`${actionBtn} text-zinc-600 hover:bg-surface-raised focus:ring-accent`}
+          className={`${actionBtn} text-text-muted hover:bg-surface-raised focus:ring-accent`}
         >
           <Undo2 size={16} aria-hidden="true" /> Reopen
         </button>
@@ -104,7 +104,7 @@ export default function BulkActionsBar({
             disabled={busy}
             aria-haspopup="true"
             aria-expanded={openMenu === "project"}
-            className={`${actionBtn} text-zinc-600 hover:bg-surface-raised focus:ring-accent`}
+            className={`${actionBtn} text-text-muted hover:bg-surface-raised focus:ring-accent`}
           >
             <FolderInput size={16} aria-hidden="true" /> Move to project
           </button>
@@ -148,7 +148,7 @@ export default function BulkActionsBar({
             disabled={busy}
             aria-haspopup="true"
             aria-expanded={openMenu === "deadline"}
-            className={`${actionBtn} text-zinc-600 hover:bg-surface-raised focus:ring-accent`}
+            className={`${actionBtn} text-text-muted hover:bg-surface-raised focus:ring-accent`}
           >
             <CalendarClock size={16} aria-hidden="true" /> Set deadline
           </button>
@@ -173,7 +173,7 @@ export default function BulkActionsBar({
             disabled={busy}
             aria-haspopup="true"
             aria-expanded={openMenu === "priority"}
-            className={`${actionBtn} text-zinc-600 hover:bg-surface-raised focus:ring-accent`}
+            className={`${actionBtn} text-text-muted hover:bg-surface-raised focus:ring-accent`}
           >
             <Flag size={16} aria-hidden="true" /> Set priority
           </button>

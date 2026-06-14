@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { usePolling } from "@/hooks/usePolling";
-import Link from "next/link";
 import { Trash2, CheckCircle, XCircle, Loader2, MoreHorizontal, Plus, Pencil, ListChecks, List, LayoutGrid, Flame } from "lucide-react";
 import { getTasks, deleteTask, completeTask, getLabels, updateTask, bulkTasks, BulkOperation, Task, Project, Label, Habit } from "@/lib/api";
 import { formatDate, formatDeadline, deadlineColorClass, projectName, labelColor } from "@/lib/format";
 import TaskCard from "./TaskCard";
 import TaskSheet from "./TaskSheet";
+import TaskDetailModal from "./TaskDetailModal";
 import TaskDoneControl from "./TaskDoneControl";
 import TimerControl from "./TimerControl";
 import { TASKS_CHANGED_EVENT } from "@/contexts/TimeTrackingContext";
@@ -86,7 +86,9 @@ export default function TasksClient({
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
   // Ref for the filter trigger button, used to position the panel.
   const filterButtonRef = useRef<HTMLDivElement>(null);
-  // The task currently open in the edit modal (null = modal closed).
+  // The task currently open in the detail overlay (null = closed).
+  const [openingTask, setOpeningTask] = useState<Task | null>(null);
+  // The task currently open in the edit sheet (null = closed).
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   // Which task's deadline quick-popover is open in the DESKTOP table (mobile
   // cards manage their own popover state internally).
@@ -212,6 +214,19 @@ export default function TasksClient({
   }
 
   // Called by TaskSheet after a successful create OR edit, with the canonical task.
+  // "Edit" button inside the detail modal: close modal, open edit sheet.
+  function handleEditFromModal(task: Task) {
+    setOpeningTask(null);
+    setEditingTask(task);
+  }
+
+  // Inline field saves from TaskDetailModal (project/due/priority/labels).
+  function handleModalSaved(task: Task) {
+    setTasks((prev) => prev.map((t) => (t.id === task.id ? task : t)));
+    setOpeningTask(task);
+    onHabitsChanged();
+  }
+
   // New tasks (id not yet in the list) are prepended; edits replace in place. The
   // sheet handles the API calls itself; this just reconciles local state + closes.
   function handleSheetSaved(task: Task) {
@@ -314,6 +329,10 @@ export default function TasksClient({
     if (activeView === "inbox" && t.projectId !== null) return false;
     if (typeof activeView === "number" && t.projectId !== activeView) return false;
 
+    // Habits only appear on the days they're scheduled. On off-days they live in
+    // the sidebar habits section only - no point cluttering the task list.
+    if (t.isHabit && !occursOn(t.recurrence, new Date())) return false;
+
     // 2. Label filter - task must have at least one of the selected labels.
     if (filterState.labelIds.length > 0) {
       const taskLabelIds = t.labels.map((l) => l.id);
@@ -394,8 +413,8 @@ export default function TasksClient({
           role="alert"
           className={`flex items-center gap-2 px-4 py-3 rounded-md text-sm font-medium ${
             feedback.type === "success"
-              ? "bg-green-50 text-green-700 border border-green-200"
-              : "bg-red-50 text-red-700 border border-red-200"
+              ? "bg-success-bg text-success border border-success/30"
+              : "bg-danger-bg text-danger border border-danger/30"
           }`}
         >
           {feedback.type === "success" ? (
@@ -408,12 +427,9 @@ export default function TasksClient({
       )}
 
       {/* Task list panel */}
-      <div className="bg-surface border border-border rounded-lg">
+      <div className="bg-surface border border-border rounded-xl shadow-sm">
         <div className="px-4 sm:px-6 py-4 border-b border-border flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h1
-            className="text-lg font-semibold text-text-primary"
-            style={{ fontFamily: "var(--font-space-grotesk), sans-serif" }}
-          >
+          <h1 className="font-heading text-lg font-semibold text-text-primary">
             {activeView === "all"
               ? "All Tasks"
               : activeView === "inbox"
@@ -569,6 +585,7 @@ export default function TasksClient({
               pendingCheckIns={pendingCheckIns}
               onComplete={handleComplete}
               onCheckInToggle={onCheckInToggle}
+              onOpen={setOpeningTask}
               onEdit={setEditingTask}
               onDelete={handleDelete}
             />
@@ -662,17 +679,17 @@ export default function TasksClient({
                         />
                       </td>
 
-                      {/* Task title: links to detail page, with a priority dot. Habits
-                          get a flame so they're distinguishable from normal tasks. */}
+                      {/* Task title: opens the detail overlay. Habits get a flame. */}
                       <td className="px-6 py-4">
                         <span className="inline-flex items-center gap-2">
-                          <Link
-                            href={`/tasks/${task.id}`}
-                            className="inline-flex items-center gap-1.5 text-text-primary font-medium hover:text-accent focus:outline-none focus:underline transition-colors duration-150"
+                          <button
+                            type="button"
+                            onClick={() => setOpeningTask(task)}
+                            className="inline-flex items-center gap-1.5 text-text-primary font-medium hover:text-accent focus:outline-none focus:underline transition-colors duration-150 cursor-pointer"
                           >
                             <PriorityDot priority={task.priority} />
                             {task.title}
-                          </Link>
+                          </button>
                           {task.isHabit && (
                             <Flame size={13} className="text-amber-500 shrink-0" aria-label="Habit" />
                           )}
@@ -793,6 +810,7 @@ export default function TasksClient({
                 activeView={activeView}
                 onComplete={handleComplete}
                 onDelete={handleDelete}
+                onOpen={setOpeningTask}
                 onEdit={setEditingTask}
                 onDeadlineChange={handleDeadlineQuickSet}
                 selectionMode={selectionMode}
@@ -810,6 +828,18 @@ export default function TasksClient({
           </>
         )}
       </div>
+
+      {/* Task detail overlay - opens when clicking a task card title or board card. */}
+      {openingTask && (
+        <TaskDetailModal
+          task={openingTask}
+          projects={projects}
+          allLabels={allLabels}
+          onClose={() => setOpeningTask(null)}
+          onEdit={handleEditFromModal}
+          onSaved={handleModalSaved}
+        />
+      )}
 
       {/* Chip-driven sheet for both create (creating) and edit (editingTask). */}
       {(creating || editingTask) && (

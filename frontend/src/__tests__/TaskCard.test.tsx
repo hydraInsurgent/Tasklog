@@ -35,6 +35,7 @@ function makeProps(overrides: Partial<Parameters<typeof TaskCard>[0]> = {}) {
     activeView: 'all' as const,
     onComplete: jest.fn(),
     onDelete: jest.fn(),
+    onOpen: jest.fn(),
     onEdit: jest.fn(),
     onDeadlineChange: jest.fn(),
     deletingId: null,
@@ -45,10 +46,11 @@ function makeProps(overrides: Partial<Parameters<typeof TaskCard>[0]> = {}) {
 }
 
 describe('TaskCard', () => {
-  it('renders the task title as a link to /tasks/[id]', () => {
-    render(<TaskCard {...makeProps()} />)
-    const link = screen.getByRole('link', { name: /buy groceries/i })
-    expect(link).toHaveAttribute('href', '/tasks/1')
+  it('renders the task title as a button that opens the detail modal', () => {
+    const onOpen = jest.fn()
+    render(<TaskCard {...makeProps({ onOpen })} />)
+    const btn = screen.getByRole('button', { name: /buy groceries/i })
+    expect(btn).toBeInTheDocument()
   })
 
   it('renders an unchecked checkbox when task is not completed', () => {

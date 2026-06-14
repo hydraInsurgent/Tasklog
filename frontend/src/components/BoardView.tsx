@@ -21,6 +21,7 @@ interface Props {
   pendingCheckIns: Set<number>;
   onComplete: (id: number, isCompleted: boolean) => void;
   onCheckInToggle: (id: number) => void;
+  onOpen: (task: Task) => void;
   onEdit: (task: Task) => void;
   onDelete: (id: number) => void;
 }
@@ -35,6 +36,7 @@ export default function BoardView({
   pendingCheckIns,
   onComplete,
   onCheckInToggle,
+  onOpen,
   onEdit,
   onDelete,
 }: Props) {
@@ -73,6 +75,7 @@ export default function BoardView({
                     pendingCheckIn={pendingCheckIns.has(task.id)}
                     onComplete={onComplete}
                     onCheckInToggle={onCheckInToggle}
+                    onOpen={onOpen}
                     onEdit={onEdit}
                     onDelete={onDelete}
                   />

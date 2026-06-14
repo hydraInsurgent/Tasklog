@@ -402,6 +402,13 @@ export async function getTimeEntries(from: string, to: string): Promise<TimeEntr
   return res.json();
 }
 
+// GET /api/time-entries?taskId=X - all entries for a task, newest first.
+export async function getTaskTimeEntries(taskId: number): Promise<TimeEntry[]> {
+  const res = await fetch(`${getApiUrl()}/api/time-entries?taskId=${taskId}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Failed to fetch time entries.");
+  return res.json();
+}
+
 // GET /api/time-entries/active - the running entry, or null. A 204 (and an empty body) both
 // mean "no timer running" - guard against them so res.json() doesn't choke on no content.
 export async function getActiveTimeEntry(): Promise<TimeEntry | null> {

@@ -39,6 +39,7 @@ import DueDatePicker from "./pickers/DueDatePicker";
 import PriorityPicker from "./pickers/PriorityPicker";
 import ProjectPicker from "./pickers/ProjectPicker";
 import LabelPicker from "./pickers/LabelPicker";
+import TaskTimeLog from "./TaskTimeLog";
 
 interface Props {
   // The task being edited, or undefined to create a new one.
@@ -524,6 +525,11 @@ export default function TaskSheet({ task, projects, allLabels, defaultProjectId,
                 Track as a daily habit
               </label>
             </div>
+
+            {/* Time log - only shown when editing an existing task */}
+            {isEdit && task?.id && (
+              <TaskTimeLog taskId={task.id} />
+            )}
           </div>
 
           {/* Footer */}

@@ -227,7 +227,7 @@ export default function RecurrencePicker({ value, onChange, deadline, disabled, 
                   key={d.code} type="button" onClick={() => toggleWeekday(d.code)} disabled={disabled}
                   aria-pressed={active} aria-label={d.full}
                   className={`w-9 h-9 rounded-full text-sm font-medium focus:outline-none focus:ring-2 focus:ring-accent transition-colors duration-150 cursor-pointer ${
-                    active ? "bg-primary text-white" : "bg-surface text-zinc-600 border border-border hover:bg-surface-raised"
+                    active ? "bg-primary text-white" : "bg-surface text-text-muted border border-border hover:bg-surface-raised"
                   }`}
                 >
                   {d.short}

@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
-import Link from "next/link";
 import { MoreVertical, Trash2, Loader2, Pencil, Flame } from "lucide-react";
 import { Task, Project, Habit } from "@/lib/api";
 import { formatDeadline, deadlineColorClass, projectName, labelColor } from "@/lib/format";
@@ -21,7 +20,9 @@ interface Props {
   activeView: "all" | "inbox" | number;
   onComplete: (id: number, isCompleted: boolean) => void;
   onDelete: (id: number) => void;
-  // Open the edit modal for this task (handled by the parent).
+  // Open the detail overlay for this task (handled by the parent).
+  onOpen: (task: Task) => void;
+  // Open the edit sheet for this task (handled by the parent).
   onEdit: (task: Task) => void;
   // Quick deadline change from the deadline-pill popover. null clears it.
   onDeadlineChange: (id: number, deadline: string | null) => void;
@@ -49,6 +50,7 @@ export default function TaskCard({
   activeView,
   onComplete,
   onDelete,
+  onOpen,
   onEdit,
   onDeadlineChange,
   selectionMode = false,
@@ -94,7 +96,7 @@ export default function TaskCard({
 
   return (
     <div
-      className={`flex items-center gap-1 px-2 py-3 border-b border-border-muted last:border-b-0${
+      className={`group/card flex items-center gap-1 px-3 py-3.5 border-b border-border-muted last:border-b-0 hover:bg-surface-raised/60${
         isHiding ? " transition-all duration-300 opacity-0 translate-y-1" : " transition-colors duration-150"
       }${isCompletedAndVisible ? " opacity-50" : ""}`}
     >
@@ -142,16 +144,17 @@ export default function TaskCard({
 
       {/* Card body: title on top, project + deadline below */}
       <div className="flex-1 min-w-0 py-1">
-        <Link
-          href={`/tasks/${task.id}`}
-          className={`flex items-center gap-1.5 text-sm font-medium text-text-primary hover:text-accent focus:outline-none focus:underline transition-colors duration-150 break-words cursor-pointer${
+        <button
+          type="button"
+          onClick={() => onOpen(task)}
+          className={`flex items-center gap-1.5 text-sm font-medium text-text-primary hover:text-accent focus:outline-none focus:underline transition-colors duration-150 break-words cursor-pointer text-left w-full${
             isCompletedAndVisible ? " line-through" : ""
           }`}
         >
           <PriorityDot priority={task.priority} />
           <span className="min-w-0 break-words">{task.title}</span>
           {task.isHabit && <Flame size={13} className="text-amber-500 shrink-0" aria-label="Habit" />}
-        </Link>
+        </button>
 
         {/* Footer row: project name, deadline, and labels */}
         <div className="mt-0.5 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-xs">
@@ -166,10 +169,10 @@ export default function TaskCard({
                 onClick={() => setDeadlineOpen((p) => !p)}
                 aria-label={`Change deadline for "${task.title}"`}
                 className={`rounded px-1 -mx-1 hover:bg-surface-raised focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer transition-colors duration-150 ${
-                  task.deadline ? deadlineColorClass(task.deadline) : "text-zinc-300"
+                  task.deadline ? deadlineColorClass(task.deadline) : "text-text-muted opacity-0 group-hover/card:opacity-100"
                 }`}
               >
-                {task.deadline ? formatDeadline(task.deadline) : "No deadline"}
+                {task.deadline ? formatDeadline(task.deadline) : "Add date"}
               </button>
               {deadlineOpen && (
                 <DeadlinePopover
@@ -244,7 +247,7 @@ export default function TaskCard({
               }}
               disabled={isDeleting}
               aria-label={`Delete task: ${task.title}`}
-              className="flex items-center gap-2 w-full px-3 py-2.5 text-sm text-danger hover:bg-red-50 focus:outline-none focus:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors duration-150 rounded-md"
+              className="flex items-center gap-2 w-full px-3 py-2.5 text-sm text-danger hover:bg-danger-bg focus:outline-none focus:bg-danger-bg disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-colors duration-150 rounded-md"
             >
               {isDeleting ? (
                 <Loader2 size={14} className="animate-spin" aria-hidden="true" />
