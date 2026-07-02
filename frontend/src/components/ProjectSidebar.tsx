@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Pencil, Trash2, Plus, Tag, Clock, Inbox, LayoutList } from "lucide-react";
+import { Pencil, Trash2, Plus, Tag, Clock, Inbox, LayoutList, BookOpen } from "lucide-react";
 import { Project, Habit } from "@/lib/api";
 import SidebarHabits from "./SidebarHabits";
 import ColorPickerButton from "./ColorPickerButton";
@@ -192,6 +192,16 @@ export default function ProjectSidebar({
           >
             <Clock size={15} aria-hidden="true" />
             Time
+          </Link>
+
+          <Link
+            href="/journal"
+            className={`flex items-center gap-2.5 w-full text-left text-sm px-3 py-2 rounded-lg transition-colors duration-150 cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent ${
+              pathname === "/journal" ? activeNavClass : inactiveNavClass
+            }`}
+          >
+            <BookOpen size={15} aria-hidden="true" />
+            Journal
           </Link>
         </div>
 
