@@ -46,3 +46,4 @@ PLAN-*.md
 build/
 release/
 dist/sample/
+.claude/scheduled_tasks.lock

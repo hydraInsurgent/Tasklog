@@ -32,7 +32,9 @@
       "WebFetch(domain:support.claude.com)",
       "WebFetch(domain:developers.cloudflare.com)",
       "WebFetch(domain:claude.com)",
-      "Bash(node --import tsx --test *)"
+      "Bash(node --import tsx --test *)",
+      "WebSearch",
+      "Bash(dotnet test *)"
     ],
     "additionalDirectories": [
       "/tmp"
