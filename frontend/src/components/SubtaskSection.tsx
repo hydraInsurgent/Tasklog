@@ -7,7 +7,7 @@
  * Kept separate from the card's read-only SubtaskChecklist: this is the place for editing,
  * the card is the place for a glance + a quick tick. */
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors,
   type DragEndEvent,
@@ -19,7 +19,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Check, GripVertical, Trash2, Calendar, Plus, Loader2 } from "lucide-react";
 import { Subtask, createSubtask, toggleSubtask, updateSubtask, deleteSubtask, reorderSubtasks } from "@/lib/api";
 import { formatDeadline, deadlineColorClass } from "@/lib/format";
-import DeadlinePopover from "./DeadlinePopover";
+import DueDatePicker from "./pickers/DueDatePicker";
 
 interface Props {
   taskId: number;
@@ -189,6 +189,8 @@ function SubtaskRow({
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: s.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.6 : 1 };
+  // The date button anchors the DueDatePicker popover (same picker the task's due date uses).
+  const dateTriggerRef = useRef<HTMLButtonElement>(null);
 
   return (
     <li
@@ -225,20 +227,29 @@ function SubtaskRow({
         {s.title}
       </span>
 
-      {/* Deadline pill / add-date */}
-      <span className="relative shrink-0">
+      {/* Deadline: a compact calendar-icon button (with the date when set) that opens the
+          same rich due-date picker (quick chips + month calendar + time) as a task. */}
+      <span className="shrink-0">
         <button
+          ref={dateTriggerRef}
           type="button"
           onClick={onOpenDeadline}
-          aria-label={`Change deadline for "${s.title}"`}
-          className={`flex items-center gap-1 text-xs rounded px-1 py-0.5 hover:bg-surface-raised focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer transition-colors duration-150 ${
-            s.deadline ? deadlineColorClass(s.deadline) : "text-text-muted opacity-0 group-hover:opacity-100"
+          aria-label={s.deadline ? `Change deadline for "${s.title}"` : `Set a deadline for "${s.title}"`}
+          title={s.deadline ? undefined : "Set a date"}
+          className={`flex items-center gap-1 text-xs rounded px-1.5 py-0.5 hover:bg-surface-raised focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer transition-colors duration-150 ${
+            s.deadline ? deadlineColorClass(s.deadline) : "text-text-muted opacity-0 group-hover:opacity-100 focus:opacity-100"
           }`}
         >
-          <Calendar size={11} aria-hidden="true" />
-          {s.deadline ? formatDeadline(s.deadline) : "Date"}
+          <Calendar size={12} aria-hidden="true" />
+          {s.deadline && <span>{formatDeadline(s.deadline)}</span>}
         </button>
-        {deadlineOpen && <DeadlinePopover onPick={onPickDeadline} onClose={onCloseDeadline} />}
+        <DueDatePicker
+          open={deadlineOpen}
+          triggerRef={dateTriggerRef}
+          value={s.deadline}
+          onChange={onPickDeadline}
+          onClose={onCloseDeadline}
+        />
       </span>
 
       {/* Delete */}

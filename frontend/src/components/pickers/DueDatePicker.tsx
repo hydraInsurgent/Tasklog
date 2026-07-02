@@ -113,7 +113,7 @@ export default function DueDatePicker({ open, triggerRef, value, onChange, onClo
   }
 
   const quickChipBase =
-    "inline-flex items-center justify-center min-h-[44px] px-3 rounded-full text-sm border " +
+    "inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs border " +
     "transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 cursor-pointer";
   const quickChipClass = (active: boolean) =>
     active
@@ -122,9 +122,9 @@ export default function DueDatePicker({ open, triggerRef, value, onChange, onClo
 
   return (
     <PickerSheet open={open} triggerRef={triggerRef} title="Due date" onClose={onClose}>
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
         {/* Quick chips */}
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5">
           <button type="button" onClick={() => emitDate(today)} className={quickChipClass(activeChip === "today")}>
             Today
           </button>
@@ -146,7 +146,7 @@ export default function DueDatePicker({ open, triggerRef, value, onChange, onClo
               type="button"
               onClick={gotoPrevMonth}
               aria-label="Previous month"
-              className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded text-text-muted hover:text-text-primary hover:bg-surface-raised focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 cursor-pointer"
+              className="h-7 w-7 inline-flex items-center justify-center rounded text-text-muted hover:text-text-primary hover:bg-surface-raised focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 cursor-pointer"
             >
               <ChevronLeft size={16} aria-hidden="true" />
             </button>
@@ -157,14 +157,14 @@ export default function DueDatePicker({ open, triggerRef, value, onChange, onClo
               type="button"
               onClick={gotoNextMonth}
               aria-label="Next month"
-              className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded text-text-muted hover:text-text-primary hover:bg-surface-raised focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 cursor-pointer"
+              className="h-7 w-7 inline-flex items-center justify-center rounded text-text-muted hover:text-text-primary hover:bg-surface-raised focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 cursor-pointer"
             >
               <ChevronRight size={16} aria-hidden="true" />
             </button>
           </div>
           <div className="grid grid-cols-7 gap-0.5">
             {DAY_LABELS.map((d) => (
-              <div key={d} className="text-center text-[10px] font-medium uppercase tracking-wide text-text-muted py-1">
+              <div key={d} className="text-center text-[10px] font-medium uppercase tracking-wide text-text-muted py-0.5">
                 {d}
               </div>
             ))}
@@ -180,7 +180,7 @@ export default function DueDatePicker({ open, triggerRef, value, onChange, onClo
                   aria-label={cellIso}
                   aria-pressed={isSelected}
                   className={
-                    "min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-sm rounded-full " +
+                    "h-8 inline-flex items-center justify-center text-[13px] rounded-full " +
                     "transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 cursor-pointer " +
                     (isSelected
                       ? "bg-accent text-white "
@@ -199,7 +199,7 @@ export default function DueDatePicker({ open, triggerRef, value, onChange, onClo
 
         {/* Optional time-of-day. Only meaningful with a date; preserves the app's
             midnight = date-only convention (blank time = date-only). */}
-        <div className="flex items-center gap-2 text-sm">
+        <div className="flex items-center gap-2 text-xs">
           <label htmlFor="due-time" className="text-text-muted">
             Time (optional)
           </label>
@@ -209,7 +209,7 @@ export default function DueDatePicker({ open, triggerRef, value, onChange, onClo
             value={timePart}
             onChange={(e) => emitTime(e.target.value)}
             disabled={!datePart}
-            className="px-2 py-1.5 border border-border rounded-md text-text-primary bg-surface focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            className="px-2 py-1 border border-border rounded-md text-text-primary bg-surface focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           />
         </div>
       </div>
