@@ -635,7 +635,7 @@ export default function TasksClient({
         ) : viewMode === "board" ? (
           <div className="p-4">
             <BoardView
-              tasks={selectableTasks}
+              tasks={visibleTasks}
               groupBy={groupBy}
               projects={projects}
               habitsByTaskId={habitsByTaskId}
@@ -647,6 +647,8 @@ export default function TasksClient({
               onOpen={setOpeningTask}
               onEdit={setEditingTask}
               onDelete={handleDelete}
+              onToggleSubtask={handleToggleSubtask}
+              onOpenParent={openParentOf}
             />
           </div>
         ) : (

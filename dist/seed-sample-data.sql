@@ -1,6 +1,7 @@
 -- Tasklog Sample Data Seed Script
--- Updated for v2.19.0: project colors, habits + check-ins, time entries,
--- descriptions, priorities, and comments.
+-- Updated for v2.20.0: adds subtasks (checklist items, incl. dated ones that
+-- surface as their own cards). Also: project colors, habits + check-ins, time
+-- entries, descriptions, priorities, and comments (v2.19.0).
 -- Idempotent: clears all data before inserting.
 
 PRAGMA foreign_keys = OFF;
@@ -10,12 +11,13 @@ DELETE FROM LabelTaskModel;
 DELETE FROM Comments;
 DELETE FROM CheckIns;
 DELETE FROM TimeEntries;
+DELETE FROM Subtasks;
 DELETE FROM Tasks;
 DELETE FROM Labels;
 DELETE FROM Projects;
 
 DELETE FROM sqlite_sequence
-  WHERE name IN ('Projects', 'Tasks', 'Labels', 'Comments', 'CheckIns', 'TimeEntries');
+  WHERE name IN ('Projects', 'Tasks', 'Labels', 'Comments', 'CheckIns', 'TimeEntries', 'Subtasks');
 
 PRAGMA foreign_keys = ON;
 
@@ -153,6 +155,28 @@ INSERT INTO Comments (Id, Body, CreatedAt, TaskId) VALUES
       datetime('now', '-1 day'),  3),
   (3, 'Leadership asked for a "risks and dependencies" slide. Updated scope.',
       datetime('now', '-1 day'),  1);
+
+-- ============================================================
+-- Subtasks  (checklist items, #78 / v2.20.0)
+-- A subtask with a Deadline also surfaces as its own card in the task list,
+-- breadcrumbed to its parent. IsCompleted subtasks show ticked; Position sets order.
+-- ============================================================
+INSERT INTO Subtasks (Id, Title, IsCompleted, Position, Deadline, CreatedAt, TaskId) VALUES
+  -- Task 1: Prepare Q3 roadmap presentation (Work) - a mostly-open checklist, one dated
+  (1,  'Draft the slide deck',                   1, 0, NULL,                        datetime('now', '-13 days'), 1),
+  (2,  'Add the risks & dependencies slide',     0, 1, NULL,                        datetime('now', '-13 days'), 1),
+  (3,  'Rehearse timing',                        0, 2, datetime('now', '+3 days'),  datetime('now', '-13 days'), 1),
+  (4,  'Send to leadership for sign-off',        0, 3, NULL,                        datetime('now', '-13 days'), 1),
+
+  -- Task 11: Ship v0.1 landing page (Side Project)
+  (5,  'Write the hero copy',                    1, 0, NULL,                        datetime('now', '-9 days'),  11),
+  (6,  'Build the features section',             0, 1, NULL,                        datetime('now', '-9 days'),  11),
+  (7,  'Wire up the waitlist form',              0, 2, NULL,                        datetime('now', '-9 days'),  11),
+
+  -- Task 7: Book flights for August trip (Personal) - another dated subtask
+  (8,  'Compare flight prices',                  1, 0, NULL,                        datetime('now', '-11 days'), 7),
+  (9,  'Book the outbound flight',               0, 1, datetime('now', '+2 days'),  datetime('now', '-11 days'), 7),
+  (10, 'Book the return flight',                 0, 2, NULL,                        datetime('now', '-11 days'), 7);
 
 -- ============================================================
 -- CheckIns for habits
