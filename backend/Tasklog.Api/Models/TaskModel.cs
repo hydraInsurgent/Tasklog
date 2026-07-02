@@ -92,18 +92,6 @@ namespace Tasklog.Api.Models
         [NotMapped]
         public int CompletedSubtaskCount { get; set; }
 
-        // Projected-subtask fields (#78). Normally false/null. When GetAll projects a dated,
-        // incomplete subtask into the list as its own card, it builds a TaskModel with these
-        // set: IsSubtask=true, ParentTaskId + ParentTitle identify the owner (rendered as a
-        // breadcrumb), and the row inherits the parent's ProjectId/Labels for filtering while
-        // carrying the subtask's own Id + Deadline. [NotMapped] - response-only, never stored.
-        [NotMapped]
-        public bool IsSubtask { get; set; }
-        [NotMapped]
-        public int? ParentTaskId { get; set; }
-        [NotMapped]
-        public string? ParentTitle { get; set; }
-
         // Read-only "due bucket" relative to now. [NotMapped] keeps EF Core from
         // treating it as a column (so it is always computed fresh, never stored);
         // System.Text.Json still serializes the getter, so every action that returns

@@ -118,7 +118,7 @@ Tasklog/
 │       │   ├── HabitsPanel.tsx    Right-side habits panel beside the task list, shares habit state with ProjectLayout (#73)
 │       │   ├── HabitsClient.tsx   Full /habits view: fetch + poll habits, optimistic done-today toggle (Client Component, v2.16.0)
 │       │   └── HabitCard.tsx      One habit: specific-days view (schedule label, day streak, 7-day dot row) OR frequency view (n/x this week, week streak, coloured recent-week strip) keyed on weeklyTarget; shared CheckInButton (v2.16.0/#73/#75)
-│       │   ├── SubtaskChecklist.tsx  Inline tickable subtask circles on a task card, capped ~6 + "+N more" (#78)
+│       │   ├── SubtaskChecklist.tsx  Inline tickable subtask circles clubbed under a parent (card + table sub-row + board), cap + "+N more" (#78)
 │       │   ├── SubtaskSection.tsx  Full subtask editor (detail modal + /tasks/:id): add/tick/deadline/delete + @dnd-kit drag-reorder (#78)
 │       │   ├── CompleteWithSubtasksDialog.tsx  Complete-all vs pull-out prompt when completing a parent with open subtasks (#78)
 │       │   (list is representative - other components: TaskCard, FilterPanel, LabelsClient, etc.)
@@ -218,16 +218,15 @@ Subtasks  (v2.20.0 - a task's checklist items, #78)
   Title       TEXT     not null  (<= 500 chars)
   IsCompleted INTEGER  not null  default 0  (boolean)
   Position    INTEGER  not null  (manual order within the parent; assigned max+1 on create)
-  Deadline    TEXT     nullable  (ISO 8601 datetime; a dated incomplete subtask is also
-                       projected into the task list as its own card. Midnight = date-only)
+  Deadline    TEXT     nullable  (ISO 8601 datetime; shown inline next to the subtask.
+                       Midnight = date-only, mirroring Tasks.Deadline)
   CreatedAt   TEXT     not null  (ISO 8601 datetime string)
   TaskId      INTEGER  not null  foreign key -> Tasks.Id  (cascade delete; indexed)
 
   (task response fields, v2.20.0) subtaskCount / completedSubtaskCount  int  always present
-                  (drive the "2/5" card badge). subtasks[]  full rows, [NotMapped] nav -
-                  serialized on GetById, and on GetAll only when includeSubtasks=true.
-  (projected-row fields) isSubtask bool + parentTaskId int? + parentTitle string?  set only
-                  on the synthetic rows GetAll emits for a dated incomplete subtask.
+                  (drive the "2/5" badge). subtasks[]  full rows, [NotMapped] nav - serialized
+                  on GetById, and on GetAll only when includeSubtasks=true (the web loads them
+                  to render the inline checklist; MCP's list_tasks gets counts only).
 
 CheckIns  (v2.16.0 - one per habit per day)
   Id          INTEGER  primary key, autoincrement
@@ -254,7 +253,7 @@ TimeEntries  (v2.19.0 - one interval per start+stop cycle)
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/tasks` | Filtered/sorted task list. Filter params: `projectIds` (repeated key), `inbox`, `labelIds` (repeated key), `dueBefore`, `dueAfter`, `createdAfter`, `createdBefore`, `completed`, `text`, `priorities` (repeated key, P1-P4). Sort: `sort` (`created`/`deadline`/`priority`, default `created`) + `order` (`asc`/`desc`, default `desc`; deadline sorts nulls-last, priority asc = P1 first). `limit` caps to the first N after sorting (`<1` → 400). Arrays use repeated keys, not comma-separated. AND across dimensions, OR within id arrays. No params = all tasks, newest-first. `inbox=true` + `projectIds` → 400. `includeSubtasks=true` (v2.20.0, web-only) loads each task's `subtasks[]` and projects dated incomplete subtasks as their own synthetic rows (flagged `isSubtask`, inheriting the parent that survived the filters); MCP omits it so `list_tasks` stays pure tasks. |
+| GET | `/api/tasks` | Filtered/sorted task list. Filter params: `projectIds` (repeated key), `inbox`, `labelIds` (repeated key), `dueBefore`, `dueAfter`, `createdAfter`, `createdBefore`, `completed`, `text`, `priorities` (repeated key, P1-P4). Sort: `sort` (`created`/`deadline`/`priority`, default `created`) + `order` (`asc`/`desc`, default `desc`; deadline sorts nulls-last, priority asc = P1 first). `limit` caps to the first N after sorting (`<1` → 400). Arrays use repeated keys, not comma-separated. AND across dimensions, OR within id arrays. No params = all tasks, newest-first. `inbox=true` + `projectIds` → 400. `includeSubtasks=true` (v2.20.0, web-only) loads each task's `subtasks[]` so the web can render the inline checklist; MCP omits it so `list_tasks` stays lean (counts only). |
 | GET | `/api/tasks/{id}` | Single task by ID, including its `comments[]` (newest first) and `subtasks[]` (by Position). 404 if not found |
 | GET | `/api/tasks/{taskId}/subtasks` | List a task's subtasks in manual order. 404 if task missing (v2.20.0) |
 | POST | `/api/tasks/{taskId}/subtasks` | Add a subtask. Body: `{ title, deadline? }` (title <= 500). Position = max+1. 201; 400 bad title; 404 task missing (v2.20.0) |

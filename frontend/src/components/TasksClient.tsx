@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { usePolling } from "@/hooks/usePolling";
 import { Trash2, CheckCircle, XCircle, Loader2, MoreHorizontal, Plus, Pencil, ListChecks, List, LayoutGrid, Flame, CornerDownRight } from "lucide-react";
 import { getTasks, deleteTask, completeTask, toggleSubtask, getLabels, updateTask, bulkTasks, BulkOperation, Task, Project, Label, Habit } from "@/lib/api";
 import { formatDate, formatDeadline, deadlineColorClass, projectName, labelColor } from "@/lib/format";
 import TaskCard from "./TaskCard";
 import CompleteWithSubtasksDialog from "./CompleteWithSubtasksDialog";
+import SubtaskChecklist from "./SubtaskChecklist";
 import TaskSheet from "./TaskSheet";
 import TaskDetailModal from "./TaskDetailModal";
 import TaskDoneControl from "./TaskDoneControl";
@@ -452,9 +453,10 @@ export default function TasksClient({
   const visibleTasks = filteredTasks.filter(
     (t) => showCompleted || !isDoneForToday(t) || hidingIds.has(t.id)
   );
-  // Real tasks only - projected subtask rows aren't bulk-selectable (a subtask id could
-  // collide with a task id, and bulk ops act on tasks). Also the board shows tasks only.
-  const selectableTasks = visibleTasks.filter((t) => !t.isSubtask);
+  // What we actually render: real tasks only. Subtasks are never shown as their own row -
+  // they nest inline under their parent (card, table sub-row, board card, detail). We drop
+  // any projected subtask rows the API returns so the two views agree everywhere.
+  const displayTasks = visibleTasks.filter((t) => !t.isSubtask);
 
   // Human-readable label for the current view, used in empty state text.
   const viewLabel =
@@ -635,7 +637,7 @@ export default function TasksClient({
         ) : viewMode === "board" ? (
           <div className="p-4">
             <BoardView
-              tasks={visibleTasks}
+              tasks={displayTasks}
               groupBy={groupBy}
               projects={projects}
               habitsByTaskId={habitsByTaskId}
@@ -663,10 +665,10 @@ export default function TasksClient({
                     <th className="pl-6 pr-2 py-3 w-8">
                       <input
                         type="checkbox"
-                        checked={selectableTasks.length > 0 && selectableTasks.every((t) => selectedIds.has(t.id))}
+                        checked={displayTasks.length > 0 && displayTasks.every((t) => selectedIds.has(t.id))}
                         onChange={(e) =>
                           setSelectedIds(
-                            e.target.checked ? new Set(selectableTasks.map((t) => t.id)) : new Set(),
+                            e.target.checked ? new Set(displayTasks.map((t) => t.id)) : new Set(),
                           )
                         }
                         aria-label="Select all tasks"
@@ -704,16 +706,18 @@ export default function TasksClient({
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-muted">
-                {visibleTasks.map((task) => {
+                {displayTasks.map((task) => {
                   const isHiding = hidingIds.has(task.id);
                   const isCompletedAndVisible = task.isCompleted && !isHiding;
                   const openSubtasks = openSubtaskCount(task);
                   return (
+                    <Fragment key={rowKey(task)}>
                     <tr
-                      key={rowKey(task)}
                       className={`group hover:bg-surface-raised transition-colors duration-150${
                         isHiding ? " transition-all duration-300 opacity-0 translate-y-1" : ""
-                      }${isCompletedAndVisible ? " opacity-50" : ""}`}
+                      }${isCompletedAndVisible ? " opacity-50" : ""}${
+                        (task.subtaskCount ?? 0) > 0 ? " border-b-0" : ""
+                      }`}
                     >
                       {/* Selection checkbox - only in select mode, and not for projected
                           subtask rows (they aren't bulk-selectable). */}
@@ -893,6 +897,22 @@ export default function TasksClient({
                         )}
                       </td>
                     </tr>
+
+                    {/* Subtasks clubbed under the parent row (all of them, tickable), so the
+                        desktop table matches the mobile card. Full-width, indented. */}
+                    {task.subtasks && task.subtasks.length > 0 && (
+                      <tr className={`border-b border-border-muted${isCompletedAndVisible ? " opacity-50" : ""}`}>
+                        <td colSpan={9} className="pl-16 pr-6 pb-3 pt-0">
+                          <SubtaskChecklist
+                            subtasks={task.subtasks}
+                            max={100}
+                            onToggle={(subtaskId, isCompleted) => handleToggleSubtask(task.id, subtaskId, isCompleted)}
+                            onOpenParent={() => setOpeningTask(task)}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   );
                 })}
               </tbody>
@@ -901,7 +921,7 @@ export default function TasksClient({
 
           {/* Mobile card list - shown below md: breakpoint, hidden on desktop. */}
           <div className="md:hidden overflow-hidden rounded-b-lg">
-            {visibleTasks.map((task) => (
+            {displayTasks.map((task) => (
               <TaskCard
                 key={rowKey(task)}
                 task={task}

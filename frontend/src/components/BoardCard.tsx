@@ -11,6 +11,7 @@ import { priorityMeta, formatDeadline, deadlineColorClass, labelColor } from "@/
 import TaskDoneControl from "./TaskDoneControl";
 import TimerControl from "./TimerControl";
 import RecurringBadge from "./RecurringBadge";
+import SubtaskChecklist from "./SubtaskChecklist";
 
 // Background tint by due urgency (only while not completed). Overdue red, today amber.
 const DUE_TINT: Record<Task["dueStatus"], string> = {
@@ -137,6 +138,17 @@ export default function BoardCard({
           {task.deadline && (
             <span className={`ml-auto ${deadlineColorClass(task.deadline)}`}>{formatDeadline(task.deadline)}</span>
           )}
+        </div>
+      )}
+
+      {/* Subtasks clubbed inline under the card (tickable), stopping card-click propagation. */}
+      {task.subtasks && task.subtasks.length > 0 && (
+        <div className="pl-7" onClick={(e) => e.stopPropagation()}>
+          <SubtaskChecklist
+            subtasks={task.subtasks}
+            onToggle={(subtaskId, isCompleted) => onToggleSubtask?.(task.id, subtaskId, isCompleted)}
+            onOpenParent={() => onOpen(task)}
+          />
         </div>
       )}
 

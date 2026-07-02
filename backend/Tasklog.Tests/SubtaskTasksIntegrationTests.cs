@@ -48,86 +48,46 @@ public class SubtaskTasksIntegrationTests
 
         var tasks = Ok(await controller.GetAll(Filter()));
 
-        var parent = tasks.Single(t => !t.IsSubtask);
+        var parent = tasks.Single();
         parent.SubtaskCount.Should().Be(2);
         parent.CompletedSubtaskCount.Should().Be(1);
     }
 
     [Fact]
-    public async Task GetAll_WithIncludeSubtasks_ProjectsDatedIncompleteSubtaskAsRow()
+    public async Task GetAll_WithIncludeSubtasks_LoadsSubtaskRows()
     {
         using var context = CreateContext();
-        var parent = await SeedTaskWithSubtasks(context,
-            new Subtask { Title = "dated open", Position = 0, Deadline = new DateTime(2026, 9, 1), CreatedAt = DateTime.Now },
-            new Subtask { Title = "undated open", Position = 1, CreatedAt = DateTime.Now },
-            new Subtask { Title = "dated done", Position = 2, Deadline = new DateTime(2026, 9, 2), IsCompleted = true, CreatedAt = DateTime.Now });
+        await SeedTaskWithSubtasks(context,
+            new Subtask { Title = "a", Position = 0, CreatedAt = DateTime.Now },
+            new Subtask { Title = "b", Position = 1, CreatedAt = DateTime.Now });
         var controller = new TasksController(context);
 
         var tasks = Ok(await controller.GetAll(Filter(includeSubtasks: true)));
 
-        // Only the dated + incomplete subtask is projected as its own row.
-        var projected = tasks.Where(t => t.IsSubtask).ToList();
-        projected.Should().HaveCount(1);
-        projected[0].Title.Should().Be("dated open");
-        projected[0].ParentTaskId.Should().Be(parent.Id);
-        projected[0].ParentTitle.Should().Be("Parent");
+        // includeSubtasks loads the full ordered rows (for the inline checklist) - and the list
+        // never contains synthetic subtask rows; subtasks nest under their parent everywhere.
+        var parent = tasks.Single();
+        parent.Subtasks.Should().HaveCount(2);
+        parent.Subtasks.Select(s => s.Title).Should().ContainInOrder("a", "b");
     }
 
     [Fact]
-    public async Task GetAll_WithoutIncludeSubtasks_DoesNotProject()
+    public async Task GetAll_WithoutIncludeSubtasks_PopulatesCountsOnly()
     {
         using var context = CreateContext();
         await SeedTaskWithSubtasks(context,
-            new Subtask { Title = "dated open", Position = 0, Deadline = new DateTime(2026, 9, 1), CreatedAt = DateTime.Now });
+            new Subtask { Title = "a", Position = 0, IsCompleted = true, CreatedAt = DateTime.Now },
+            new Subtask { Title = "b", Position = 1, CreatedAt = DateTime.Now });
         var controller = new TasksController(context);
 
         var tasks = Ok(await controller.GetAll(Filter(includeSubtasks: null)));
 
-        tasks.Any(t => t.IsSubtask).Should().BeFalse();
-        // Counts are still populated via the grouped query.
-        tasks.Single().SubtaskCount.Should().Be(1);
-    }
-
-    [Fact]
-    public async Task GetAll_CompletedFilter_SkipsProjection()
-    {
-        using var context = CreateContext();
-        await SeedTaskWithSubtasks(context,
-            new Subtask { Title = "dated open", Position = 0, Deadline = new DateTime(2026, 9, 1), CreatedAt = DateTime.Now });
-        var controller = new TasksController(context);
-
-        // Asking only for completed tasks must not inject the (incomplete) projected subtask rows.
-        var tasks = Ok(await controller.GetAll(Filter(includeSubtasks: true, completed: true)));
-
-        tasks.Any(t => t.IsSubtask).Should().BeFalse();
-    }
-
-    [Fact]
-    public async Task GetAll_Projection_RespectsParentProjectFilter()
-    {
-        using var context = CreateContext();
-        var projA = new Project { Name = "A", CreatedAt = DateTime.Now };
-        var projB = new Project { Name = "B", CreatedAt = DateTime.Now };
-        context.Projects.AddRange(projA, projB);
-        await context.SaveChangesAsync();
-        var inA = new TaskModel { Title = "in A", ProjectId = projA.Id, CreatedAt = DateTime.Now };
-        var inB = new TaskModel { Title = "in B", ProjectId = projB.Id, CreatedAt = DateTime.Now };
-        context.Tasks.AddRange(inA, inB);
-        await context.SaveChangesAsync();
-        context.Subtasks.AddRange(
-            new Subtask { TaskId = inA.Id, Title = "sub A", Position = 0, Deadline = new DateTime(2026, 9, 1), CreatedAt = DateTime.Now },
-            new Subtask { TaskId = inB.Id, Title = "sub B", Position = 0, Deadline = new DateTime(2026, 9, 1), CreatedAt = DateTime.Now });
-        await context.SaveChangesAsync();
-        var controller = new TasksController(context);
-
-        // Filtering to project A must project only A's subtask (the projection follows the
-        // parents that survived the filter).
-        var filter = new TaskFilterQuery(new[] { projA.Id }, null, null, null, null, null, null, IncludeSubtasks: true);
-        var tasks = Ok(await controller.GetAll(filter));
-
-        var projected = tasks.Where(t => t.IsSubtask).ToList();
-        projected.Should().ContainSingle();
-        projected[0].Title.Should().Be("sub A");
+        // Counts come from the grouped query even without loading the rows (kept lean for MCP).
+        // (We assert only the counts here: the InMemory provider's shared change-tracker
+        // populates the nav regardless of Include, unlike production SQLite's per-request context.)
+        var parent = tasks.Single();
+        parent.SubtaskCount.Should().Be(2);
+        parent.CompletedSubtaskCount.Should().Be(1);
     }
 
     [Fact]

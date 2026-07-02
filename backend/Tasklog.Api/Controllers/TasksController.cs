@@ -47,8 +47,9 @@ namespace Tasklog.Api.Controllers
 
             IQueryable<TaskModel> query = _context.Tasks.Include(t => t.Labels);
 
-            // The web list opts into the full subtask rows (for the inline checklist);
-            // MCP's list_tasks does not, and gets the cheap counts only (stitched below).
+            // The web list opts into the full subtask rows so it can render the inline
+            // checklist under each task; MCP's list_tasks does not, and gets the cheap
+            // counts only (stitched below).
             if (filter.IncludeSubtasks == true)
                 query = query.Include(t => t.Subtasks.OrderBy(s => s.Position));
 
@@ -189,44 +190,6 @@ namespace Tasklog.Api.Controllers
                     {
                         t.SubtaskCount = c.Total;
                         t.CompletedSubtaskCount = c.Completed;
-                    }
-                }
-            }
-
-            // Project dated, incomplete subtasks into the list as their own cards, but only
-            // when the caller opts in (the web list does; MCP's list_tasks stays pure tasks).
-            // We project from the subtasks ALREADY loaded on the parents in view (Include
-            // above), so a projected row automatically respects every filter + limit applied
-            // to its parent, and we avoid a second query. Each becomes a synthetic task-shaped
-            // row inheriting the parent's project/labels/priority (so it satisfies the same
-            // client filters), flagged IsSubtask with a breadcrumb back to the parent. A
-            // caller asking only for completed tasks skips these (subtasks here are open).
-            if (filter.IncludeSubtasks == true && filter.Completed != true)
-            {
-                // Snapshot the real tasks first - we append to `tasks` inside the loop.
-                var parents = tasks.ToList();
-                foreach (var parent in parents)
-                {
-                    foreach (var s in parent.Subtasks.Where(s => !s.IsCompleted && s.Deadline != null))
-                    {
-                        var row = new TaskModel
-                        {
-                            // The row carries the subtask's own identity + deadline; IsSubtask
-                            // lets the frontend route its done-toggle to the subtask endpoint
-                            // and render a breadcrumb to the parent.
-                            Id = s.Id,
-                            Title = s.Title,
-                            Deadline = s.Deadline,
-                            CreatedAt = s.CreatedAt,
-                            ProjectId = parent.ProjectId,
-                            Priority = parent.Priority,
-                            IsSubtask = true,
-                            ParentTaskId = parent.Id,
-                            ParentTitle = parent.Title,
-                        };
-                        foreach (var label in parent.Labels)
-                            row.Labels.Add(label);
-                        tasks.Add(row);
                     }
                 }
             }
