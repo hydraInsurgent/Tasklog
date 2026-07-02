@@ -11,7 +11,7 @@
 // fresh while the page is open.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Download, Moon, Sun } from "lucide-react";
+import { Download, PanelLeft, X } from "lucide-react";
 import {
   getJournalTemplates,
   getJournalEntries,
@@ -72,9 +72,12 @@ export default function JournalClient() {
   const [habitsDone, setHabitsDone] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
   const [timeSeconds, setTimeSeconds] = useState(0);
   const [wheelOpen, setWheelOpen] = useState(false);
+  // Mobile-only: widgets live in a left swipe-out drawer (desktop shows the right rail).
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
 
   const key = dateKey(date);
   const isToday = key === dateKey(new Date());
@@ -275,10 +278,33 @@ export default function JournalClient() {
   const selectDate = (d: Date) => {
     setMode("edit");
     setDate(d);
+    setDrawerOpen(false); // picking a day is a destination - show the note
     if (d.getMonth() !== date.getMonth() || d.getFullYear() !== date.getFullYear()) {
       loadMonthDots(d);
     }
   };
+
+  // Edge-swipe right opens the widget drawer; swipe left anywhere closes it.
+  // Mostly-horizontal gestures only, so vertical scrolling is never hijacked.
+  const onTouchStart = (e: React.TouchEvent) => {
+    touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const start = touchStart.current;
+    touchStart.current = null;
+    if (!start) return;
+    const dx = e.changedTouches[0].clientX - start.x;
+    const dy = e.changedTouches[0].clientY - start.y;
+    if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx)) return;
+    if (dx > 0 && start.x < 32) setDrawerOpen(true);
+    if (dx < 0) setDrawerOpen(false);
+  };
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setDrawerOpen(false);
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
 
   // ---------- render ----------
 
@@ -289,10 +315,52 @@ export default function JournalClient() {
     return <p className="text-danger text-sm py-8">{error}</p>;
   }
 
+  // Widgets, shared by the desktop right rail and the mobile drawer.
+  const railContent = (
+    <>
+      <CalendarWidget selected={date} entryDates={entryDates} onSelect={selectDate} onMonthChange={loadMonthDots} />
+      <MoodArcWidget checkins={checkins} onLog={() => { setDrawerOpen(false); setWheelOpen(true); }} />
+      <MindWidget
+        title="Front of mind"
+        items={fom}
+        rolled={fomRolled}
+        onChange={(items) => updateSection("daily", "front_of_mind", items)}
+      />
+      <MindWidget
+        title="Back of mind"
+        items={bom}
+        rolled={bomRolled}
+        onChange={(items) => updateSection("daily", "back_of_mind", items)}
+      />
+      <TodaySoFarWidget
+        planDone={planDone}
+        planTotal={planIds.size}
+        unplannedDone={unplanned.length}
+        timeSeconds={timeSeconds}
+        habitsDone={habitsDone.done}
+        habitsTotal={habitsDone.total}
+        checkinCount={checkins.length}
+      />
+      <button
+        onClick={() => { setDrawerOpen(false); jumpToEvening(); }}
+        className="w-full rounded-xl border border-j-line bg-j-card py-2.5 text-sm font-semibold text-j-accent hover:bg-j-accent-soft cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-j-accent"
+      >
+        Jump to evening ↓
+      </button>
+    </>
+  );
+
   return (
-    <div className="rounded-2xl bg-j-paper text-j-ink p-4 sm:p-6 -mx-2 sm:mx-0">
-      {/* Header: date, mode toggle, export */}
+    <div className="rounded-2xl bg-j-paper text-j-ink p-4 sm:p-6 -mx-2 sm:mx-0" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+      {/* Header: widgets drawer (mobile), date, mode toggle, export */}
       <header className="flex flex-wrap items-center gap-3 border-b border-j-line pb-4 mb-6">
+        <button
+          onClick={() => setDrawerOpen(true)}
+          aria-label="Open journal widgets"
+          className="lg:hidden grid place-items-center w-9 h-9 rounded-lg border border-j-line bg-j-card text-j-muted hover:text-j-ink cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-j-accent"
+        >
+          <PanelLeft size={16} aria-hidden="true" />
+        </button>
         <h1 className="font-heading text-xl font-bold">Journal</h1>
         <span className="text-sm rounded-full border border-j-line bg-j-card px-3.5 py-1.5">
           {date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
@@ -339,38 +407,10 @@ export default function JournalClient() {
       {loading ? (
         <p className="text-sm text-j-muted py-10 text-center">Loading the day…</p>
       ) : (
-        <div className="flex flex-col lg:flex-row gap-6 items-start">
-          {/* Rail: right on desktop, stacked on top on mobile */}
-          <aside className="w-full lg:w-[300px] lg:order-2 lg:sticky lg:top-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3.5">
-            <CalendarWidget selected={date} entryDates={entryDates} onSelect={selectDate} onMonthChange={loadMonthDots} />
-            <MoodArcWidget checkins={checkins} onLog={() => setWheelOpen(true)} />
-            <MindWidget
-              title="Front of mind"
-              items={fom}
-              rolled={fomRolled}
-              onChange={(items) => updateSection("daily", "front_of_mind", items)}
-            />
-            <MindWidget
-              title="Back of mind"
-              items={bom}
-              rolled={bomRolled}
-              onChange={(items) => updateSection("daily", "back_of_mind", items)}
-            />
-            <TodaySoFarWidget
-              planDone={planDone}
-              planTotal={planIds.size}
-              unplannedDone={unplanned.length}
-              timeSeconds={timeSeconds}
-              habitsDone={habitsDone.done}
-              habitsTotal={habitsDone.total}
-              checkinCount={checkins.length}
-            />
-            <button
-              onClick={jumpToEvening}
-              className="hidden lg:block w-full rounded-xl border border-j-line bg-j-card py-2.5 text-sm font-semibold text-j-accent hover:bg-j-accent-soft cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-j-accent"
-            >
-              Jump to evening ↓
-            </button>
+        <div className="flex gap-6 items-start">
+          {/* Desktop rail: right column. On mobile the same widgets live in the drawer. */}
+          <aside className="hidden lg:grid w-[300px] order-2 sticky top-4 grid-cols-1 gap-3.5">
+            {railContent}
           </aside>
 
           {/* Note column */}
@@ -489,6 +529,29 @@ export default function JournalClient() {
       >
         Evening ↓
       </button>
+
+      {/* Mobile widget drawer: slides in from the left (edge-swipe right also opens it) */}
+      {drawerOpen && (
+        <div className="fixed inset-0 bg-black/40 z-40 lg:hidden tl-fade" onClick={() => setDrawerOpen(false)} aria-hidden="true" />
+      )}
+      <aside
+        aria-label="Journal widgets"
+        className={`lg:hidden fixed top-0 left-0 bottom-0 z-50 w-[320px] max-w-[86vw] overflow-y-auto bg-j-paper border-r border-j-line p-4 space-y-3.5 transform transition-transform duration-200 ${
+          drawerOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="flex items-center justify-between">
+          <span className="font-mono text-[0.68rem] uppercase tracking-[0.13em] text-j-muted">Widgets</span>
+          <button
+            onClick={() => setDrawerOpen(false)}
+            aria-label="Close widgets"
+            className="grid place-items-center w-9 h-9 rounded-lg text-j-muted hover:text-j-ink cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-j-accent"
+          >
+            <X size={16} aria-hidden="true" />
+          </button>
+        </div>
+        {railContent}
+      </aside>
 
       {wheelOpen && (
         <FeelingsWheelModal onSave={handleSaveCheckin} onClose={() => setWheelOpen(false)} />
