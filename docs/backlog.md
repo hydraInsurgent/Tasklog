@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| P79-journaling.md (pending) | #79 | feature/journaling-#79 | Planning |
+| P79-journaling.md | #79 | feature/journaling-#79 | In Progress |
 
 ---
 
