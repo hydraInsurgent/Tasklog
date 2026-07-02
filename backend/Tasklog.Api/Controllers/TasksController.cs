@@ -119,6 +119,16 @@ namespace Tasklog.Api.Controllers
                 query = query.Where(t => t.CreatedAt <= filter.CreatedBefore.Value);
             }
 
+            // completedOn: completed within that calendar day (date component only).
+            // CompletedAt carries a time, so this is a [midnight, next midnight) range (#79).
+            if (filter.CompletedOn.HasValue)
+            {
+                var dayStart = filter.CompletedOn.Value.Date;
+                var dayEnd = dayStart.AddDays(1);
+                query = query.Where(t => t.CompletedAt.HasValue
+                    && t.CompletedAt.Value >= dayStart && t.CompletedAt.Value < dayEnd);
+            }
+
             // limit is a post-sort count cap. Reject nonsense up front.
             if (filter.Limit is < 1)
             {
@@ -900,6 +910,9 @@ namespace Tasklog.Api.Controllers
         string? Sort = null,
         string? Order = null,
         int? Limit = null,
+        // Tasks completed ON this calendar day (CompletedAt within [date, date+1)).
+        // Added for the journal's derived "Unplanned, got done" bucket (#79).
+        DateTime? CompletedOn = null,
         // When true, dated incomplete subtasks are projected into the result as their own
         // synthetic task-shaped rows (the web list uses this; MCP's list_tasks does not).
         bool? IncludeSubtasks = null);
