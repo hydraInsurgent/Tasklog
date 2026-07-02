@@ -21,6 +21,44 @@ namespace Tasklog.Api.Controllers
             _context = context;
         }
 
+        // GET /api/subtasks?text=&completed=
+        // Global search across every task's subtasks (absolute route - not scoped to one
+        // task). Optional case-insensitive title substring + completion filter. Each match
+        // carries its parent task's id + title so a caller (e.g. the MCP AI) can resolve
+        // "I finished <subtask>" to the right subtask without knowing which task it's under.
+        [HttpGet("/api/subtasks")]
+        public async Task<IActionResult> Search([FromQuery] string? text, [FromQuery] bool? completed)
+        {
+            IQueryable<Subtask> query = _context.Subtasks.Include(s => s.Task);
+
+            if (completed.HasValue)
+                query = query.Where(s => s.IsCompleted == completed.Value);
+
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                // Lowercase both sides so the match is case-insensitive in SQLite and the
+                // InMemory test provider alike (mirrors TasksController's text filter).
+                var lowered = text.Trim().ToLower();
+                query = query.Where(s => s.Title.ToLower().Contains(lowered));
+            }
+
+            var results = await query
+                .OrderBy(s => s.TaskId).ThenBy(s => s.Position)
+                .Select(s => new
+                {
+                    s.Id,
+                    s.Title,
+                    s.IsCompleted,
+                    s.Position,
+                    s.Deadline,
+                    s.TaskId,
+                    TaskTitle = s.Task!.Title,
+                })
+                .ToListAsync();
+
+            return Ok(results);
+        }
+
         // GET /api/tasks/{taskId}/subtasks
         // Lists the task's subtasks in manual order (Position asc). 404 if task missing.
         [HttpGet]

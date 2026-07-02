@@ -173,6 +173,53 @@ public class SubtasksControllerTests
     }
 
     [Fact]
+    public async Task Search_ByText_FindsMatchAcrossTasksWithParentTitle()
+    {
+        var context = CreateContext();
+        using var _ = context;
+        var t1 = new TaskModel { Title = "Landing page", CreatedAt = DateTime.Now };
+        var t2 = new TaskModel { Title = "Trip", CreatedAt = DateTime.Now };
+        context.Tasks.AddRange(t1, t2);
+        await context.SaveChangesAsync();
+        context.Subtasks.AddRange(
+            new Subtask { TaskId = t1.Id, Title = "Wire up the waitlist form", Position = 0, CreatedAt = DateTime.Now },
+            new Subtask { TaskId = t1.Id, Title = "Write hero copy", Position = 1, CreatedAt = DateTime.Now },
+            new Subtask { TaskId = t2.Id, Title = "Book flight", Position = 0, CreatedAt = DateTime.Now });
+        await context.SaveChangesAsync();
+        var controller = new SubtasksController(context);
+
+        var result = await controller.Search(text: "waitlist", completed: null);
+
+        var list = (result as OkObjectResult)!.Value as System.Collections.IEnumerable;
+        var items = list!.Cast<object>().ToList();
+        items.Should().ContainSingle();
+        // The match carries the parent task's id + title (via an anonymous projection).
+        var match = items[0];
+        var type = match.GetType();
+        type.GetProperty("Title")!.GetValue(match).Should().Be("Wire up the waitlist form");
+        type.GetProperty("TaskId")!.GetValue(match).Should().Be(t1.Id);
+        type.GetProperty("TaskTitle")!.GetValue(match).Should().Be("Landing page");
+    }
+
+    [Fact]
+    public async Task Search_CompletedFilter_NarrowsResults()
+    {
+        var context = CreateContext();
+        using var _ = context;
+        var t = new TaskModel { Title = "T", CreatedAt = DateTime.Now };
+        context.Tasks.Add(t);
+        await context.SaveChangesAsync();
+        context.Subtasks.AddRange(
+            new Subtask { TaskId = t.Id, Title = "done one", Position = 0, IsCompleted = true, CreatedAt = DateTime.Now },
+            new Subtask { TaskId = t.Id, Title = "open one", Position = 1, CreatedAt = DateTime.Now });
+        await context.SaveChangesAsync();
+        var controller = new SubtasksController(context);
+
+        var open = ((await controller.Search(text: null, completed: false) as OkObjectResult)!.Value as System.Collections.IEnumerable)!.Cast<object>().ToList();
+        open.Should().ContainSingle();
+    }
+
+    [Fact]
     public async Task Reorder_IdsNotAPermutation_Returns400()
     {
         var (controller, context, taskId) = await SeedTask();

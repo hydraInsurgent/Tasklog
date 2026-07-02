@@ -385,4 +385,17 @@ describe('subtask wire contract', () => {
       '{"orderedIds":[3,1,2]}',
     );
   });
+
+  test('find_subtasks builds a query string, omitting undefined filters', () => {
+    const build = (opts: { text?: string; completed?: boolean }) => {
+      const params = new URLSearchParams();
+      if (opts.text) params.set('text', opts.text);
+      if (opts.completed !== undefined) params.set('completed', String(opts.completed));
+      const qs = params.toString();
+      return `/api/subtasks${qs ? `?${qs}` : ''}`;
+    };
+    assert.equal(build({}), '/api/subtasks');
+    assert.equal(build({ text: 'waitlist' }), '/api/subtasks?text=waitlist');
+    assert.equal(build({ completed: false }), '/api/subtasks?completed=false');
+  });
 });

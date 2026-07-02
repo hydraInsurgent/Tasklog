@@ -5,6 +5,8 @@
  * add_subtask, list_subtasks, set_subtask_completion, update_subtask,
  * delete_subtask, and reorder_subtasks. Subtasks are lightweight - a title, a
  * done flag, a manual order, and an optional deadline - so the tools stay small.
+ * (Searching for an item by name across tasks AND subtasks is the `find` tool in
+ * tasks.ts, which returns each hit tagged task-vs-subtask with a parent reference.)
  *
  * set_subtask_completion is split out from the general update_subtask (mirroring
  * how set_task_completion is its own tool) because "tick this off" is the most

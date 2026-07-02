@@ -11,7 +11,7 @@
   - Subtasks show **inline, clubbed under their parent** on every surface - the desktop table (a full-width sub-row beneath the task), the mobile card, and the board card - as tickable circles with a **"2/5" progress** badge. Tap a circle to tick a step without opening anything. A subtask with a deadline shows that date inline next to it.
   - The **task detail** (modal + `/tasks/:id` page) has a full subtask editor: add inline, tick, set/clear a per-subtask deadline, delete, and **drag-reorder**.
   - **Completing a parent** that still has open subtasks asks what to do: **complete them all**, or **move them out** as their own standalone tasks (kept in the parent's project, with a back-reference). Recurring tasks get the same prompt, then the next occurrence spawns with a fresh, all-unchecked copy of the checklist.
-- **MCP: 6 new subtask tools** bringing total to 35: `add_subtask`, `list_subtasks`, `set_subtask_completion`, `update_subtask`, `delete_subtask`, `reorder_subtasks`.
+- **MCP: 7 new tools** bringing total to 36: 6 subtask tools (`add_subtask`, `list_subtasks`, `set_subtask_completion`, `update_subtask`, `delete_subtask`, `reorder_subtasks`) plus **`find`** - one by-name search over both tasks and subtasks that tags each hit `task` or `subtask` (subtasks carry their parent), so "I finished wire up the waitlist form" resolves in a single call without knowing which task it's under.
 
 ### Notes
 

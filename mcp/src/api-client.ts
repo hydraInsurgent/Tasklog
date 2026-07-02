@@ -297,6 +297,24 @@ export const addSubtask = (
 export const listSubtasks = (taskId: number): Promise<Subtask[]> =>
   request(`/api/tasks/${taskId}/subtasks`);
 
+// A subtask match from the global search, carrying its parent task's id + title so the
+// caller can resolve "I finished <subtask>" without knowing which task it belongs to.
+export interface SubtaskMatch extends Subtask {
+  taskTitle: string;
+}
+
+// Search subtasks across ALL tasks by title text and/or completion. Both filters optional.
+export const findSubtasks = (opts: {
+  text?: string;
+  completed?: boolean;
+}): Promise<SubtaskMatch[]> => {
+  const params = new URLSearchParams();
+  if (opts.text) params.set('text', opts.text);
+  if (opts.completed !== undefined) params.set('completed', String(opts.completed));
+  const qs = params.toString();
+  return request(`/api/subtasks${qs ? `?${qs}` : ''}`);
+};
+
 // Partial update: any of title / deadline (null clears) / isCompleted. Omit a
 // field to leave it unchanged. Returns the updated subtask.
 export const updateSubtask = (

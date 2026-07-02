@@ -75,7 +75,7 @@ I wanted a task system I understood completely - one where the data, the workflo
 
 **Talk to your tasks via Claude (v2.10)**
 - Tasklog can be plugged into claude.ai as a custom connector (Model Context Protocol server)
-- 35 MCP tools: create/manage tasks and subtasks, check in habits, start/stop timers, query time summaries, manage projects and labels - all from claude.ai web or mobile
+- 36 MCP tools: create/manage tasks and subtasks, find any task or subtask by name, check in habits, start/stop timers, query time summaries, manage projects and labels - all from claude.ai web or mobile
 - Tasks created via Claude appear instantly in your Tasklog UI
 - OAuth 2.1 with GitHub upstream gates access; only your username is allowed
 - The Tasklog API itself stays LAN-only; only one tightly-scoped MCP endpoint is exposed
