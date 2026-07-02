@@ -2,6 +2,24 @@
 
 ---
 
+## v2.20.0 - Subtasks
+*July 2026*
+
+### Added
+
+- **Subtasks** (#78) - break a task into a checklist of one-line items, each with a done state, a manual order, and an optional deadline.
+  - Subtasks show **inline, clubbed under their parent** on every surface - the desktop table (a full-width sub-row beneath the task), the mobile card, and the board card - as tickable circles with a **"2/5" progress** badge. Tap a circle to tick a step without opening anything. A subtask with a deadline shows that date inline next to it.
+  - The **task detail** (modal + `/tasks/:id` page) has a full subtask editor: add inline, tick, set/clear a per-subtask deadline, delete, and **drag-reorder**.
+  - **Completing a parent** that still has open subtasks asks what to do: **complete them all**, or **move them out** as their own standalone tasks (kept in the parent's project, with a back-reference). Recurring tasks get the same prompt, then the next occurrence spawns with a fresh, all-unchecked copy of the checklist.
+- **MCP: 7 new tools** bringing total to 36: 6 subtask tools (`add_subtask`, `list_subtasks`, `set_subtask_completion`, `update_subtask`, `delete_subtask`, `reorder_subtasks`) plus **`find`** - one by-name search over both tasks and subtasks that tags each hit `task` or `subtask` (subtasks carry their parent), so "I finished wire up the waitlist form" resolves in a single call without knowing which task it's under.
+
+### Notes
+
+- New `Subtasks` table (`Tasks` 1-to-many, cascade delete) mirroring the `TaskComment`/`CheckIn` pattern. Tasks gain response-only `subtaskCount` / `completedSubtaskCount` (always present) and a `subtasks[]` array (loaded on the detail, and on the list only when the web passes `?includeSubtasks=true` for the inline checklist; MCP's `list_tasks` stays lean with counts only).
+- New frontend components: `SubtaskChecklist` (the inline clubbed list, shared by card + table + board), `SubtaskSection` (full editor with @dnd-kit drag-reorder), `CompleteWithSubtasksDialog` (the complete-all vs pull-out prompt). First drag-and-drop dependency: `@dnd-kit`.
+
+---
+
 ## v2.19.0 - Time tracking + project colors
 *June 2026*
 

@@ -1,9 +1,10 @@
 /**
  * MCP tools for task operations.
  *
- * Fourteen tools wrap the task-related Tasklog API endpoints: ten single-task
- * tools (incl. add_task_comment and log_habit_checkin) plus four bulk tools
- * (bulk_set_completion, bulk_assign_to_project, bulk_set_deadline,
+ * Fifteen tools wrap the task-related Tasklog API endpoints: eleven single-task
+ * tools (incl. add_task_comment, log_habit_checkin, and `find` - a by-name search
+ * over BOTH tasks and subtasks that returns each hit tagged task-vs-subtask) plus
+ * four bulk tools (bulk_set_completion, bulk_assign_to_project, bulk_set_deadline,
  * bulk_set_priority) that apply one operation to many tasks in a single
  * transactional call. The completion toggle
  * is a single tool
@@ -67,7 +68,13 @@ export function registerTaskTools(server: McpServer): void {
         '"this_week" | "later" | "none", computed server-side from the ' +
         'deadline), priority (1-4, 1=P1 urgent .. 4=P4 none), isCompleted, ' +
         'completedAt, projectId, project, labels[], recurrence (RRULE string or ' +
-        'null) and isRecurring.',
+        'null) and isRecurring. Also subtaskCount + completedSubtaskCount (the ' +
+        'task\'s checklist progress, e.g. 2 of 5 done). The full subtask rows are ' +
+        'NOT included here - use get_task or list_subtasks to read them. NOTE: a ' +
+        'subtask can have its OWN deadline, which does not affect the parent\'s ' +
+        'dueStatus/deadline; so "what is due this week" over TASKS may miss a ' +
+        'subtask due this week under a task due later - check subtaskCount>0 tasks ' +
+        'with list_subtasks when the user asks about checklist items.',
       inputSchema: {
         projectIds: z
           .array(z.number().int().positive())
@@ -169,12 +176,73 @@ export function registerTaskTools(server: McpServer): void {
       description:
         'Fetch a single task by id. Returns: the task (same shape as ' +
         'list_tasks items, including dueStatus) plus its comments[] ' +
-        '({ id, body, createdAt }, newest first), or 404 if not found.',
+        '({ id, body, createdAt }, newest first) AND its subtasks[] ' +
+        '({ id, title, isCompleted, position, deadline }, in checklist order), ' +
+        'or 404 if not found. Use this (or list_subtasks) when the user asks ' +
+        'about a task\'s checklist items or their dates.',
       inputSchema: {
         id: z.number().int().positive().describe('The task id.'),
       },
     },
     async ({ id }) => runTool('get_task', () => api.getTask(id)),
+  );
+
+  server.registerTool(
+    'find',
+    {
+      title: 'Find Tasks & Subtasks',
+      description:
+        'Find a task OR a subtask by name, in ONE search. Use this whenever the ' +
+        'user refers to something by its title without saying whether it is a task ' +
+        'or a checklist item - e.g. "I finished wire up the waitlist form", "mark ' +
+        'the Q3 roadmap done", "is the catering item still open?". Searches task ' +
+        'titles AND subtask titles (case-insensitive substring) and returns a ' +
+        'single flat list. Each result is tagged with type: "task" or "subtask". ' +
+        'A "subtask" result also carries parentTaskId + parentTitle (and is clearly ' +
+        'a subtask) so you can act on the right thing - for a subtask call ' +
+        'set_subtask_completion(parentTaskId, id, ...), for a task call ' +
+        'set_task_completion(id, ...). Optional completed filter. (For structured ' +
+        'browsing - by project, label, deadline range, or priority - use list_tasks; ' +
+        'find is for resolving a name to the item you should act on.)',
+      inputSchema: {
+        text: z
+          .string()
+          .min(1)
+          .describe('Case-insensitive substring to match against task AND subtask titles.'),
+        completed: z
+          .boolean()
+          .optional()
+          .describe('Filter to done (true) or open (false) items. Omit for both.'),
+      },
+    },
+    async ({ text, completed }) =>
+      runTool('find', async () => {
+        // One search over both kinds: reuse the task list's text filter and the global
+        // subtask search, then merge into a tagged, flat list the LLM can act on directly.
+        const [tasks, subtasks] = await Promise.all([
+          api.listTasks({ text, ...(completed !== undefined ? { completed } : {}) }),
+          api.findSubtasks({ text, completed }),
+        ]);
+        return [
+          ...tasks.map((t) => ({
+            type: 'task' as const,
+            id: t.id,
+            title: t.title,
+            isCompleted: t.isCompleted,
+            deadline: t.deadline,
+            projectId: t.projectId,
+          })),
+          ...subtasks.map((s) => ({
+            type: 'subtask' as const,
+            id: s.id,
+            title: s.title,
+            isCompleted: s.isCompleted,
+            deadline: s.deadline,
+            parentTaskId: s.taskId,
+            parentTitle: s.taskTitle,
+          })),
+        ];
+      }),
   );
 
   server.registerTool(

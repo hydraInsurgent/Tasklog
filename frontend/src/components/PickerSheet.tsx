@@ -71,7 +71,7 @@ export default function PickerSheet({ open, triggerRef, title, onClose, children
     const rect = trigger.getBoundingClientRect();
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    const width = Math.min(360, vw - POPOVER_MARGIN * 2);
+    const width = Math.min(300, vw - POPOVER_MARGIN * 2);
     /* Open below by default with a 4px gap; flip above if there's < ~200px below. */
     const spaceBelow = vh - rect.bottom - POPOVER_MARGIN;
     const spaceAbove = rect.top - POPOVER_MARGIN;

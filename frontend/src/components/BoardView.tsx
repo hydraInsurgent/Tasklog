@@ -24,6 +24,8 @@ interface Props {
   onOpen: (task: Task) => void;
   onEdit: (task: Task) => void;
   onDelete: (id: number) => void;
+  onToggleSubtask?: (parentTaskId: number, subtaskId: number, isCompleted: boolean) => void;
+  onOpenParent?: (subtaskRow: Task) => void;
 }
 
 export default function BoardView({
@@ -39,6 +41,8 @@ export default function BoardView({
   onOpen,
   onEdit,
   onDelete,
+  onToggleSubtask,
+  onOpenParent,
 }: Props) {
   const columns = groupTasksForBoard(tasks, groupBy, projects);
 
@@ -66,7 +70,7 @@ export default function BoardView({
               ) : (
                 col.tasks.map((task) => (
                   <BoardCard
-                    key={task.id}
+                    key={task.isSubtask ? `s-${task.id}` : `t-${task.id}`}
                     task={task}
                     projects={projects}
                     habit={habitsByTaskId.get(task.id)}
@@ -78,6 +82,8 @@ export default function BoardView({
                     onOpen={onOpen}
                     onEdit={onEdit}
                     onDelete={onDelete}
+                    onToggleSubtask={onToggleSubtask}
+                    onOpenParent={onOpenParent}
                   />
                 ))
               )}

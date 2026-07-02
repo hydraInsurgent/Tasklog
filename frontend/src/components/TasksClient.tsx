@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { usePolling } from "@/hooks/usePolling";
-import { Trash2, CheckCircle, XCircle, Loader2, MoreHorizontal, Plus, Pencil, ListChecks, List, LayoutGrid, Flame } from "lucide-react";
-import { getTasks, deleteTask, completeTask, getLabels, updateTask, bulkTasks, BulkOperation, Task, Project, Label, Habit } from "@/lib/api";
+import { Trash2, CheckCircle, XCircle, Loader2, MoreHorizontal, Plus, Pencil, ListChecks, List, LayoutGrid, Flame, CornerDownRight } from "lucide-react";
+import { getTasks, deleteTask, completeTask, toggleSubtask, getLabels, updateTask, bulkTasks, BulkOperation, Task, Project, Label, Habit } from "@/lib/api";
 import { formatDate, formatDeadline, deadlineColorClass, projectName, labelColor } from "@/lib/format";
 import TaskCard from "./TaskCard";
+import CompleteWithSubtasksDialog from "./CompleteWithSubtasksDialog";
+import SubtaskChecklist from "./SubtaskChecklist";
 import TaskSheet from "./TaskSheet";
 import TaskDetailModal from "./TaskDetailModal";
 import TaskDoneControl from "./TaskDoneControl";
@@ -19,6 +21,12 @@ import RecurringBadge from "./RecurringBadge";
 import FilterPanel, { FilterState, hasActiveFilters, activeFilterCount } from "./FilterPanel";
 import { occursOn } from "@/lib/recurrence";
 import type { ViewMode, GroupBy } from "./ProjectLayout";
+
+// A stable React key across the mixed list of real tasks and projected subtask rows,
+// whose numeric ids can collide (a subtask id may equal a task id). Prefixed by kind.
+const rowKey = (t: Task) => (t.isSubtask ? `s-${t.id}` : `t-${t.id}`);
+// Open subtasks remaining on a parent (drives the completion dialog + the "2/5" chip).
+const openSubtaskCount = (t: Task) => (t.subtaskCount ?? 0) - (t.completedSubtaskCount ?? 0);
 
 // Feedback shown briefly after an action (replaces TempData flash messages from v1).
 type Feedback = { type: "success" | "error"; message: string } | null;
@@ -98,6 +106,9 @@ export default function TasksClient({
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   // True while a bulk request is in flight (disables the bulk bar actions).
   const [bulkBusy, setBulkBusy] = useState(false);
+  // When completing a parent that still has open subtasks, we hold it here to ask
+  // the user how to resolve them (complete all vs pull out) before calling the API.
+  const [subtaskConfirm, setSubtaskConfirm] = useState<Task | null>(null);
 
   // Fetch all tasks and labels in parallel. Called on mount.
   const loadTasks = useCallback(async () => {
@@ -268,12 +279,56 @@ export default function TasksClient({
     }
   }
 
+  // Entry point for a task's done control. If completing a parent that still has open
+  // subtasks, defer to the confirmation dialog (which picks completeAll vs pullOut);
+  // otherwise complete straight away.
+  function handleComplete(id: number, isCompleted: boolean) {
+    const task = tasks.find((t) => !t.isSubtask && t.id === id);
+    if (isCompleted && task && !task.isHabit && openSubtaskCount(task) > 0) {
+      setSubtaskConfirm(task);
+      return;
+    }
+    void performComplete(id, isCompleted);
+  }
+
+  // Toggle a single subtask (inline card circle, or a projected subtask row's control).
+  // Optimistically updates the parent's embedded subtasks + counts, and drops a projected
+  // dated row once it's completed. Reverts by refetching on error.
+  async function handleToggleSubtask(parentTaskId: number, subtaskId: number, isCompleted: boolean) {
+    setTasks((prev) =>
+      prev
+        .map((t) => {
+          if (!t.isSubtask && t.id === parentTaskId && t.subtasks) {
+            const subtasks = t.subtasks.map((s) => (s.id === subtaskId ? { ...s, isCompleted } : s));
+            return { ...t, subtasks, completedSubtaskCount: subtasks.filter((s) => s.isCompleted).length };
+          }
+          return t;
+        })
+        // A projected dated-subtask row is only shown while incomplete - drop it once ticked.
+        .filter((t) => !(t.isSubtask && t.id === subtaskId && isCompleted)),
+    );
+    try {
+      await toggleSubtask(parentTaskId, subtaskId, isCompleted);
+    } catch {
+      showFeedback("error", "Failed to update subtask.");
+      loadTasks();
+    }
+  }
+
+  // Open the detail overlay for a projected subtask row's PARENT task (the projected row
+  // itself isn't a real task). Falls back to a fetch if the parent isn't in local state.
+  function openParentOf(subtaskRow: Task) {
+    const parent = tasks.find((t) => !t.isSubtask && t.id === subtaskRow.parentTaskId);
+    if (parent) setOpeningTask(parent);
+  }
+
   // Toggle completion for a task. When marking complete and not showing completed tasks,
-  // the row animates out before being removed from the list.
-  async function handleComplete(id: number, isCompleted: boolean) {
+  // the row animates out before being removed from the list. subtaskMode (when the task
+  // had open subtasks) tells the backend to complete-all or pull-them-out.
+  async function performComplete(id: number, isCompleted: boolean, subtaskMode?: "completeAll" | "pullOut") {
     setCompletingId(id);
     try {
-      const updated = await completeTask(id, isCompleted);
+      const updated = await completeTask(id, isCompleted, subtaskMode);
       // Use the full returned task so completedAt is set from the server.
       setTasks((prev) =>
         prev.map((t) => (t.id === id ? updated : t))
@@ -300,16 +355,18 @@ export default function TasksClient({
         hideTimers.current.set(id, timer);
       }
 
-      // Completing a recurring task spawns the next occurrence server-side. Pull
-      // it in immediately (instead of waiting for the next poll) by fetching and
-      // adding only the tasks we don't already have, so the new occurrence shows
-      // up without disturbing the completed row's hide animation.
-      if (isCompleted && updated.isRecurring) {
+      // Completing a recurring task spawns the next occurrence server-side; pulling
+      // subtasks out creates new standalone tasks. Either way, pull the new rows in
+      // immediately (instead of waiting for the next poll) by fetching and adding only
+      // the tasks we don't already have, without disturbing the completed row's animation.
+      if (isCompleted && (updated.isRecurring || subtaskMode === "pullOut")) {
         try {
           const fresh = await getTasks();
           setTasks((prev) => {
-            const known = new Set(prev.map((t) => t.id));
-            const spawned = fresh.filter((t) => !known.has(t.id));
+            // Key by rowKey so a projected subtask row (subtask id) never collides with a
+            // real task id, and only merge in genuinely new REAL tasks (not projected rows).
+            const known = new Set(prev.map((t) => (t.isSubtask ? `s-${t.id}` : `t-${t.id}`)));
+            const spawned = fresh.filter((t) => !t.isSubtask && !known.has(`t-${t.id}`));
             return spawned.length > 0 ? [...spawned, ...prev] : prev;
           });
         } catch {
@@ -347,29 +404,32 @@ export default function TasksClient({
       if (!matches) return false;
     }
 
-    // 4. Date filter.
+    // 4. Date filter. A task matches if its OWN deadline is in the window, OR any of its
+    // incomplete subtasks has a deadline in the window - so a subtask due this week keeps its
+    // parent visible in the "this week" view even when the parent itself is due later (the
+    // subtask is what's actionable now). The parent then shows with its full checklist, its
+    // own deadline still in the Deadline column. Deadlines are user-local calendar dates.
     if (filterState.dateFilter !== "none") {
       const now = new Date();
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const weekEnd = new Date(todayStart.getTime() + 7 * 24 * 60 * 60 * 1000);
-      const deadline = t.deadline ? new Date(t.deadline) : null;
 
-      if (filterState.dateFilter === "today") {
-        if (!deadline) return false;
-        const d = new Date(deadline.getFullYear(), deadline.getMonth(), deadline.getDate());
-        if (d.getTime() !== todayStart.getTime()) return false;
-      }
-      if (filterState.dateFilter === "this-week") {
-        if (!deadline) return false;
-        if (deadline < todayStart || deadline >= weekEnd) return false;
-      }
-      // Overdue: deadline is before today's midnight in the browser's local time.
-      // Deadlines are stored as date-only strings (YYYY-MM-DD) from the backend,
-      // so timezone ambiguity is minimal - the filter matches user-local calendar dates.
-      if (filterState.dateFilter === "overdue") {
-        if (!deadline || t.isCompleted) return false;
-        if (deadline >= todayStart) return false;
-      }
+      const inWindow = (iso: string | null): boolean => {
+        if (!iso) return false;
+        const d = new Date(iso);
+        if (filterState.dateFilter === "today") {
+          const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+          return day.getTime() === todayStart.getTime();
+        }
+        if (filterState.dateFilter === "this-week") return d >= todayStart && d < weekEnd;
+        if (filterState.dateFilter === "overdue") return d < todayStart;
+        return false;
+      };
+
+      // A completed task can't be "overdue"; its own deadline otherwise counts.
+      const ownMatches = inWindow(t.deadline) && !(filterState.dateFilter === "overdue" && t.isCompleted);
+      const subtaskMatches = (t.subtasks ?? []).some((s) => !s.isCompleted && inWindow(s.deadline));
+      if (!ownMatches && !subtaskMatches) return false;
     }
 
     // 5. Text filter - case-insensitive substring on the title. Whitespace-only
@@ -396,6 +456,10 @@ export default function TasksClient({
   const visibleTasks = filteredTasks.filter(
     (t) => showCompleted || !isDoneForToday(t) || hidingIds.has(t.id)
   );
+  // What we actually render: real tasks only. Subtasks are never shown as their own row -
+  // they nest inline under their parent (card, table sub-row, board card, detail). We drop
+  // any projected subtask rows the API returns so the two views agree everywhere.
+  const displayTasks = visibleTasks.filter((t) => !t.isSubtask);
 
   // Human-readable label for the current view, used in empty state text.
   const viewLabel =
@@ -576,7 +640,7 @@ export default function TasksClient({
         ) : viewMode === "board" ? (
           <div className="p-4">
             <BoardView
-              tasks={visibleTasks}
+              tasks={displayTasks}
               groupBy={groupBy}
               projects={projects}
               habitsByTaskId={habitsByTaskId}
@@ -588,6 +652,8 @@ export default function TasksClient({
               onOpen={setOpeningTask}
               onEdit={setEditingTask}
               onDelete={handleDelete}
+              onToggleSubtask={handleToggleSubtask}
+              onOpenParent={openParentOf}
             />
           </div>
         ) : (
@@ -602,10 +668,10 @@ export default function TasksClient({
                     <th className="pl-6 pr-2 py-3 w-8">
                       <input
                         type="checkbox"
-                        checked={visibleTasks.length > 0 && visibleTasks.every((t) => selectedIds.has(t.id))}
+                        checked={displayTasks.length > 0 && displayTasks.every((t) => selectedIds.has(t.id))}
                         onChange={(e) =>
                           setSelectedIds(
-                            e.target.checked ? new Set(visibleTasks.map((t) => t.id)) : new Set(),
+                            e.target.checked ? new Set(displayTasks.map((t) => t.id)) : new Set(),
                           )
                         }
                         aria-label="Select all tasks"
@@ -643,48 +709,71 @@ export default function TasksClient({
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-muted">
-                {visibleTasks.map((task) => {
+                {displayTasks.map((task) => {
                   const isHiding = hidingIds.has(task.id);
                   const isCompletedAndVisible = task.isCompleted && !isHiding;
+                  const openSubtasks = openSubtaskCount(task);
                   return (
+                    <Fragment key={rowKey(task)}>
                     <tr
-                      key={task.id}
                       className={`group hover:bg-surface-raised transition-colors duration-150${
                         isHiding ? " transition-all duration-300 opacity-0 translate-y-1" : ""
-                      }${isCompletedAndVisible ? " opacity-50" : ""}`}
+                      }${isCompletedAndVisible ? " opacity-50" : ""}${
+                        (task.subtaskCount ?? 0) > 0 ? " border-b-0" : ""
+                      }`}
                     >
-                      {/* Selection checkbox - only in select mode. */}
+                      {/* Selection checkbox - only in select mode, and not for projected
+                          subtask rows (they aren't bulk-selectable). */}
                       {selectionMode && (
                         <td className="pl-6 pr-2 py-4">
-                          <input
-                            type="checkbox"
-                            checked={selectedIds.has(task.id)}
-                            onChange={() => toggleSelect(task.id)}
-                            aria-label={`Select ${task.title}`}
-                            className="w-4 h-4 rounded border-border text-accent focus:ring-2 focus:ring-accent cursor-pointer"
-                          />
+                          {!task.isSubtask && (
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(task.id)}
+                              onChange={() => toggleSelect(task.id)}
+                              aria-label={`Select ${task.title}`}
+                              className="w-4 h-4 rounded border-border text-accent focus:ring-2 focus:ring-accent cursor-pointer"
+                            />
+                          )}
                         </td>
                       )}
 
                       {/* Done control: a complete checkbox, or a check-in toggle for a
-                          habit (habits are checked in daily, never completed/closed). */}
+                          habit. A projected subtask row toggles its own subtask instead. */}
                       <td className={`${selectionMode ? "pl-2" : "pl-6"} pr-2 py-4`}>
                         <TaskDoneControl
                           task={task}
                           habit={habitsByTaskId.get(task.id)}
                           completing={completingId === task.id}
                           pendingCheckIn={pendingCheckIns.has(task.id)}
-                          onComplete={handleComplete}
+                          onComplete={
+                            task.isSubtask
+                              ? (sid, c) => handleToggleSubtask(task.parentTaskId!, sid, c)
+                              : handleComplete
+                          }
                           onCheckInToggle={onCheckInToggle}
                         />
                       </td>
 
-                      {/* Task title: opens the detail overlay. Habits get a flame. */}
+                      {/* Task title: opens the detail overlay. Habits get a flame; a
+                          projected subtask row shows a breadcrumb to its parent; a parent
+                          with subtasks shows a "2/5" progress chip. */}
                       <td className="px-6 py-4">
-                        <span className="inline-flex items-center gap-2">
+                        <span className="inline-flex items-center gap-2 flex-wrap">
+                          {task.isSubtask && (
+                            <button
+                              type="button"
+                              onClick={() => openParentOf(task)}
+                              className="inline-flex items-center gap-1 text-xs text-text-muted hover:text-accent focus:outline-none focus:underline cursor-pointer"
+                              aria-label={`Open parent task ${task.parentTitle}`}
+                            >
+                              <CornerDownRight size={12} aria-hidden="true" />
+                              {task.parentTitle}
+                            </button>
+                          )}
                           <button
                             type="button"
-                            onClick={() => setOpeningTask(task)}
+                            onClick={() => (task.isSubtask ? openParentOf(task) : setOpeningTask(task))}
                             className="inline-flex items-center gap-1.5 text-text-primary font-medium hover:text-accent focus:outline-none focus:underline transition-colors duration-150 cursor-pointer"
                           >
                             <PriorityDot priority={task.priority} />
@@ -694,6 +783,19 @@ export default function TasksClient({
                             <Flame size={13} className="text-amber-500 shrink-0" aria-label="Habit" />
                           )}
                           <RecurringBadge recurrence={task.recurrence} />
+                          {!task.isSubtask && (task.subtaskCount ?? 0) > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setOpeningTask(task)}
+                              title="Subtask progress"
+                              className={`inline-flex items-center gap-1 text-xs rounded px-1.5 py-0.5 cursor-pointer transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-accent ${
+                                openSubtasks === 0 ? "text-success bg-success-bg" : "text-text-muted bg-surface-raised hover:text-text-primary"
+                              }`}
+                            >
+                              <ListChecks size={12} aria-hidden="true" />
+                              {task.completedSubtaskCount ?? 0}/{task.subtaskCount ?? 0}
+                            </button>
+                          )}
                           {task.isHabit && !occursOn(task.recurrence, new Date()) && (
                             <span className="text-xs text-text-muted">not due today</span>
                           )}
@@ -764,8 +866,11 @@ export default function TasksClient({
                         )}
                       </td>
 
-                      {/* Edit + Delete actions (+ a hover-reveal timer play/stop, #77) */}
+                      {/* Edit + Delete actions (+ a hover-reveal timer play/stop, #77).
+                          Projected subtask rows are managed from their parent's detail, so
+                          they carry no task-level actions here. */}
                       <td className="px-6 py-4">
+                        {!task.isSubtask && (
                         <div className="flex items-center gap-1">
                           <TimerControl task={task} />
                           <button
@@ -792,8 +897,25 @@ export default function TasksClient({
                             )}
                           </button>
                         </div>
+                        )}
                       </td>
                     </tr>
+
+                    {/* Subtasks clubbed under the parent row (all of them, tickable), so the
+                        desktop table matches the mobile card. Full-width, indented. */}
+                    {task.subtasks && task.subtasks.length > 0 && (
+                      <tr className={`border-b border-border-muted${isCompletedAndVisible ? " opacity-50" : ""}`}>
+                        <td colSpan={9} className="pl-16 pr-6 pb-3 pt-0">
+                          <SubtaskChecklist
+                            subtasks={task.subtasks}
+                            max={100}
+                            onToggle={(subtaskId, isCompleted) => handleToggleSubtask(task.id, subtaskId, isCompleted)}
+                            onOpenParent={() => setOpeningTask(task)}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   );
                 })}
               </tbody>
@@ -802,17 +924,19 @@ export default function TasksClient({
 
           {/* Mobile card list - shown below md: breakpoint, hidden on desktop. */}
           <div className="md:hidden overflow-hidden rounded-b-lg">
-            {visibleTasks.map((task) => (
+            {displayTasks.map((task) => (
               <TaskCard
-                key={task.id}
+                key={rowKey(task)}
                 task={task}
                 projects={projects}
                 activeView={activeView}
                 onComplete={handleComplete}
                 onDelete={handleDelete}
                 onOpen={setOpeningTask}
+                onOpenParent={openParentOf}
                 onEdit={setEditingTask}
                 onDeadlineChange={handleDeadlineQuickSet}
+                onToggleSubtask={handleToggleSubtask}
                 selectionMode={selectionMode}
                 selected={selectedIds.has(task.id)}
                 onToggleSelect={toggleSelect}
@@ -853,6 +977,26 @@ export default function TasksClient({
             setEditingTask(null);
             onCreatingChange(false);
           }}
+        />
+      )}
+
+      {/* Completion confirmation - completing a parent that still has open subtasks. */}
+      {subtaskConfirm && (
+        <CompleteWithSubtasksDialog
+          taskTitle={subtaskConfirm.title}
+          openCount={openSubtaskCount(subtaskConfirm)}
+          busy={completingId === subtaskConfirm.id}
+          onCompleteAll={() => {
+            const t = subtaskConfirm;
+            setSubtaskConfirm(null);
+            void performComplete(t.id, true, "completeAll");
+          }}
+          onPullOut={() => {
+            const t = subtaskConfirm;
+            setSubtaskConfirm(null);
+            void performComplete(t.id, true, "pullOut");
+          }}
+          onCancel={() => setSubtaskConfirm(null)}
         />
       )}
 

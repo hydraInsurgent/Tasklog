@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
-import { MoreVertical, Trash2, Loader2, Pencil, Flame } from "lucide-react";
+import { MoreVertical, Trash2, Loader2, Pencil, Flame, CornerDownRight, ListChecks } from "lucide-react";
 import { Task, Project, Habit } from "@/lib/api";
 import { formatDeadline, deadlineColorClass, projectName, labelColor } from "@/lib/format";
 import DeadlinePopover from "./DeadlinePopover";
@@ -9,6 +9,7 @@ import PriorityDot from "./PriorityDot";
 import RecurringBadge from "./RecurringBadge";
 import TaskDoneControl from "./TaskDoneControl";
 import TimerControl from "./TimerControl";
+import SubtaskChecklist from "./SubtaskChecklist";
 import { occursOn } from "@/lib/recurrence";
 
 interface Props {
@@ -22,8 +23,13 @@ interface Props {
   onDelete: (id: number) => void;
   // Open the detail overlay for this task (handled by the parent).
   onOpen: (task: Task) => void;
+  // Open the detail overlay for a projected subtask row's PARENT task.
+  onOpenParent?: (subtaskRow: Task) => void;
   // Open the edit sheet for this task (handled by the parent).
   onEdit: (task: Task) => void;
+  // Toggle one of this task's subtasks (inline checklist) or, for a projected subtask
+  // row, the row's own subtask. (parentTaskId, subtaskId, isCompleted).
+  onToggleSubtask?: (parentTaskId: number, subtaskId: number, isCompleted: boolean) => void;
   // Quick deadline change from the deadline-pill popover. null clears it.
   onDeadlineChange: (id: number, deadline: string | null) => void;
   // Multi-select support (all optional - off by default). When selectionMode is
@@ -51,8 +57,10 @@ export default function TaskCard({
   onComplete,
   onDelete,
   onOpen,
+  onOpenParent,
   onEdit,
   onDeadlineChange,
+  onToggleSubtask,
   selectionMode = false,
   selected = false,
   onToggleSelect,
@@ -134,7 +142,11 @@ export default function TaskCard({
           <input
             type="checkbox"
             checked={task.isCompleted}
-            onChange={(e) => onComplete(task.id, e.target.checked)}
+            onChange={(e) =>
+              task.isSubtask
+                ? onToggleSubtask?.(task.parentTaskId!, task.id, e.target.checked)
+                : onComplete(task.id, e.target.checked)
+            }
             disabled={isCompleting}
             aria-label={`Mark "${task.title}" as ${task.isCompleted ? "incomplete" : "complete"}`}
             className="appearance-none w-5 h-5 rounded-full border-2 border-border checked:bg-primary checked:border-primary focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 shrink-0 cursor-pointer"
@@ -144,9 +156,21 @@ export default function TaskCard({
 
       {/* Card body: title on top, project + deadline below */}
       <div className="flex-1 min-w-0 py-1">
+        {/* Breadcrumb to the parent, for a projected dated-subtask row. */}
+        {task.isSubtask && (
+          <button
+            type="button"
+            onClick={() => onOpenParent?.(task)}
+            className="flex items-center gap-1 text-xs text-text-muted hover:text-accent focus:outline-none focus:underline cursor-pointer mb-0.5"
+            aria-label={`Open parent task ${task.parentTitle}`}
+          >
+            <CornerDownRight size={12} aria-hidden="true" />
+            <span className="min-w-0 break-words">{task.parentTitle}</span>
+          </button>
+        )}
         <button
           type="button"
-          onClick={() => onOpen(task)}
+          onClick={() => (task.isSubtask ? onOpenParent?.(task) : onOpen(task))}
           className={`flex items-center gap-1.5 text-sm font-medium text-text-primary hover:text-accent focus:outline-none focus:underline transition-colors duration-150 break-words cursor-pointer text-left w-full${
             isCompletedAndVisible ? " line-through" : ""
           }`}
@@ -182,6 +206,17 @@ export default function TaskCard({
               )}
             </span>
             <RecurringBadge recurrence={task.recurrence} />
+            {!task.isSubtask && (task.subtaskCount ?? 0) > 0 && (
+              <span
+                className={`inline-flex items-center gap-0.5 ${
+                  (task.completedSubtaskCount ?? 0) === task.subtaskCount ? "text-success" : "text-text-muted"
+                }`}
+                title="Subtask progress"
+              >
+                <ListChecks size={12} aria-hidden="true" />
+                {task.completedSubtaskCount ?? 0}/{task.subtaskCount ?? 0}
+              </span>
+            )}
             {habitNotDueToday && <span className="text-text-muted">Not due today</span>}
           </div>
 
@@ -201,15 +236,28 @@ export default function TaskCard({
             </div>
           )}
         </div>
+
+        {/* Inline subtask checklist (parent card only) - tickable circles + "+N more". */}
+        {!task.isSubtask && task.subtasks && task.subtasks.length > 0 && (
+          <SubtaskChecklist
+            subtasks={task.subtasks}
+            onToggle={(subtaskId, isCompleted) => onToggleSubtask?.(task.id, subtaskId, isCompleted)}
+            onOpenParent={() => onOpen(task)}
+          />
+        )}
       </div>
 
-      {/* Timer play/stop (#77). Always visible on the touch card (no hover affordance). */}
+      {/* Timer play/stop (#77). Always visible on the touch card (no hover affordance).
+          A projected subtask row has no timer/menu - it's managed from its parent. */}
+      {!task.isSubtask && (
       <span className="flex items-center shrink-0">
         <TimerControl task={task} alwaysVisible />
       </span>
+      )}
 
       {/* Three-dot menu - opens a small dropdown with a Delete action only.
           The button itself has a 44px tap target for comfortable mobile use. */}
+      {!task.isSubtask && (
       <div ref={menuRef} className="relative shrink-0">
         <button
           onClick={() => setMenuOpen((prev) => !prev)}
@@ -259,6 +307,7 @@ export default function TaskCard({
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

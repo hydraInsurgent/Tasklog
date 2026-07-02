@@ -47,6 +47,12 @@ namespace Tasklog.Api.Controllers
 
             IQueryable<TaskModel> query = _context.Tasks.Include(t => t.Labels);
 
+            // The web list opts into the full subtask rows so it can render the inline
+            // checklist under each task; MCP's list_tasks does not, and gets the cheap
+            // counts only (stitched below).
+            if (filter.IncludeSubtasks == true)
+                query = query.Include(t => t.Subtasks.OrderBy(s => s.Position));
+
             if (filter.Inbox == true)
             {
                 query = query.Where(t => t.ProjectId == null);
@@ -153,6 +159,41 @@ namespace Tasklog.Api.Controllers
 
             var tasks = await sorted.ToListAsync();
 
+            // Populate the subtask progress counts. When the rows were loaded (web list),
+            // count them in memory; otherwise (MCP) run one lightweight grouped count query
+            // over the returned ids so the counts are present without loading the full rows.
+            if (filter.IncludeSubtasks == true)
+            {
+                foreach (var t in tasks)
+                {
+                    t.SubtaskCount = t.Subtasks.Count;
+                    t.CompletedSubtaskCount = t.Subtasks.Count(s => s.IsCompleted);
+                }
+            }
+            else if (tasks.Count > 0)
+            {
+                var taskIds = tasks.Select(t => t.Id).ToList();
+                var counts = await _context.Subtasks
+                    .Where(s => taskIds.Contains(s.TaskId))
+                    .GroupBy(s => s.TaskId)
+                    .Select(g => new
+                    {
+                        TaskId = g.Key,
+                        Total = g.Count(),
+                        Completed = g.Count(s => s.IsCompleted),
+                    })
+                    .ToListAsync();
+                var countByTask = counts.ToDictionary(c => c.TaskId);
+                foreach (var t in tasks)
+                {
+                    if (countByTask.TryGetValue(t.Id, out var c))
+                    {
+                        t.SubtaskCount = c.Total;
+                        t.CompletedSubtaskCount = c.Completed;
+                    }
+                }
+            }
+
             return Ok(tasks);
         }
 
@@ -168,10 +209,16 @@ namespace Tasklog.Api.Controllers
             var task = await _context.Tasks
                 .Include(t => t.Labels)
                 .Include(t => t.Comments.OrderByDescending(c => c.CreatedAt))
+                .Include(t => t.Subtasks.OrderBy(s => s.Position))
                 .FirstOrDefaultAsync(t => t.Id == id);
 
             if (task is null)
                 return NotFound(new { message = $"Task {id} not found." });
+
+            // Counts come from the collection loaded above (the single-task view is the one
+            // place we load full subtask rows). The list path stitches them from a query instead.
+            task.SubtaskCount = task.Subtasks.Count;
+            task.CompletedSubtaskCount = task.Subtasks.Count(s => s.IsCompleted);
 
             return Ok(task);
         }
@@ -433,9 +480,11 @@ namespace Tasklog.Api.Controllers
         [HttpPatch("{id:int}/complete")]
         public async Task<IActionResult> Complete(int id, [FromBody] CompleteTaskRequest request)
         {
-            // Load labels too: a spawned occurrence carries the same labels.
+            // Load labels + subtasks too: a spawned occurrence carries the same labels, and
+            // subtask completion/pull-out is resolved on this open -> completed transition.
             var task = await _context.Tasks
                 .Include(t => t.Labels)
+                .Include(t => t.Subtasks)
                 .FirstOrDefaultAsync(t => t.Id == id);
 
             if (task is null)
@@ -444,6 +493,54 @@ namespace Tasklog.Api.Controllers
             // Only spawn on a genuine open -> completed transition, so re-completing an
             // already-completed task (or reopening it) never creates duplicate occurrences.
             var transitioningToComplete = request.IsCompleted && !task.IsCompleted;
+
+            // Snapshot the subtask "template" (title + order) BEFORE any mutation below, so a
+            // recurring task's next occurrence gets a fresh unchecked copy regardless of what
+            // completeAll/pullOut does to this occurrence's rows. Deadlines are intentionally
+            // dropped on the copy - a subtask deadline is tied to this occurrence; carrying a
+            // past date onto the next one would render it instantly overdue.
+            var subtaskTemplate = task.Subtasks
+                .OrderBy(s => s.Position)
+                .Select(s => new { s.Title, s.Position })
+                .ToList();
+
+            // Resolve open subtasks when the parent is being completed. completeAll (default)
+            // ticks them; pullOut graduates each open subtask into a standalone task in the
+            // parent's project (keeping its title/deadline, with a back-reference comment) and
+            // detaches it from the parent.
+            if (transitioningToComplete)
+            {
+                var openSubtasks = task.Subtasks.Where(s => !s.IsCompleted).ToList();
+                if (openSubtasks.Count > 0)
+                {
+                    if (string.Equals(request.SubtaskMode, "pullOut", StringComparison.OrdinalIgnoreCase))
+                    {
+                        foreach (var s in openSubtasks)
+                        {
+                            var standalone = new TaskModel
+                            {
+                                Title = s.Title,
+                                Deadline = s.Deadline,
+                                CreatedAt = DateTime.Now,
+                                ProjectId = task.ProjectId,
+                            };
+                            standalone.Comments.Add(new TaskComment
+                            {
+                                Body = $"Pulled out of \"{task.Title}\" on {DateTime.Now:yyyy-MM-dd}.",
+                                CreatedAt = DateTime.Now,
+                            });
+                            _context.Tasks.Add(standalone);
+                            _context.Subtasks.Remove(s);
+                        }
+                    }
+                    else
+                    {
+                        // completeAll (also the default when no mode is supplied): tick them all.
+                        foreach (var s in openSubtasks)
+                            s.IsCompleted = true;
+                    }
+                }
+            }
 
             task.IsCompleted = request.IsCompleted;
             // Record when the task was completed; clear it if marked incomplete again.
@@ -481,6 +578,19 @@ namespace Tasklog.Api.Controllers
                     };
                     foreach (var label in task.Labels)
                         nextOccurrence.Labels.Add(label);
+
+                    // Carry the subtask checklist to the next occurrence, reset to unchecked
+                    // (a repeatable checklist). Title + order are preserved from the snapshot;
+                    // per-occurrence deadlines are not carried (see the snapshot comment above).
+                    foreach (var st in subtaskTemplate)
+                        nextOccurrence.Subtasks.Add(new Subtask
+                        {
+                            Title = st.Title,
+                            Position = st.Position,
+                            IsCompleted = false,
+                            CreatedAt = DateTime.Now,
+                        });
+
                     _context.Tasks.Add(nextOccurrence);
 
                     // Log the completion on the row just finished - the seam habit-tracking
@@ -740,8 +850,11 @@ namespace Tasklog.Api.Controllers
     // mutually exclusive with Recurrence).
     public record CreateTaskRequest(string Title, DateTime? Deadline, int? ProjectId, int? Priority = null, string? Description = null, string? Recurrence = null, bool? IsHabit = null, int? WeeklyTarget = null);
 
-    // Request body shape for toggling task completion.
-    public record CompleteTaskRequest(bool IsCompleted);
+    // Request body shape for toggling task completion. SubtaskMode (optional) decides what
+    // happens to a completed parent's still-open subtasks: "completeAll" (default) ticks them,
+    // "pullOut" graduates them into standalone tasks. Ignored when reopening or when the task
+    // has no open subtasks.
+    public record CompleteTaskRequest(bool IsCompleted, string? SubtaskMode = null);
 
     // Request body shape for assigning or unassigning a project on a task.
     // ProjectName, when provided, is resolved by name and wins over ProjectId.
@@ -786,5 +899,8 @@ namespace Tasklog.Api.Controllers
         DateTime? CreatedBefore = null,
         string? Sort = null,
         string? Order = null,
-        int? Limit = null);
+        int? Limit = null,
+        // When true, dated incomplete subtasks are projected into the result as their own
+        // synthetic task-shaped rows (the web list uses this; MCP's list_tasks does not).
+        bool? IncludeSubtasks = null);
 }

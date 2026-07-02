@@ -177,7 +177,7 @@ public class TimeEntriesControllerTests
         await ctx.SaveChangesAsync();
         var controller = new TimeEntriesController(ctx);
 
-        var ok = await controller.List(new DateTime(2026, 6, 8), new DateTime(2026, 6, 9)) as OkObjectResult;
+        var ok = await controller.List(taskId: null, from: new DateTime(2026, 6, 8), to: new DateTime(2026, 6, 9)) as OkObjectResult;
         var list = ok!.Value as List<TimeEntryResponse>;
         list!.Should().HaveCount(1);
     }
