@@ -1,6 +1,6 @@
 # P79 Journaling v3.0 - Implementation Plan
 
-**Overall Progress:** `35%`
+**Overall Progress:** `75%`
 
 ## TLDR
 Add journaling as its own section: three code-seeded templates (Daily, Gratitude, Affirmations) whose entries are structured data rendered to markdown; timestamped mood check-ins logged through a feelings-wheel picker that derives the Map of Consciousness score; a task-linked Today's Plan with a derived "Unplanned, got done" bucket; a `/journal` page (note center, widget rail right) matching the approved interactive prototype; markdown export as download. Autonomous run: after this plan, proceed /execute -> /unit-test -> /review -> /document, stop at ship-ready.
@@ -34,9 +34,9 @@ Add journaling as its own section: three code-seeded templates (Daily, Gratitude
 
 ## Tasks
 
-- [ ] 🟨 **Step 1: Feelings wheel research + dataset** `[parallel]` → delivers: `docs/research/feelings-wheel-moc.md` + `frontend/src/lib/feelingsWheel.ts` (agent running in background)
-  - [ ] 🟨 Research the standard feelings wheel ring structure and the Hawkins MoC scale (cite sources, verbatim level anchors)
-  - [ ] 🟨 Curate the full wheel dataset with a per-feeling MoC level; document mapping judgment calls
+- [x] 🟩 **Step 1: Feelings wheel research + dataset** `[parallel]` → delivers: `docs/research/feelings-wheel-moc.md` + `frontend/src/lib/feelingsWheel.ts` (agent running in background)
+  - [x] 🟩 Research the standard feelings wheel ring structure and the Hawkins MoC scale (cite sources, verbatim level anchors)
+  - [x] 🟩 Curate the full wheel dataset with a per-feeling MoC level; document mapping judgment calls
 
 - [x] 🟩 **Step 2: Backend data layer** `[parallel]` → delivers: tables + seeded templates via startup migration
   - [x] 🟩 Models: `JournalTemplate` (Key, Name, Periodicity, SectionsJson), `JournalEntry` (TemplateId, EntryDate date-only local, ContentJson, CreatedAt/UpdatedAt, UNIQUE(TemplateId, EntryDate)), `MoodCheckin` (CheckinAt local ISO, WordsJson, Energy 0-10, MocLevel?, CreatedAt)
@@ -51,22 +51,22 @@ Add journaling as its own section: three code-seeded templates (Daily, Gratitude
   - [x] 🟩 `Services/JournalMarkdown.cs`: pure (templates, entries, checkins, date) -> markdown string (frontmatter + sections, prototype preview shape); derived shift/EOD computed in renderer
   - [x] 🟩 Export endpoints: GET day `.md` download; GET all-entries `.zip` (System.IO.Compression); preview reuses the same renderer output
 
-- [ ] 🟥 **Step 5: Frontend foundation** `[sequential]` → depends on: Step 3
-  - [ ] 🟥 `lib/api.ts` journal + mood functions; `lib/journal.ts` types (section content shapes), derived helpers (mood shift, MoC average, rollover derivation)
-  - [ ] 🟥 `/journal` route + nav link in ProjectSidebar + back-link header; journal-scoped theme variables (light + dark)
+- [x] 🟩 **Step 5: Frontend foundation** `[sequential]` → depends on: Step 3
+  - [x] 🟩 `lib/api.ts` journal + mood functions; `lib/journal.ts` types (section content shapes), derived helpers (mood shift, MoC average, rollover derivation)
+  - [x] 🟩 `/journal` route + nav link in ProjectSidebar + back-link header; journal-scoped theme variables (light + dark)
 
-- [ ] 🟥 **Step 6: Note column components** `[sequential]` → depends on: Step 5
-  - [ ] 🟥 CheckinsSection, ProseSection (auto-grow serif textarea), ProjectsTodaySection (project combobox + inline focus), ListSection (gratitude/affirmations), GhostSection (collapsed empty), EveningReviewSection (fixed fields + derived shift/EOD)
-  - [ ] 🟥 PlanSection: bucket lists, task combobox (search + explicit "+ Create task", created -> due today/no project), rolled-over state from task data, derived Unplanned bucket (via completedOn)
-  - [ ] 🟥 Autosave wiring (debounce + blur) with subtle saved indicator
+- [x] 🟩 **Step 6: Note column components** `[sequential]` → depends on: Step 5
+  - [x] 🟩 CheckinsSection, ProseSection (auto-grow serif textarea), ProjectsTodaySection (project combobox + inline focus), ListSection (gratitude/affirmations), GhostSection (collapsed empty), EveningReviewSection (fixed fields + derived shift/EOD)
+  - [x] 🟩 PlanSection: bucket lists, task combobox (search + explicit "+ Create task", created -> due today/no project), rolled-over state from task data, derived Unplanned bucket (via completedOn)
+  - [x] 🟩 Autosave wiring (debounce + blur) with subtle saved indicator
 
-- [ ] 🟥 **Step 7: Rail widgets** `[sequential]` → depends on: Steps 1, 5
-  - [ ] 🟥 CalendarWidget (month grid, entry dots, date select); TodaySoFarWidget (plan progress, time logged, habits, check-in count); FrontBackMindWidget (transient lists, clear ×, rolled-over adopt); jump-to-evening (+ auto after 18:00, reduced-motion safe)
-  - [ ] 🟥 MoodArcWidget (SVG arc, MoC color scale, courage line, expand) + FeelingsWheelModal (full dataset rings, multi-select, derived MoC, own words, energy, save)
+- [x] 🟩 **Step 7: Rail widgets** `[sequential]` → depends on: Steps 1, 5
+  - [x] 🟩 CalendarWidget (month grid, entry dots, date select); TodaySoFarWidget (plan progress, time logged, habits, check-in count); FrontBackMindWidget (transient lists, clear ×, rolled-over adopt); jump-to-evening (+ auto after 18:00, reduced-motion safe)
+  - [x] 🟩 MoodArcWidget (SVG arc, MoC color scale, courage line, expand) + FeelingsWheelModal (full dataset rings, multi-select, derived MoC, own words, energy, save)
 
-- [ ] 🟥 **Step 8: Preview + export UI** `[sequential]` → depends on: Steps 4, 6
-  - [ ] 🟥 Edit/Preview toggle; preview fetches backend-rendered markdown, displays via react-markdown
-  - [ ] 🟥 Export button (day .md; zip all)
+- [x] 🟩 **Step 8: Preview + export UI** `[sequential]` → depends on: Steps 4, 6
+  - [x] 🟩 Edit/Preview toggle; preview fetches backend-rendered markdown, displays via react-markdown
+  - [x] 🟩 Export button (day .md; zip all)
 
 - [ ] 🟥 **Step 9: Unit tests** `[sequential]` → depends on: Steps 4, 6, 7
   - [ ] 🟥 Backend (xUnit + InMemory): entry upsert/uniqueness, mood checkins, JournalMarkdown renderer, completedOn filter

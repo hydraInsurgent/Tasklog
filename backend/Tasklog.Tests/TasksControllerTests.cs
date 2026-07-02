@@ -292,6 +292,26 @@ public class TasksControllerTests
         tasks.Select(t => t.Title).Should().BeEquivalentTo(new[] { "The match" });
     }
 
+    [Fact]
+    public async Task GetAll_CompletedOn_ReturnsOnlyTasksCompletedThatCalendarDay()
+    {
+        using var context = CreateContext();
+        var day = new DateTime(2026, 7, 2);
+        context.Tasks.AddRange(
+            new TaskModel { Title = "Done that day", CreatedAt = DateTime.Now, IsCompleted = true, CompletedAt = day.AddHours(14) },
+            new TaskModel { Title = "Done at day edge", CreatedAt = DateTime.Now, IsCompleted = true, CompletedAt = day }, // midnight inclusive
+            new TaskModel { Title = "Done day after", CreatedAt = DateTime.Now, IsCompleted = true, CompletedAt = day.AddDays(1) },
+            new TaskModel { Title = "Never completed", CreatedAt = DateTime.Now }
+        );
+        await context.SaveChangesAsync();
+        var controller = new TasksController(context);
+
+        var result = await controller.GetAll(EmptyFilter() with { CompletedOn = day.AddHours(9) }); // time component ignored
+
+        var tasks = ExtractTasks(result);
+        tasks.Select(t => t.Title).Should().BeEquivalentTo(new[] { "Done that day", "Done at day edge" });
+    }
+
     // Helper to unwrap the OkObjectResult task list, keeps individual tests readable.
     private static List<TaskModel> ExtractTasks(IActionResult result)
     {
