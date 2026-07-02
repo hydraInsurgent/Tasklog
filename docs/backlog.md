@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| [P78-subtasks.md](plans/P78-subtasks.md) | #78 | feature/subtasks-#78 | In Progress |
+| - | - | - | - |
 
 ---
 
@@ -80,6 +80,7 @@ Recently completed work (keep last 10):
 
 | # | Title | Type | Closed |
 |---|-------|------|--------|
+| #78 | Subtasks: lightweight checklist items under a task (v2.20.0) | feature | 2026-07-02 |
 | #77 | Time tracking per task + timeline dashboard + project colors (v2.19.0) | feature | 2026-06-12 |
 | #76 | Fix: frequency habit check-in showed stale weekly progress (optimistic update) (v2.18.1) | bug | 2026-06-01 |
 | #75 | Habits v2 Step 2: x-times-a-week frequency + deadline-free habit schedules (v2.18.0) | feature | 2026-05-31 |
@@ -89,8 +90,6 @@ Recently completed work (keep last 10):
 | #71 | Advanced recurrence grammar (nth-weekday, end conditions, intervals) (v2.14.1) | feature | 2026-05-27 |
 | #70 | Recurrence core (recurring tasks) (v2.14.0) | feature | 2026-05-27 |
 | #69 | Task comments + completion-log foundation (v2.13.0) | feature | 2026-05-27 |
-| #68 | Deadline time-of-day (v2.12.0) | feature | 2026-05-27 |
-| #67 | Task description field (v2.11.0) | feature | 2026-05-27 |
 
 ---
 
