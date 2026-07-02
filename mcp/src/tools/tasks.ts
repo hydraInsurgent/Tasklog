@@ -67,7 +67,13 @@ export function registerTaskTools(server: McpServer): void {
         '"this_week" | "later" | "none", computed server-side from the ' +
         'deadline), priority (1-4, 1=P1 urgent .. 4=P4 none), isCompleted, ' +
         'completedAt, projectId, project, labels[], recurrence (RRULE string or ' +
-        'null) and isRecurring.',
+        'null) and isRecurring. Also subtaskCount + completedSubtaskCount (the ' +
+        'task\'s checklist progress, e.g. 2 of 5 done). The full subtask rows are ' +
+        'NOT included here - use get_task or list_subtasks to read them. NOTE: a ' +
+        'subtask can have its OWN deadline, which does not affect the parent\'s ' +
+        'dueStatus/deadline; so "what is due this week" over TASKS may miss a ' +
+        'subtask due this week under a task due later - check subtaskCount>0 tasks ' +
+        'with list_subtasks when the user asks about checklist items.',
       inputSchema: {
         projectIds: z
           .array(z.number().int().positive())
@@ -169,7 +175,10 @@ export function registerTaskTools(server: McpServer): void {
       description:
         'Fetch a single task by id. Returns: the task (same shape as ' +
         'list_tasks items, including dueStatus) plus its comments[] ' +
-        '({ id, body, createdAt }, newest first), or 404 if not found.',
+        '({ id, body, createdAt }, newest first) AND its subtasks[] ' +
+        '({ id, title, isCompleted, position, deadline }, in checklist order), ' +
+        'or 404 if not found. Use this (or list_subtasks) when the user asks ' +
+        'about a task\'s checklist items or their dates.',
       inputSchema: {
         id: z.number().int().positive().describe('The task id.'),
       },
