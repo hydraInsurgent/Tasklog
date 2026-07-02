@@ -404,29 +404,32 @@ export default function TasksClient({
       if (!matches) return false;
     }
 
-    // 4. Date filter.
+    // 4. Date filter. A task matches if its OWN deadline is in the window, OR any of its
+    // incomplete subtasks has a deadline in the window - so a subtask due this week keeps its
+    // parent visible in the "this week" view even when the parent itself is due later (the
+    // subtask is what's actionable now). The parent then shows with its full checklist, its
+    // own deadline still in the Deadline column. Deadlines are user-local calendar dates.
     if (filterState.dateFilter !== "none") {
       const now = new Date();
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const weekEnd = new Date(todayStart.getTime() + 7 * 24 * 60 * 60 * 1000);
-      const deadline = t.deadline ? new Date(t.deadline) : null;
 
-      if (filterState.dateFilter === "today") {
-        if (!deadline) return false;
-        const d = new Date(deadline.getFullYear(), deadline.getMonth(), deadline.getDate());
-        if (d.getTime() !== todayStart.getTime()) return false;
-      }
-      if (filterState.dateFilter === "this-week") {
-        if (!deadline) return false;
-        if (deadline < todayStart || deadline >= weekEnd) return false;
-      }
-      // Overdue: deadline is before today's midnight in the browser's local time.
-      // Deadlines are stored as date-only strings (YYYY-MM-DD) from the backend,
-      // so timezone ambiguity is minimal - the filter matches user-local calendar dates.
-      if (filterState.dateFilter === "overdue") {
-        if (!deadline || t.isCompleted) return false;
-        if (deadline >= todayStart) return false;
-      }
+      const inWindow = (iso: string | null): boolean => {
+        if (!iso) return false;
+        const d = new Date(iso);
+        if (filterState.dateFilter === "today") {
+          const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+          return day.getTime() === todayStart.getTime();
+        }
+        if (filterState.dateFilter === "this-week") return d >= todayStart && d < weekEnd;
+        if (filterState.dateFilter === "overdue") return d < todayStart;
+        return false;
+      };
+
+      // A completed task can't be "overdue"; its own deadline otherwise counts.
+      const ownMatches = inWindow(t.deadline) && !(filterState.dateFilter === "overdue" && t.isCompleted);
+      const subtaskMatches = (t.subtasks ?? []).some((s) => !s.isCompleted && inWindow(s.deadline));
+      if (!ownMatches && !subtaskMatches) return false;
     }
 
     // 5. Text filter - case-insensitive substring on the title. Whitespace-only
