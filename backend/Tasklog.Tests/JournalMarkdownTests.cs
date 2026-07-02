@@ -140,6 +140,45 @@ public class JournalMarkdownTests
     }
 
     [Fact]
+    public void Render_ControlCharsInUserStrings_CannotInjectLines()
+    {
+        // A task title (creatable via the public MCP surface) with embedded newlines
+        // must flatten to one checklist line - never extra headings/rows in the note.
+        var content = Content("""
+            { "todays_plan": { "buckets": { "non_negotiable": [1], "if_energy": [], "easy_wins": [] } } }
+            """);
+        var tasks = new Dictionary<int, JournalMarkdown.PlanTaskData>
+        {
+            [1] = new(1, "innocent\n## Injected heading\n- [x] fake", false),
+        };
+        var checkins = new List<JournalMarkdown.CheckinData>
+        {
+            new(Day.AddHours(7), new[] { "calm\nmood-injected: true" }, 5, null),
+        };
+
+        var md = Render(content, checkins: checkins, planTasks: tasks);
+
+        md.Should().Contain("- [ ] innocent ## Injected heading - [x] fake");
+        md.Should().NotContain("\n## Injected heading");
+        md.Should().Contain("mood: calm mood-injected: true"); // one frontmatter line, not two
+        md.Should().NotContain("\nmood-injected:");
+    }
+
+    [Fact]
+    public void Render_EmptyWordsArray_DegradesInsteadOfThrowing()
+    {
+        // The controller rejects empty words, but Render is public - a stored "[]"
+        // row must not 500 the whole day's export.
+        var md = Render(checkins: new List<JournalMarkdown.CheckinData>
+        {
+            new(Day.AddHours(7), Array.Empty<string>(), 5, null),
+            new(Day.AddHours(21), new[] { "flat" }, 2, null),
+        });
+
+        md.Should().Contain("**Emotion shift:**  -> flat");
+    }
+
+    [Fact]
     public void Render_GratitudeAndAffirmations_RenderAsLists()
     {
         var content = new Dictionary<string, JsonElement>

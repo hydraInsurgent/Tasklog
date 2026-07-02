@@ -78,10 +78,12 @@ export default function JournalClient() {
 
   const key = dateKey(date);
   const isToday = key === dateKey(new Date());
-  // Debounced save timers + latest contents, per template key.
+  // Debounced save timers, per template key.
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  // Synchronous mirror of `contents`, updated in the same tick as every edit and on
+  // day load - the reliable base for save snapshots (React state updates are deferred,
+  // so reading `contents` in an event handler can be one edit behind).
   const contentsRef = useRef<Contents>({});
-  contentsRef.current = contents;
   const eveningRef = useRef<HTMLDivElement | null>(null);
   const autoJumped = useRef(false);
 
@@ -107,7 +109,9 @@ export default function JournalClient() {
     ]);
     const byKey: Contents = {};
     for (const e of entries) byKey[e.templateKey] = e.content;
+    contentsRef.current = byKey;
     setContents(byKey);
+    setSaveState("idle");
     setCheckins(cks);
     setCompletedOnDate(completed);
     setYesterdayDaily(prevEntries.find((e) => e.templateKey === "daily")?.content ?? null);
@@ -159,32 +163,36 @@ export default function JournalClient() {
 
   // ---------- saving ----------
 
+  // Both the date AND the content are snapshotted at schedule time. Reading content
+  // at fire time (e.g. through a ref) is a corruption bug: switch dates within the
+  // debounce window and the pending timer would write the NEW day's content onto the
+  // OLD day's entry. With the snapshot, a timer that outlives a date switch still
+  // persists exactly the edit that scheduled it, onto the day it belongs to.
   const scheduleSave = useCallback(
-    (templateKey: string) => {
+    (templateKey: string, dayKey: string, snapshot: Record<string, unknown>) => {
       clearTimeout(saveTimers.current[templateKey]);
       saveTimers.current[templateKey] = setTimeout(async () => {
         try {
           setSaveState("saving");
-          await upsertJournalEntry(templateKey, key, contentsRef.current[templateKey] ?? {});
+          await upsertJournalEntry(templateKey, dayKey, snapshot);
           setSaveState("saved");
-          setEntryDates((prev) => new Set(prev).add(key));
+          setEntryDates((prev) => new Set(prev).add(dayKey));
         } catch {
           setSaveState("error");
         }
       }, SAVE_DEBOUNCE_MS);
     },
-    [key],
+    [],
   );
 
   const updateSection = useCallback(
     (templateKey: string, sectionKey: string, value: unknown) => {
-      setContents((prev) => ({
-        ...prev,
-        [templateKey]: { ...(prev[templateKey] ?? {}), [sectionKey]: value },
-      }));
-      scheduleSave(templateKey);
+      const snapshot = { ...(contentsRef.current[templateKey] ?? {}), [sectionKey]: value };
+      contentsRef.current = { ...contentsRef.current, [templateKey]: snapshot };
+      setContents(contentsRef.current);
+      scheduleSave(templateKey, key, snapshot);
     },
-    [scheduleSave],
+    [scheduleSave, key],
   );
 
   // ---------- derived ----------
@@ -239,11 +247,14 @@ export default function JournalClient() {
 
   const handleSaveCheckin = useCallback(
     async (words: string[], energy: number, mocLevel: number | null) => {
-      await addMoodCheckin(words, energy, mocLevel);
+      // Viewing a past date = backfilling that day (at the current wall-clock time),
+      // not silently logging onto today.
+      const checkinAt = isToday ? undefined : `${key}T${new Date().toTimeString().slice(0, 8)}`;
+      await addMoodCheckin(words, energy, mocLevel, checkinAt);
       setCheckins(await getMoodCheckins(key));
       setWheelOpen(false);
     },
-    [key],
+    [key, isToday],
   );
 
   const handleDeleteCheckin = useCallback(
@@ -255,7 +266,10 @@ export default function JournalClient() {
   );
 
   const jumpToEvening = () => {
-    eveningRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    // "smooth" is an author-forced animation browsers do NOT suppress under
+    // prefers-reduced-motion - honor the preference explicitly.
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    eveningRef.current?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "center" });
   };
 
   const selectDate = (d: Date) => {
@@ -386,6 +400,7 @@ export default function JournalClient() {
                           title={section.title}
                           value={(value as string | undefined) ?? ""}
                           optional={section.optional}
+                          resetKey={key}
                           onChange={onChange}
                         />
                       );
@@ -452,6 +467,7 @@ export default function JournalClient() {
                           title={section.title}
                           value={(value as string | undefined) ?? ""}
                           optional={section.optional}
+                          resetKey={key}
                           onChange={onChange}
                         />
                       );

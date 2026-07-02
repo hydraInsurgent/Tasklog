@@ -648,11 +648,13 @@ export async function addMoodCheckin(
   words: string[],
   energy: number,
   mocLevel?: number | null,
+  // Local ISO datetime to backfill a past day; omitted = now (server default).
+  checkinAt?: string,
 ): Promise<MoodCheckinDto> {
   const res = await fetch(`${getApiUrl()}/api/mood-checkins`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ words, energy, mocLevel: mocLevel ?? null }),
+    body: JSON.stringify({ words, energy, mocLevel: mocLevel ?? null, checkinAt: checkinAt ?? null }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));

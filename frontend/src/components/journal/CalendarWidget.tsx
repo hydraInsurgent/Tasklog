@@ -4,7 +4,7 @@
 // journal entry exists (from GET /api/journal/entries/dates). Month navigation refetches
 // the dots for the shown month. Local-calendar math throughout (never toISOString).
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { dateKey } from "@/lib/time";
 import SectionCard from "./SectionCard";
@@ -22,6 +22,16 @@ export default function CalendarWidget({ selected, entryDates, onSelect, onMonth
   const [anchor, setAnchor] = useState<Date>(new Date(selected.getFullYear(), selected.getMonth(), 1));
   const todayKey = dateKey(new Date());
   const selectedKey = dateKey(selected);
+
+  // Follow the selection across months (e.g. the header's "today" shortcut while
+  // browsing March) - otherwise the grid shows a month the selection isn't in.
+  useEffect(() => {
+    setAnchor((a) =>
+      a.getFullYear() === selected.getFullYear() && a.getMonth() === selected.getMonth()
+        ? a
+        : new Date(selected.getFullYear(), selected.getMonth(), 1),
+    );
+  }, [selected]);
 
   const shiftMonth = (n: number) => {
     const next = new Date(anchor.getFullYear(), anchor.getMonth() + n, 1);
@@ -65,7 +75,7 @@ export default function CalendarWidget({ selected, entryDates, onSelect, onMonth
               onClick={() => onSelect(day)}
               aria-label={day.toDateString()}
               aria-current={isSelected ? "date" : undefined}
-              className={`relative rounded-lg py-1 text-[0.78rem] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-j-accent hover:bg-j-accent-soft ${
+              className={`relative rounded-lg py-2.5 lg:py-1 text-[0.78rem] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-j-accent hover:bg-j-accent-soft ${
                 isToday ? "bg-j-ink text-j-paper font-bold hover:bg-j-ink" : "text-j-ink"
               } ${isSelected && !isToday ? "ring-[1.6px] ring-j-accent" : ""}`}
             >

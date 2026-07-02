@@ -79,6 +79,12 @@ namespace Tasklog.Api.Controllers
                 || content.ValueKind != JsonValueKind.Object)
                 return BadRequest(new { message = "Body must be { content: { ... } } with content as a JSON object." });
 
+            // A day's note is prose, not a payload: cap the stored blob so a runaway
+            // client can't grow the DB (and the zip export) without bound.
+            var raw = content.GetRawText();
+            if (raw.Length > 256 * 1024)
+                return BadRequest(new { message = "Entry content must be under 256KB." });
+
             var day = date.Date;
             var now = DateTime.Now;
             var entry = await _context.JournalEntries
@@ -94,7 +100,7 @@ namespace Tasklog.Api.Controllers
                 };
                 _context.JournalEntries.Add(entry);
             }
-            entry.ContentJson = content.GetRawText();
+            entry.ContentJson = raw;
             entry.UpdatedAt = now;
             await _context.SaveChangesAsync();
 

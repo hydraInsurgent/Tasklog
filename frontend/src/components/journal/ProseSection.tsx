@@ -11,18 +11,21 @@ interface Props {
   title: string;
   value: string;
   optional?: boolean;
+  // Identity of the day being shown (yyyy-MM-dd) - collapse state resets when it changes.
+  resetKey: string;
   onChange: (value: string) => void;
 }
 
-export default function ProseSection({ title, value, optional, onChange }: Props) {
+export default function ProseSection({ title, value, optional, resetKey, onChange }: Props) {
   const [expanded, setExpanded] = useState(!optional || value.trim().length > 0);
   const ref = useRef<HTMLTextAreaElement | null>(null);
 
-  // Collapse state follows the data when the date changes underneath us.
+  // Collapse state follows the data when the DATE changes underneath us (resetKey);
+  // deliberately not on every keystroke, so deleting all text doesn't collapse the box.
   useEffect(() => {
     setExpanded(!optional || value.trim().length > 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, optional]);
+  }, [resetKey, optional]);
 
   // Auto-grow: height tracks content so the note reads as one document.
   useEffect(() => {

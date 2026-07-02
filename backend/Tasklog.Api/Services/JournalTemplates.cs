@@ -11,10 +11,12 @@ namespace Tasklog.Api.Services
     //   checkins - derived from MoodCheckins, no stored content
     //   prose    - free text (string)
     //   projects - [{ "name", "focus" }]
-    //   plan     - { "buckets": [{ "key", "title", "taskIds": [int] }] }
+    //   plan     - { "buckets": { "non_negotiable": [taskIds], "if_energy": [...], "easy_wins": [...] } }
     //   mind     - transient list [{ "text", "cleared" }] (rendered as a rail widget)
-    //   evening  - fixed sub-fields object (see Services/JournalContent.cs)
+    //   evening  - fixed sub-fields object (keys in JournalMarkdown.EveningFields)
     //   list     - string[]
+    // The client-side contract for these shapes is frontend/src/lib/journal.ts; the
+    // renderer mirror is Services/JournalMarkdown.cs - change them together.
     public static class JournalTemplates
     {
         public static readonly IReadOnlyList<JournalTemplate> Definitions = new List<JournalTemplate>

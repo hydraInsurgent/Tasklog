@@ -39,15 +39,16 @@
   --color-j-paper: #f5f4ef;        /* fog paper page ground */
   --color-j-card: #fdfcf9;         /* note + widget cards */
   --color-j-ink: #24261f;          /* text */
-  --color-j-muted: #70746a;        /* labels, captions */
+  --color-j-muted: #676b61;        /* labels, captions (>= 4.5:1 on j-paper AND j-card) */
   --color-j-line: #e3e3da;         /* borders */
   --color-j-accent: #5a4b70;       /* plum accent */
   --color-j-accent-soft: #efebf4;  /* chip/hover tint */
 
-  /* Map of Consciousness bands (mood arc + wheel) - semantic, not accent */
+  /* Map of Consciousness bands (mood arc + wheel) - semantic, not accent.
+     moc-high darkened for AA when used as text on the card. */
   --color-moc-low: #bf463e;
   --color-moc-mid: #ce9433;
-  --color-moc-high: #4e9a62;
+  --color-moc-high: #3d7a4e;
 }
 
 /* Dark mode - applied when <html class="dark">.

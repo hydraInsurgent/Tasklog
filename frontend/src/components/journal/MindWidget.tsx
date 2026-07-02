@@ -51,7 +51,7 @@ export default function MindWidget({ title, items, rolled, onChange }: Props) {
               onClick={() => clear(item.text)}
               aria-label={`Clear "${item.text}" (done with this)`}
               title="Clear - done with this"
-              className="opacity-0 group-hover:opacity-100 focus:opacity-100 text-j-muted hover:text-j-ink px-1 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-j-accent rounded"
+              className="opacity-60 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 text-j-muted hover:text-j-ink p-2 -my-2 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-j-accent rounded"
             >
               <X size={12} aria-hidden="true" />
             </button>

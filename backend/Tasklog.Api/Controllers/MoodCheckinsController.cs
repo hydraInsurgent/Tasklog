@@ -40,12 +40,19 @@ namespace Tasklog.Api.Controllers
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] MoodCheckinRequest request)
         {
+            // Words flow verbatim into markdown structure (frontmatter lines, list rows),
+            // so control characters/newlines are collapsed to spaces - a word must never
+            // be able to inject extra lines into the note. Caps keep the blobs honest.
             var words = (request.Words ?? Array.Empty<string>())
-                .Select(w => w.Trim())
+                .Select(w => System.Text.RegularExpressions.Regex.Replace(w, "[\\u0000-\\u001F]+", " ").Trim())
                 .Where(w => w.Length > 0)
                 .ToArray();
             if (words.Length == 0)
                 return BadRequest(new { message = "At least one mood word is required." });
+            if (words.Length > 20)
+                return BadRequest(new { message = "At most 20 mood words per check-in." });
+            if (words.Any(w => w.Length > 60))
+                return BadRequest(new { message = "A mood word must be 60 characters or fewer." });
             if (request.Energy is < 0 or > 10)
                 return BadRequest(new { message = "energy must be between 0 and 10." });
             if (request.MocLevel is < 20 or > 1000)

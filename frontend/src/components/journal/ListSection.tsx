@@ -33,7 +33,7 @@ export default function ListSection({ title, hint, value, onChange }: Props) {
             <button
               onClick={() => onChange(value.filter((_, j) => j !== i))}
               aria-label={`Remove "${item}"`}
-              className="opacity-0 group-hover:opacity-100 focus:opacity-100 text-j-muted hover:text-danger p-1 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-j-accent rounded"
+              className="opacity-60 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 text-j-muted hover:text-danger p-2 -my-2 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-j-accent rounded"
             >
               <X size={13} aria-hidden="true" />
             </button>

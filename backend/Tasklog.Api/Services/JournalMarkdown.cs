@@ -18,12 +18,31 @@ namespace Tasklog.Api.Services
         public record PlanTaskData(int Id, string Title, bool IsCompleted);
 
         // Bucket key -> heading, in render order. Content JSON uses the keys.
+        // PAIRED CONTRACT: these keys are mirrored verbatim in frontend/src/lib/journal.ts
+        // (PLAN_BUCKETS) - change both together.
         private static readonly (string Key, string Title)[] PlanBuckets =
         {
             ("non_negotiable", "Non-negotiable"),
             ("if_energy", "If energy allows"),
             ("easy_wins", "Easy wins"),
         };
+
+        // Flatten a user string onto one line: control chars (incl. newlines) become
+        // spaces. Every string interpolated into markdown STRUCTURE (frontmatter values,
+        // list rows, checklist lines, bold field values) goes through this so no stored
+        // value - including a task title created via the public MCP surface - can inject
+        // extra lines, headings, or frontmatter keys into the note. Multi-line prose
+        // sections don't use this: they render per-line inside blockquotes instead.
+        private static string Inline(string? s)
+        {
+            if (string.IsNullOrEmpty(s)) return "";
+            var sb = new StringBuilder(s.Length);
+            foreach (var c in s) sb.Append(char.IsControl(c) ? ' ' : c);
+            return sb.ToString().Trim();
+        }
+
+        private static string Inline(IEnumerable<string> words) =>
+            string.Join(", ", words.Select(w => Inline(w)).Where(w => w.Length > 0));
 
         public static string Render(
             DateTime date,
@@ -71,7 +90,7 @@ namespace Tasklog.Api.Services
             sb.AppendLine($"day-of-week: {date:dddd}");
             if (first != null)
             {
-                sb.AppendLine($"mood: {string.Join(", ", first.Words)}{(last != null ? $" -> {string.Join(", ", last.Words)}" : "")}");
+                sb.AppendLine($"mood: {Inline(first.Words)}{(last != null ? $" -> {Inline(last.Words)}" : "")}");
                 sb.AppendLine($"energy: {first.Energy}{(last != null ? $" -> {last.Energy}" : "")}");
             }
             sb.AppendLine($"checkins: {checkins.Count}");
@@ -99,7 +118,7 @@ namespace Tasklog.Api.Services
                 case "checkins":
                     if (checkins.Count == 0) { sb.AppendLine("- (none)"); break; }
                     foreach (var c in checkins)
-                        sb.AppendLine($"- {c.At:HH:mm} - {string.Join(", ", c.Words)} - energy {c.Energy}{(c.MocLevel is int m ? $" - MoC {m}" : "")}");
+                        sb.AppendLine($"- {c.At:HH:mm} - {Inline(c.Words)} - energy {c.Energy}{(c.MocLevel is int m ? $" - MoC {m}" : "")}");
                     break;
 
                 case "prose":
@@ -110,8 +129,8 @@ namespace Tasklog.Api.Services
                     if (value?.ValueKind != JsonValueKind.Array || value.Value.GetArrayLength() == 0) { sb.AppendLine("- (none)"); break; }
                     foreach (var p in value.Value.EnumerateArray())
                     {
-                        var name = GetString(p, "name");
-                        var focus = GetString(p, "focus");
+                        var name = Inline(GetString(p, "name"));
+                        var focus = Inline(GetString(p, "focus"));
                         sb.AppendLine($"- **{name}**{(focus.Length > 0 ? $" - {focus}" : "")}");
                     }
                     break;
@@ -124,7 +143,7 @@ namespace Tasklog.Api.Services
                     if (value?.ValueKind != JsonValueKind.Array || value.Value.GetArrayLength() == 0) { sb.AppendLine("- (cleared)"); break; }
                     foreach (var item in value.Value.EnumerateArray())
                     {
-                        var text = GetString(item, "text");
+                        var text = Inline(GetString(item, "text"));
                         var cleared = item.TryGetProperty("cleared", out var cl) && cl.ValueKind == JsonValueKind.True;
                         sb.AppendLine(cleared ? $"- ~~{text}~~ (cleared)" : $"- {text}");
                     }
@@ -137,7 +156,7 @@ namespace Tasklog.Api.Services
                 case "list":
                     if (value?.ValueKind != JsonValueKind.Array || value.Value.GetArrayLength() == 0) { sb.AppendLine("- (none)"); break; }
                     foreach (var item in value.Value.EnumerateArray())
-                        sb.AppendLine($"- {item.GetString()}");
+                        sb.AppendLine($"- {Inline(item.GetString())}");
                     break;
             }
         }
@@ -163,7 +182,7 @@ namespace Tasklog.Api.Services
                 {
                     if (!idEl.TryGetInt32(out var id)) continue;
                     if (planTasks.TryGetValue(id, out var t))
-                        sb.AppendLine($"- [{(t.IsCompleted ? "x" : " ")}] {t.Title}");
+                        sb.AppendLine($"- [{(t.IsCompleted ? "x" : " ")}] {Inline(t.Title)}");
                     else
                         sb.AppendLine("- [ ] (deleted task)");
                 }
@@ -174,12 +193,14 @@ namespace Tasklog.Api.Services
             {
                 sb.AppendLine("**Unplanned, got done**");
                 foreach (var title in unplannedDone)
-                    sb.AppendLine($"- [x] {title}");
+                    sb.AppendLine($"- [x] {Inline(title)}");
             }
         }
 
         // Evening sub-fields in template order. Emotion shift + energy EOD are derived
         // from check-ins, never stored - the renderer computes them the same way the UI does.
+        // PAIRED CONTRACT: these keys are mirrored verbatim in frontend/src/lib/journal.ts
+        // (EVENING_FIELDS) - change both together.
         private static readonly (string Key, string Label)[] EveningFields =
         {
             ("whatDroveIt", "What drove it"),
@@ -195,15 +216,19 @@ namespace Tasklog.Api.Services
         {
             var first = checkins.Count > 0 ? checkins[0] : null;
             var last = checkins.Count > 1 ? checkins[^1] : null;
+            // FirstOrDefault: the controller rejects empty word arrays, but Render is a
+            // public pure function - a stored "[]" must degrade, not throw.
+            var firstWord = Inline(first?.Words.FirstOrDefault());
+            var lastWord = Inline(last?.Words.FirstOrDefault());
             var shift = first == null ? "--"
-                : last == null ? $"{first.Words[0]} -> (no evening check-in)"
-                : $"{first.Words[0]} -> {last.Words[0]}";
+                : last == null ? $"{firstWord} -> (no evening check-in)"
+                : $"{firstWord} -> {lastWord}";
             sb.AppendLine($"**Emotion shift:** {shift}");
             sb.AppendLine();
 
             foreach (var (key, label) in EveningFields)
             {
-                var text = value?.ValueKind == JsonValueKind.Object ? GetString(value.Value, key) : "";
+                var text = Inline(value?.ValueKind == JsonValueKind.Object ? GetString(value.Value, key) : "");
                 sb.AppendLine($"**{label}:** {(text.Length > 0 ? text : "--")}");
                 sb.AppendLine();
             }

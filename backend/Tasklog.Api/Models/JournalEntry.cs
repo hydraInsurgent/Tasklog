@@ -21,8 +21,9 @@ namespace Tasklog.Api.Models
         public DateTime EntryDate { get; set; }
 
         // Section contents as a JSON object keyed by section key. Value shape depends on
-        // the section kind (prose = string, list = string[], plan = bucketed task ids,
-        // etc. - see Services/JournalContent.cs). Plain TEXT, parsed with System.Text.Json.
+        // the section kind (prose = string, list = string[], plan = bucketed task ids...)
+        // - the client contract is frontend/src/lib/journal.ts and the renderer mirror is
+        // Services/JournalMarkdown.cs. Plain TEXT, parsed with System.Text.Json.
         public string ContentJson { get; set; } = "{}";
 
         public DateTime CreatedAt { get; set; }

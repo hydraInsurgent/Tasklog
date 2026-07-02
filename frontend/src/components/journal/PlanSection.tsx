@@ -97,8 +97,13 @@ export default function PlanSection({
                     role="checkbox"
                     aria-checked={task.isCompleted}
                     aria-label={`${task.isCompleted ? "Reopen" : "Complete"} ${task.title}`}
-                    onClick={() => onToggleTask(task.id, !task.isCompleted)}
-                    className={`grid place-items-center w-[18px] h-[18px] rounded-[5px] border-[1.6px] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-j-accent ${
+                    // Past days are a record, not a control surface: toggling there
+                    // would stamp CompletedAt with NOW and rewrite history.
+                    disabled={!isToday}
+                    onClick={() => isToday && onToggleTask(task.id, !task.isCompleted)}
+                    className={`relative grid place-items-center w-[18px] h-[18px] rounded-[5px] border-[1.6px] after:absolute after:-inset-3 after:content-[''] focus:outline-none focus-visible:ring-2 focus-visible:ring-j-accent ${
+                      isToday ? "cursor-pointer" : "cursor-default"
+                    } ${
                       task.isCompleted ? "bg-j-accent border-j-accent text-j-paper" : "border-j-muted text-transparent"
                     }`}
                   >
@@ -109,18 +114,23 @@ export default function PlanSection({
                   </span>
                   <span className="ml-auto flex items-center gap-2">
                     {justAdded === task.id && (
-                      <span className="font-mono text-[0.62rem] text-moc-high whitespace-nowrap">created · due today</span>
+                      <span className="inline-flex items-center gap-1 font-mono text-[0.62rem] text-j-muted whitespace-nowrap">
+                        <span className="w-1.5 h-1.5 rounded-full bg-moc-high" aria-hidden="true" />
+                        created · due today
+                      </span>
                     )}
                     {rolled && (
                       <span className="font-mono text-[0.62rem] text-j-muted whitespace-nowrap">rolled over</span>
                     )}
-                    <button
-                      onClick={() => removeFromPlan(key, task.id)}
-                      aria-label={`Remove ${task.title} from the plan`}
-                      className="opacity-0 group-hover:opacity-100 focus:opacity-100 font-mono text-[0.68rem] text-j-muted hover:text-danger cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-j-accent rounded px-0.5"
-                    >
-                      ×
-                    </button>
+                    {isToday && (
+                      <button
+                        onClick={() => removeFromPlan(key, task.id)}
+                        aria-label={`Remove ${task.title} from the plan`}
+                        className="opacity-60 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 font-mono text-[0.68rem] text-j-muted hover:text-danger cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-j-accent rounded px-2 py-1 -my-1"
+                      >
+                        ×
+                      </button>
+                    )}
                   </span>
                 </div>
               );
@@ -129,8 +139,9 @@ export default function PlanSection({
         );
       })}
 
-      {/* Combobox: search or explicitly create. Bucket chips choose where it lands. */}
-      <div className="mt-3">
+      {/* Combobox: search or explicitly create. Bucket chips choose where it lands.
+          Hidden on past days - the plan is a record there, not a control surface. */}
+      <div className={`mt-3 ${isToday ? "" : "hidden"}`}>
         <div className="flex gap-1.5 mb-1.5" role="radiogroup" aria-label="Bucket for the new plan item">
           {PLAN_BUCKETS.map(({ key, title: t }) => (
             <button
