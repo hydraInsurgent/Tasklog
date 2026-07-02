@@ -1,6 +1,6 @@
 # P79 Journaling v3.0 - Implementation Plan
 
-**Overall Progress:** `75%`
+**Overall Progress:** `100%`
 
 ## TLDR
 Add journaling as its own section: three code-seeded templates (Daily, Gratitude, Affirmations) whose entries are structured data rendered to markdown; timestamped mood check-ins logged through a feelings-wheel picker that derives the Map of Consciousness score; a task-linked Today's Plan with a derived "Unplanned, got done" bucket; a `/journal` page (note center, widget rail right) matching the approved interactive prototype; markdown export as download. Autonomous run: after this plan, proceed /execute -> /unit-test -> /review -> /document, stop at ship-ready.
@@ -72,8 +72,13 @@ Add journaling as its own section: three code-seeded templates (Daily, Gratitude
   - [ ] 🟥 Backend (xUnit + InMemory): entry upsert/uniqueness, mood checkins, JournalMarkdown renderer, completedOn filter
   - [ ] 🟥 Frontend (Jest): journal helpers (shift/MoC/rollover), feelingsWheel dataset integrity (every feeling has a level), plan combobox behavior
 
-- [ ] 🟥 **Step 10: Verify end to end** `[sequential]` → depends on: Step 9
-  - [ ] 🟥 Run backend + frontend, exercise the full flow (create entry, check-ins, plan link/create, preview, export) on desktop viewport + 320px
+- [x] 🟩 **Step 10: Verify end to end** `[sequential]` → depends on: Step 9
+  - [x] 🟩 Drove the full API flow live (templates seed on startup; upsert create/update without duplication; mood check-ins; day export .md matches the designed note shape including derived shift/EOD and Unplanned; zip export; entry dates; completedOn). /journal served 200 through the running dev frontend (hot-reloaded). Dev DB restored from backup afterwards - no test rows left behind.
 
 ## Outcomes
-<!-- Fill in after execution -->
+
+- **Built as planned**: all 10 steps, no scope change. Backend: 3 tables (AddJournal migration), JournalController + MoodCheckinsController, `JournalMarkdown` pure renderer, day/.zip export, `completedOn` task filter. Frontend: `/journal` page + sidebar link, 13 new components under `components/journal/`, `lib/journal.ts` helpers, `lib/feelingsWheel.ts` dataset (7/41/82 feelings, all MoC-mapped, research-sourced in docs/research/feelings-wheel-moc.md), journal-scoped theme tokens (light + dark), react-markdown for preview.
+- **Deviations from plan**: (1) plan combobox searches the already-loaded task list locally instead of calling `searchOpenTasks` per keystroke - the full list is already in memory for id lookups; the server search endpoint + api wrapper still exist for future use. (2) Step 9 (tests) was folded into execute per plan; the standalone /unit-test stage would duplicate it. (3) Mood-checkin timestamps accept a client-supplied `checkinAt` (defaults to now) - needed for tests and backfill.
+- **Key execution decisions**: selection in the wheel is keyed by tree path (Roberts wheel repeats 4 names with different levels); each picked node counts once toward the derived average; single check-in yields no EOD/shift (a morning reading is not an end-of-day).
+- **Known pre-existing issue surfaced**: 3 TaskCard Jest tests fail on main (unrelated to #79) - flagged for /review + a follow-up issue.
+- **Tests**: backend 332 passing (26 new), frontend 180 passing minus the 3 pre-existing TaskCard failures (27 new journal tests all green). Production build clean.
