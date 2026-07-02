@@ -8,11 +8,9 @@
  * The circles mirror the task completion checkbox styling at a smaller size so the
  * "tick each step" gesture reads the same as completing a task. */
 
-import { useState } from "react";
-import { Check, Calendar } from "lucide-react";
+import { Check } from "lucide-react";
 import { Subtask } from "@/lib/api";
 import { formatDeadline, deadlineColorClass } from "@/lib/format";
-import DeadlinePopover from "./DeadlinePopover";
 
 interface Props {
   subtasks: Subtask[];
@@ -20,15 +18,11 @@ interface Props {
   onToggle: (subtaskId: number, isCompleted: boolean) => void;
   // Opens the parent task detail (used by the "+N more" row and after the cap).
   onOpenParent: () => void;
-  // Set/clear a subtask's deadline from the small preset popover. When omitted, the
-  // deadline is shown read-only (no calendar icon).
-  onSetDeadline?: (subtaskId: number, deadline: string | null) => void;
   // How many rows to show inline before collapsing the rest behind "+N more".
   max?: number;
 }
 
-export default function SubtaskChecklist({ subtasks, onToggle, onOpenParent, onSetDeadline, max = 6 }: Props) {
-  const [deadlineOpenId, setDeadlineOpenId] = useState<number | null>(null);
+export default function SubtaskChecklist({ subtasks, onToggle, onOpenParent, max = 6 }: Props) {
   if (subtasks.length === 0) return null;
 
   // Show incomplete first (they're what needs doing), then completed, preserving
@@ -58,43 +52,13 @@ export default function SubtaskChecklist({ subtasks, onToggle, onOpenParent, onS
           >
             {s.isCompleted && <Check size={10} aria-hidden="true" />}
           </button>
-          <span className={`min-w-0 text-xs break-words ${s.isCompleted ? "line-through text-text-muted" : "text-text-primary"}`}>
+          <span className={`text-xs break-words ${s.isCompleted ? "line-through text-text-muted" : "text-text-primary"}`}>
             {s.title}
           </span>
-          {onSetDeadline ? (
-            // Small calendar icon opens the preset picker (Today / Tomorrow / ... / None).
-            <span className="relative shrink-0">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setDeadlineOpenId(deadlineOpenId === s.id ? null : s.id);
-                }}
-                aria-label={`Set deadline for "${s.title}"`}
-                title="Set a date"
-                className={`flex items-center gap-1 text-[10px] rounded px-1 py-0.5 hover:bg-surface-raised focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer transition-colors duration-150 ${
-                  s.deadline ? deadlineColorClass(s.deadline) : "text-text-muted"
-                }`}
-              >
-                <Calendar size={11} aria-hidden="true" />
-                {s.deadline && formatDeadline(s.deadline)}
-              </button>
-              {deadlineOpenId === s.id && (
-                <DeadlinePopover
-                  onPick={(d) => {
-                    onSetDeadline(s.id, d);
-                    setDeadlineOpenId(null);
-                  }}
-                  onClose={() => setDeadlineOpenId(null)}
-                />
-              )}
+          {s.deadline && (
+            <span className={`text-[10px] shrink-0 ${deadlineColorClass(s.deadline)}`}>
+              {formatDeadline(s.deadline)}
             </span>
-          ) : (
-            s.deadline && (
-              <span className={`text-[10px] shrink-0 ${deadlineColorClass(s.deadline)}`}>
-                {formatDeadline(s.deadline)}
-              </span>
-            )
           )}
         </li>
       ))}

@@ -36,7 +36,6 @@ interface Props {
   onDelete: (id: number) => void;
   // For a projected dated-subtask card: toggle the subtask, and open its parent.
   onToggleSubtask?: (parentTaskId: number, subtaskId: number, isCompleted: boolean) => void;
-  onSetSubtaskDeadline?: (parentTaskId: number, subtaskId: number, deadline: string | null) => void;
   onOpenParent?: (subtaskRow: Task) => void;
 }
 
@@ -52,7 +51,6 @@ export default function BoardCard({
   onEdit,
   onDelete,
   onToggleSubtask,
-  onSetSubtaskDeadline,
   onOpenParent,
 }: Props) {
   const meta = priorityMeta(task.priority);
@@ -149,7 +147,6 @@ export default function BoardCard({
           <SubtaskChecklist
             subtasks={task.subtasks}
             onToggle={(subtaskId, isCompleted) => onToggleSubtask?.(task.id, subtaskId, isCompleted)}
-            onSetDeadline={(subtaskId, deadline) => onSetSubtaskDeadline?.(task.id, subtaskId, deadline)}
             onOpenParent={() => onOpen(task)}
           />
         </div>
