@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| - | - | - | - |
+| P79-journaling.md (pending) | #79 | feature/journaling-#79 | Planning |
 
 ---
 
@@ -105,6 +105,5 @@ Untracked ideas - not estimated, not prioritized, not committed to. Just things 
 - Cross-device sync / live updates - changes on one device reflect on another without a manual reload.
 - Rich task detail - subtasks (checklist items under a parent task) for long-running work. (Description shipped in v2.11.0; comments shipped in v2.13.0 via the TaskComment table. Now in progress as #78 - lightweight checklist model, mirroring the TaskComment table. Future increment noted: subtasks may gain their own deadline as a nullable column.)
 - Theme selection - allow the user to switch between light, dark, and high-contrast color themes. Theme changes affect overall background, header/navbar, and general UI chrome. Project colors, label colors, and other user-assigned colors remain unchanged.
-- Holistic daily journaling wrapper - gratitude and mindfulness journaling entries for each day, wrapping around that day's tasks. A daily reflective layer (e.g. what you're grateful for, an intention or mindfulness note) that sits alongside the day's tasks to create a holistic daily experience rather than a pure todo list. Likely a per-day journal record (one or more entry types: gratitude, mindfulness/reflection) surfaced next to the day's task view.
 - Recurring task progress log (auto-comments) - when a recurring occurrence is completed, automatically write a log entry capturing the outcome (e.g. "Completed 4/5 subtasks", completion date) so each series builds its own history/streak record without manual notes. Depends on subtasks (#78) for the progress count. Open design question: log onto the series (SeriesId) vs the individual occurrence.
 - Domain event log + notification foundation - persist system events (deadline crossed / task went overdue, task completed, recurring occurrence spawned or completed, subtask went overdue) as structured, durable log entries. Purpose: give a future notification service a reliable event stream to consume so reminders/notifications can be built on top and keep working. Key design decision to resolve first: reuse the TaskComment table (simple, but mixes system events into the user's comment stream) vs a dedicated Activity/Event table (cleaner separation, own schema). Leaning toward a dedicated table so user comments stay human-authored. This is the substrate a notification service would poll or subscribe to.
