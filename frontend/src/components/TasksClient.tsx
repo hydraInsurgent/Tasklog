@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { usePolling } from "@/hooks/usePolling";
 import { Trash2, CheckCircle, XCircle, Loader2, MoreHorizontal, Plus, Pencil, ListChecks, List, LayoutGrid, Flame, CornerDownRight } from "lucide-react";
-import { getTasks, deleteTask, completeTask, toggleSubtask, getLabels, updateTask, bulkTasks, BulkOperation, Task, Project, Label, Habit } from "@/lib/api";
+import { getTasks, deleteTask, completeTask, toggleSubtask, updateSubtask, getLabels, updateTask, bulkTasks, BulkOperation, Task, Project, Label, Habit } from "@/lib/api";
 import { formatDate, formatDeadline, deadlineColorClass, projectName, labelColor } from "@/lib/format";
 import TaskCard from "./TaskCard";
 import CompleteWithSubtasksDialog from "./CompleteWithSubtasksDialog";
@@ -311,6 +311,24 @@ export default function TasksClient({
       await toggleSubtask(parentTaskId, subtaskId, isCompleted);
     } catch {
       showFeedback("error", "Failed to update subtask.");
+      loadTasks();
+    }
+  }
+
+  // Set/clear a subtask's deadline from the inline preset picker. Optimistically updates the
+  // parent's embedded subtask, reverts by refetch on error.
+  async function handleSetSubtaskDeadline(parentTaskId: number, subtaskId: number, deadline: string | null) {
+    setTasks((prev) =>
+      prev.map((t) =>
+        !t.isSubtask && t.id === parentTaskId && t.subtasks
+          ? { ...t, subtasks: t.subtasks.map((s) => (s.id === subtaskId ? { ...s, deadline } : s)) }
+          : t,
+      ),
+    );
+    try {
+      await updateSubtask(parentTaskId, subtaskId, { deadline });
+    } catch {
+      showFeedback("error", "Failed to update subtask date.");
       loadTasks();
     }
   }
@@ -650,6 +668,7 @@ export default function TasksClient({
               onEdit={setEditingTask}
               onDelete={handleDelete}
               onToggleSubtask={handleToggleSubtask}
+              onSetSubtaskDeadline={handleSetSubtaskDeadline}
               onOpenParent={openParentOf}
             />
           </div>
@@ -907,6 +926,7 @@ export default function TasksClient({
                             subtasks={task.subtasks}
                             max={100}
                             onToggle={(subtaskId, isCompleted) => handleToggleSubtask(task.id, subtaskId, isCompleted)}
+                            onSetDeadline={(subtaskId, deadline) => handleSetSubtaskDeadline(task.id, subtaskId, deadline)}
                             onOpenParent={() => setOpeningTask(task)}
                           />
                         </td>
@@ -934,6 +954,7 @@ export default function TasksClient({
                 onEdit={setEditingTask}
                 onDeadlineChange={handleDeadlineQuickSet}
                 onToggleSubtask={handleToggleSubtask}
+                onSetSubtaskDeadline={handleSetSubtaskDeadline}
                 selectionMode={selectionMode}
                 selected={selectedIds.has(task.id)}
                 onToggleSelect={toggleSelect}

@@ -25,6 +25,7 @@ interface Props {
   onEdit: (task: Task) => void;
   onDelete: (id: number) => void;
   onToggleSubtask?: (parentTaskId: number, subtaskId: number, isCompleted: boolean) => void;
+  onSetSubtaskDeadline?: (parentTaskId: number, subtaskId: number, deadline: string | null) => void;
   onOpenParent?: (subtaskRow: Task) => void;
 }
 
@@ -42,6 +43,7 @@ export default function BoardView({
   onEdit,
   onDelete,
   onToggleSubtask,
+  onSetSubtaskDeadline,
   onOpenParent,
 }: Props) {
   const columns = groupTasksForBoard(tasks, groupBy, projects);
@@ -83,6 +85,7 @@ export default function BoardView({
                     onEdit={onEdit}
                     onDelete={onDelete}
                     onToggleSubtask={onToggleSubtask}
+                    onSetSubtaskDeadline={onSetSubtaskDeadline}
                     onOpenParent={onOpenParent}
                   />
                 ))

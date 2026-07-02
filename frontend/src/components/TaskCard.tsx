@@ -30,6 +30,8 @@ interface Props {
   // Toggle one of this task's subtasks (inline checklist) or, for a projected subtask
   // row, the row's own subtask. (parentTaskId, subtaskId, isCompleted).
   onToggleSubtask?: (parentTaskId: number, subtaskId: number, isCompleted: boolean) => void;
+  // Set/clear an inline subtask's deadline. (parentTaskId, subtaskId, deadline).
+  onSetSubtaskDeadline?: (parentTaskId: number, subtaskId: number, deadline: string | null) => void;
   // Quick deadline change from the deadline-pill popover. null clears it.
   onDeadlineChange: (id: number, deadline: string | null) => void;
   // Multi-select support (all optional - off by default). When selectionMode is
@@ -61,6 +63,7 @@ export default function TaskCard({
   onEdit,
   onDeadlineChange,
   onToggleSubtask,
+  onSetSubtaskDeadline,
   selectionMode = false,
   selected = false,
   onToggleSelect,
@@ -242,6 +245,7 @@ export default function TaskCard({
           <SubtaskChecklist
             subtasks={task.subtasks}
             onToggle={(subtaskId, isCompleted) => onToggleSubtask?.(task.id, subtaskId, isCompleted)}
+            onSetDeadline={(subtaskId, deadline) => onSetSubtaskDeadline?.(task.id, subtaskId, deadline)}
             onOpenParent={() => onOpen(task)}
           />
         )}
