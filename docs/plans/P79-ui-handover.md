@@ -59,10 +59,15 @@ WCAG AA contrast 4.5:1; visible 2px accent focus rings; 44x44px touch targets; v
 6. Mobile layout: what the right-rail widgets become at phone width (top bar? bottom sheet? accordion?).
 7. Calendar rail behavior: month grid always visible on desktop vs compact week strip with expand.
 
-## Wireframe decision
+## Wireframe decision (locked 2026-07-02)
 
 - Options explored: A "One Note" (single scroll, all templates stacked, right rail), B "Tabbed Templates" (one template at a time), C "Day Board" (widget strip + morning/evening columns).
-- Chosen: _to be recorded after review_.
+- **Chosen: A "One Note"**, with:
+  - **Time-aware evening jump** (from C): after ~6pm the page opens scrolled to / highlights the evening cluster; a "jump to evening" affordance exists in the rail at all times.
+  - **Mood Arc widget** (user's design): the rail mood widget rests as a small heartbeat-style chart of the day's check-ins - x = time of day, y/color = Map of Consciousness level on a red (low) to green (high) range. A log button flips the card into the check-in form (mood words + energy 0-10 + optional MoC level) with a tick/save at the card's bottom right; on save it returns to the chart with the new point added. Clicking the chart may expand it larger (optional).
+  - **Front of Mind and Back of Mind are rail widgets**, not note sections (quick lists with add-inline). Their lifecycle is transient by design: the user is encouraged to **clear them by end of day** (each item has a clear affordance; pairs with the Evening Review "close the tabs" field). Anything not cleared reappears the next day marked **"rolled over"**; tapping the rolled-over marker consciously re-adopts it as a normal item for today. The design should make clearing feel like closure and rollover feel like a gentle question, not debt.
+  - **"Today so far" widget** defined as the day summary: plan progress (done/planned), unplanned-done count, time logged, habits checked today.
+- A hi-fi interactive prototype implementing all of the above exists as an artifact (built 2026-07-02); it carries a first-pass visual identity (serif prose voice + plum accent + fog paper, dark mode) that the design session may keep, evolve, or replace.
 
 ## Out of scope for this design
 
