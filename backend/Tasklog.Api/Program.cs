@@ -67,7 +67,35 @@ app.MapControllers();
 // Creates the SQLite file and schema on first run; no-op when already up to date.
 using (var scope = app.Services.CreateScope())
 {
-    scope.ServiceProvider.GetRequiredService<TasklogDbContext>().Database.Migrate();
+    var db = scope.ServiceProvider.GetRequiredService<TasklogDbContext>();
+    db.Database.Migrate();
+
+    // Upsert the code-defined journal templates by Key (#79). Editing a definition in
+    // Services/JournalTemplates.cs updates the row on next start - no migration needed.
+    foreach (var def in Tasklog.Api.Services.JournalTemplates.Definitions)
+    {
+        var row = db.JournalTemplates.FirstOrDefault(t => t.Key == def.Key);
+        if (row == null)
+        {
+            db.JournalTemplates.Add(new Tasklog.Api.Models.JournalTemplate
+            {
+                Key = def.Key,
+                Name = def.Name,
+                Periodicity = def.Periodicity,
+                SectionsJson = def.SectionsJson,
+                SortOrder = def.SortOrder,
+                CreatedAt = DateTime.Now
+            });
+        }
+        else
+        {
+            row.Name = def.Name;
+            row.Periodicity = def.Periodicity;
+            row.SectionsJson = def.SectionsJson;
+            row.SortOrder = def.SortOrder;
+        }
+    }
+    db.SaveChanges();
 }
 
 app.Run();

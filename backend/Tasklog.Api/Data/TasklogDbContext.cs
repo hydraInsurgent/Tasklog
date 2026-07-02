@@ -14,6 +14,9 @@ namespace Tasklog.Api.Data
         public DbSet<CheckIn> CheckIns => Set<CheckIn>();
         public DbSet<TimeEntry> TimeEntries => Set<TimeEntry>();
         public DbSet<Subtask> Subtasks => Set<Subtask>();
+        public DbSet<JournalTemplate> JournalTemplates => Set<JournalTemplate>();
+        public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
+        public DbSet<MoodCheckin> MoodCheckins => Set<MoodCheckin>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -68,6 +71,25 @@ namespace Tasklog.Api.Data
                 .HasForeignKey(s => s.TaskId)
                 .OnDelete(DeleteBehavior.Cascade);
             modelBuilder.Entity<Subtask>().HasIndex(s => s.TaskId);
+
+            // Journal (#79). Templates are code-defined and upserted by Key at startup,
+            // so Key must be unique. One entry per template per date is a DB guarantee -
+            // the API upserts against this index instead of ever creating a duplicate note.
+            // Entries cascade-delete with their template.
+            modelBuilder.Entity<JournalTemplate>()
+                .HasIndex(t => t.Key)
+                .IsUnique();
+            modelBuilder.Entity<JournalEntry>()
+                .HasOne(e => e.Template)
+                .WithMany()
+                .HasForeignKey(e => e.TemplateId)
+                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<JournalEntry>()
+                .HasIndex(e => new { e.TemplateId, e.EntryDate })
+                .IsUnique();
+
+            // Mood check-ins are queried by day; index the timestamp for the date-range scan.
+            modelBuilder.Entity<MoodCheckin>().HasIndex(m => m.CheckinAt);
         }
     }
 }

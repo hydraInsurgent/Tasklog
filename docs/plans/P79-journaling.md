@@ -1,6 +1,6 @@
 # P79 Journaling v3.0 - Implementation Plan
 
-**Overall Progress:** `0%`
+**Overall Progress:** `15%`
 
 ## TLDR
 Add journaling as its own section: three code-seeded templates (Daily, Gratitude, Affirmations) whose entries are structured data rendered to markdown; timestamped mood check-ins logged through a feelings-wheel picker that derives the Map of Consciousness score; a task-linked Today's Plan with a derived "Unplanned, got done" bucket; a `/journal` page (note center, widget rail right) matching the approved interactive prototype; markdown export as download. Autonomous run: after this plan, proceed /execute -> /unit-test -> /review -> /document, stop at ship-ready.
@@ -34,13 +34,13 @@ Add journaling as its own section: three code-seeded templates (Daily, Gratitude
 
 ## Tasks
 
-- [ ] 🟥 **Step 1: Feelings wheel research + dataset** `[parallel]` → delivers: `docs/research/feelings-wheel-moc.md` + `frontend/src/lib/feelingsWheel.ts`
-  - [ ] 🟥 Research the standard feelings wheel ring structure and the Hawkins MoC scale (cite sources, verbatim level anchors)
-  - [ ] 🟥 Curate the full wheel dataset with a per-feeling MoC level; document mapping judgment calls
+- [ ] 🟨 **Step 1: Feelings wheel research + dataset** `[parallel]` → delivers: `docs/research/feelings-wheel-moc.md` + `frontend/src/lib/feelingsWheel.ts` (agent running in background)
+  - [ ] 🟨 Research the standard feelings wheel ring structure and the Hawkins MoC scale (cite sources, verbatim level anchors)
+  - [ ] 🟨 Curate the full wheel dataset with a per-feeling MoC level; document mapping judgment calls
 
-- [ ] 🟥 **Step 2: Backend data layer** `[parallel]` → delivers: tables + seeded templates via startup migration
-  - [ ] 🟥 Models: `JournalTemplate` (Key, Name, Periodicity, SectionsJson), `JournalEntry` (TemplateId, EntryDate date-only local, ContentJson, CreatedAt/UpdatedAt, UNIQUE(TemplateId, EntryDate)), `MoodCheckin` (CheckinAt local ISO, WordsJson, Energy 0-10, MocLevel?, CreatedAt)
-  - [ ] 🟥 DbContext config + EF migration; template definitions in code (Daily/Gratitude/Affirmations section defs per handover) upserted by Key at startup
+- [x] 🟩 **Step 2: Backend data layer** `[parallel]` → delivers: tables + seeded templates via startup migration
+  - [x] 🟩 Models: `JournalTemplate` (Key, Name, Periodicity, SectionsJson), `JournalEntry` (TemplateId, EntryDate date-only local, ContentJson, CreatedAt/UpdatedAt, UNIQUE(TemplateId, EntryDate)), `MoodCheckin` (CheckinAt local ISO, WordsJson, Energy 0-10, MocLevel?, CreatedAt)
+  - [x] 🟩 DbContext config + EF migration (`AddJournal`, unique indexes verified); template definitions in `Services/JournalTemplates.cs` upserted by Key at startup in Program.cs
 
 - [ ] 🟥 **Step 3: Backend endpoints** `[sequential]` → depends on: Step 2
   - [ ] 🟥 `JournalController`: GET templates; GET entries?date=; GET entry dates range (calendar dots); PUT upsert entry
