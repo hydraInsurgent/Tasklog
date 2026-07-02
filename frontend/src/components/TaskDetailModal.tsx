@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { X, Pencil, Folder, Calendar, Flag, Tag, Repeat, Flame } from "lucide-react";
 import {
-  Task, Project, Label,
+  Task, Project, Label, Subtask,
   getTask, updateTask, assignTaskProject, setTaskLabels, createLabel,
 } from "@/lib/api";
 import {
@@ -12,6 +12,7 @@ import {
 import { TASKS_CHANGED_EVENT } from "@/contexts/TimeTrackingContext";
 import TaskTimeLog from "./TaskTimeLog";
 import TaskComments from "./TaskComments";
+import SubtaskSection from "./SubtaskSection";
 import DueDatePicker from "./pickers/DueDatePicker";
 import PriorityPicker from "./pickers/PriorityPicker";
 import ProjectPicker from "./pickers/ProjectPicker";
@@ -113,6 +114,19 @@ export default function TaskDetailModal({
     onSaved(updated);
   }
 
+  // A subtask change (add/tick/deadline/delete/reorder) refreshes the modal's task with the
+  // new list + counts, and bubbles up so the underlying card's "2/5" badge stays in sync.
+  function handleSubtasksChanged(subtasks: Subtask[]) {
+    const updated: Task = {
+      ...task,
+      subtasks,
+      subtaskCount: subtasks.length,
+      completedSubtaskCount: subtasks.filter((s) => s.isCompleted).length,
+    };
+    setTask(updated);
+    onSaved(updated);
+  }
+
   const project = projects.find((p) => p.id === task.projectId);
   const pm = priorityMeta(task.priority);
   const selectedLabelIds = task.labels.map((l) => l.id);
@@ -192,6 +206,16 @@ export default function TaskDetailModal({
               </p>
             ) : (
               <p className="text-sm text-text-muted italic">No description</p>
+            )}
+
+            {/* Subtasks - only once the full task (with its subtasks) has loaded, so we
+                don't flash an empty editor over stale list data. */}
+            {!loading && (
+              <SubtaskSection
+                taskId={task.id}
+                initialSubtasks={task.subtasks ?? []}
+                onSubtasksChanged={handleSubtasksChanged}
+              />
             )}
 
             <TaskTimeLog taskId={task.id} refreshKey={timeRefreshKey} />

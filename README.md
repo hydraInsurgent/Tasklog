@@ -53,7 +53,8 @@ I wanted a task system I understood completely - one where the data, the workflo
 - Set a priority (P1-P4) per task, shown as a colored dot and filterable
 - Checkbox completion with a clean animation - done tasks step aside, not deleted
 - Show/hide completed tasks and undo completion at any time
-- Task detail page with full status, comments, and completion history
+- Break a task into **subtasks** - a checklist of tickable steps shown right on the card with a "2/5" progress badge, drag-reorderable in the detail; give a subtask its own deadline and it also shows up in your due list, linked back to its parent
+- Task detail page with full status, comments, subtasks, and completion history
 
 **Track your time**
 - A persistent tracking bar (bottom-left on desktop, full-width on mobile) - type a task name and hit Start to quick-create it and begin tracking immediately; one tap stops the timer
@@ -74,7 +75,7 @@ I wanted a task system I understood completely - one where the data, the workflo
 
 **Talk to your tasks via Claude (v2.10)**
 - Tasklog can be plugged into claude.ai as a custom connector (Model Context Protocol server)
-- 29 MCP tools: create/manage tasks, check in habits, start/stop timers, query time summaries, manage projects and labels - all from claude.ai web or mobile
+- 35 MCP tools: create/manage tasks and subtasks, check in habits, start/stop timers, query time summaries, manage projects and labels - all from claude.ai web or mobile
 - Tasks created via Claude appear instantly in your Tasklog UI
 - OAuth 2.1 with GitHub upstream gates access; only your username is allowed
 - The Tasklog API itself stays LAN-only; only one tightly-scoped MCP endpoint is exposed

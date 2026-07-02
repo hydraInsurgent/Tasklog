@@ -118,6 +118,9 @@ Tasklog/
 │       │   ├── HabitsPanel.tsx    Right-side habits panel beside the task list, shares habit state with ProjectLayout (#73)
 │       │   ├── HabitsClient.tsx   Full /habits view: fetch + poll habits, optimistic done-today toggle (Client Component, v2.16.0)
 │       │   └── HabitCard.tsx      One habit: specific-days view (schedule label, day streak, 7-day dot row) OR frequency view (n/x this week, week streak, coloured recent-week strip) keyed on weeklyTarget; shared CheckInButton (v2.16.0/#73/#75)
+│       │   ├── SubtaskChecklist.tsx  Inline tickable subtask circles on a task card, capped ~6 + "+N more" (#78)
+│       │   ├── SubtaskSection.tsx  Full subtask editor (detail modal + /tasks/:id): add/tick/deadline/delete + @dnd-kit drag-reorder (#78)
+│       │   ├── CompleteWithSubtasksDialog.tsx  Complete-all vs pull-out prompt when completing a parent with open subtasks (#78)
 │       │   (list is representative - other components: TaskCard, FilterPanel, LabelsClient, etc.)
 │       └── lib/
 │           ├── api.ts             Typed API call functions (used by both server and client)
@@ -160,7 +163,7 @@ TasklogDbContext         EF Core context. Direct DbSet access - no repository la
     │
     ▼
 TasklogDatabase.db       SQLite file. Tables: Tasks, Projects, Labels, LabelTaskModel,
-                         Comments, CheckIns.
+                         Comments, CheckIns, TimeEntries, Subtasks.
 ```
 
 ### Data model
@@ -210,6 +213,22 @@ Comments  (v2.13.0)
   CreatedAt   TEXT     not null  (ISO 8601 datetime string)
   TaskId      INTEGER  not null  foreign key -> Tasks.Id  (cascade delete)
 
+Subtasks  (v2.20.0 - a task's checklist items, #78)
+  Id          INTEGER  primary key, autoincrement
+  Title       TEXT     not null  (<= 500 chars)
+  IsCompleted INTEGER  not null  default 0  (boolean)
+  Position    INTEGER  not null  (manual order within the parent; assigned max+1 on create)
+  Deadline    TEXT     nullable  (ISO 8601 datetime; a dated incomplete subtask is also
+                       projected into the task list as its own card. Midnight = date-only)
+  CreatedAt   TEXT     not null  (ISO 8601 datetime string)
+  TaskId      INTEGER  not null  foreign key -> Tasks.Id  (cascade delete; indexed)
+
+  (task response fields, v2.20.0) subtaskCount / completedSubtaskCount  int  always present
+                  (drive the "2/5" card badge). subtasks[]  full rows, [NotMapped] nav -
+                  serialized on GetById, and on GetAll only when includeSubtasks=true.
+  (projected-row fields) isSubtask bool + parentTaskId int? + parentTitle string?  set only
+                  on the synthetic rows GetAll emits for a dated incomplete subtask.
+
 CheckIns  (v2.16.0 - one per habit per day)
   Id          INTEGER  primary key, autoincrement
   CheckInDate TEXT     not null  (date-only, local midnight - the day the habit was done)
@@ -235,15 +254,20 @@ TimeEntries  (v2.19.0 - one interval per start+stop cycle)
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/tasks` | Filtered/sorted task list. Filter params: `projectIds` (repeated key), `inbox`, `labelIds` (repeated key), `dueBefore`, `dueAfter`, `createdAfter`, `createdBefore`, `completed`, `text`, `priorities` (repeated key, P1-P4). Sort: `sort` (`created`/`deadline`/`priority`, default `created`) + `order` (`asc`/`desc`, default `desc`; deadline sorts nulls-last, priority asc = P1 first). `limit` caps to the first N after sorting (`<1` → 400). Arrays use repeated keys, not comma-separated. AND across dimensions, OR within id arrays. No params = all tasks, newest-first. `inbox=true` + `projectIds` → 400. |
-| GET | `/api/tasks/{id}` | Single task by ID, including its `comments[]` (newest first). 404 if not found |
+| GET | `/api/tasks` | Filtered/sorted task list. Filter params: `projectIds` (repeated key), `inbox`, `labelIds` (repeated key), `dueBefore`, `dueAfter`, `createdAfter`, `createdBefore`, `completed`, `text`, `priorities` (repeated key, P1-P4). Sort: `sort` (`created`/`deadline`/`priority`, default `created`) + `order` (`asc`/`desc`, default `desc`; deadline sorts nulls-last, priority asc = P1 first). `limit` caps to the first N after sorting (`<1` → 400). Arrays use repeated keys, not comma-separated. AND across dimensions, OR within id arrays. No params = all tasks, newest-first. `inbox=true` + `projectIds` → 400. `includeSubtasks=true` (v2.20.0, web-only) loads each task's `subtasks[]` and projects dated incomplete subtasks as their own synthetic rows (flagged `isSubtask`, inheriting the parent that survived the filters); MCP omits it so `list_tasks` stays pure tasks. |
+| GET | `/api/tasks/{id}` | Single task by ID, including its `comments[]` (newest first) and `subtasks[]` (by Position). 404 if not found |
+| GET | `/api/tasks/{taskId}/subtasks` | List a task's subtasks in manual order. 404 if task missing (v2.20.0) |
+| POST | `/api/tasks/{taskId}/subtasks` | Add a subtask. Body: `{ title, deadline? }` (title <= 500). Position = max+1. 201; 400 bad title; 404 task missing (v2.20.0) |
+| PATCH | `/api/tasks/{taskId}/subtasks/{id}` | Present-key update of `title`/`deadline`(null clears)/`isCompleted`. 404 if not under that task (v2.20.0) |
+| DELETE | `/api/tasks/{taskId}/subtasks/{id}` | Delete a subtask under that task. 204; 404 if not found (v2.20.0) |
+| POST | `/api/tasks/{taskId}/subtasks/reorder` | Rewrite Position from `{ orderedIds }` (must be a permutation of the task's subtask ids). 400 otherwise (v2.20.0) |
 | GET | `/api/tasks/{taskId}/comments` | List a task's comments, newest first. 404 if task missing |
 | POST | `/api/tasks/{taskId}/comments` | Add a comment. Body: `{ body }` (non-empty, <= 2000). 201 with the created comment; 400 bad body; 404 task missing |
 | DELETE | `/api/tasks/{taskId}/comments/{id}` | Delete a comment under that task. 204; 404 if not found |
 | POST | `/api/tasks` | Create task. Body: `{ title, deadline?, projectId?, priority?, description?, recurrence?, isHabit?, weeklyTarget? }`. priority is 1-4 (default 4 = none); description <= 2000 chars (blank → null); `recurrence` is an RRULE-shaped rule that stamps a SeriesId - it requires a deadline UNLESS the task `isHabit` (a habit schedules itself with no anchor, v2.18.0); `isHabit` defaults false; `weeklyTarget` (1-7) is the "x times a week" habit frequency (habits only, mutually exclusive with `recurrence` - 400 if both, if non-habit, or out of 1-7). 400 if out of range |
 | PATCH | `/api/tasks/{id}` | Partial update of title, deadline, priority, description, recurrence, isHabit, and/or weeklyTarget. JSON body, present-key detection: omit=keep, `deadline: null`/`description: null`/blank/`recurrence: null`/`weeklyTarget: null`=clear, value=set. `isHabit` is processed first so the effective habit state gates the rest (turning it off keeps past check-ins but clears WeeklyTarget). Setting recurrence requires a deadline UNLESS the task is a habit (v2.18.0), assigns a SeriesId, and clears WeeklyTarget; clearing recurrence nulls Recurrence + SeriesId. Setting `weeklyTarget` (1-7, habits only) clears Recurrence + SeriesId. Recurrence and weeklyTarget are mutually exclusive - sending both string+number in one PATCH is 400. priority must be 1-4; description <= 2000. 400 on empty title / bad date / bad priority / too-long description / unsupported recurrence / non-boolean isHabit / weeklyTarget out of 1-7 or on a non-habit. Returns the updated task |
 | DELETE | `/api/tasks/{id}` | Delete task. 204 on success, 404 if not found |
-| PATCH | `/api/tasks/{id}/complete` | Mark task complete or incomplete. Body: `{ isCompleted: bool }`. Returns the (completed) task. For a recurring task, completing it also spawns the next occurrence (deadline advanced per the rule; title/project/labels/priority/description/recurrence carried under the same SeriesId) and logs a completion comment on the finished one - UNLESS an end condition is reached (v2.14.1: UNTIL date passed or COUNT occurrences exist), in which case the series stops and a "series complete" comment is logged instead. COUNT is evaluated by counting rows with the same SeriesId. Bulk-complete does not spawn |
+| PATCH | `/api/tasks/{id}/complete` | Mark task complete or incomplete. Body: `{ isCompleted: bool }`. Returns the (completed) task. For a recurring task, completing it also spawns the next occurrence (deadline advanced per the rule; title/project/labels/priority/description/recurrence carried under the same SeriesId) and logs a completion comment on the finished one - UNLESS an end condition is reached (v2.14.1: UNTIL date passed or COUNT occurrences exist), in which case the series stops and a "series complete" comment is logged instead. COUNT is evaluated by counting rows with the same SeriesId. Bulk-complete does not spawn. Body may include `subtaskMode` (v2.20.0): when completing a parent with open subtasks, `"completeAll"` (default) ticks them all, `"pullOut"` graduates each open subtask into a standalone task in the parent's project (with a back-reference comment) and detaches it. A recurring occurrence spawns the next one with the subtask checklist reset to unchecked (title + order carried, deadlines dropped) |
 | PATCH | `/api/tasks/{id}/project` | Reassign task to a project or Inbox. Body: `{ projectId: int?, projectName?: string }`. projectName is resolved by name (case-insensitive, exact) and wins over projectId; 0/multiple matches → 400 |
 | POST | `/api/tasks/bulk` | Apply one operation to many tasks in one transaction. Body: `{ operation: "complete" \| "assignProject" \| "setDeadline" \| "setPriority", taskIds: int[], data?: { isCompleted?, projectId?, projectName?, deadline?, priority? } }`. assignProject accepts a project name (resolved, wins over id). No bulk delete. Unknown ids skipped; returns the affected tasks. 400 on empty ids / unknown op / invalid data (missing/ambiguous project name, priority out of 1-4) |
 | GET | `/api/projects` | All projects, ordered by name |
@@ -494,7 +518,7 @@ POST /token                                     auth_code and refresh_token gran
 
 ### Tool layer
 
-29 MCP tools across four families (tasks: 18, projects: 4, labels: 4, time: 7). The task family includes four bulk tools (`bulk_set_completion`, `bulk_assign_to_project`, `bulk_set_deadline`, `bulk_set_priority`) backed by the single `POST /api/tasks/bulk` endpoint; `add_task_comment`, `list_task_comments`, `delete_task_comment` (v2.19.0); `log_habit_checkin`, `undo_habit_checkin`, `get_habit_checkins` (v2.19.0); and `get_habits` (full habits dashboard with streak, done-today, weekly progress; v2.19.0). `assign_task_to_project` / `bulk_assign_to_project` / `set_task_labels` accept a name as an alternative to an id (resolved server-side). `create_task` and `update_task` accept an RRULE-shaped `recurrence` string (v2.14.0), an `isHabit` flag (v2.16.0), and a `weeklyTarget` (1-7) for "x times a week" habits (v2.18.0). `create_project` / `rename_project` accept an optional `color` hex (v2.19.0). The time family (v2.19.0) covers `start_timer`, `stop_timer`, `get_active_timer`, `log_time`, `edit_time_entry`, `delete_time_entry`, and `get_time_summary` (totals by task for a date range). Each tool is a thin wrapper around the corresponding Tasklog `/api` endpoint via `api-client.ts`. Input schemas use Zod and are inlined per tool. The `runTool()` helper in `result.ts` converts thrown `ApiError`s into MCP `isError: true` tool results (not JSON-RPC protocol errors), so the LLM can see and react to failures.
+35 MCP tools across five families (tasks: 18, subtasks: 6, projects: 4, labels: 4, time: 7). The subtask family (v2.20.0) - `add_subtask`, `list_subtasks`, `set_subtask_completion`, `update_subtask`, `delete_subtask`, `reorder_subtasks` - wraps the `/api/tasks/{taskId}/subtasks` sub-resource (registered from `tools/subtasks.ts`). The task family includes four bulk tools (`bulk_set_completion`, `bulk_assign_to_project`, `bulk_set_deadline`, `bulk_set_priority`) backed by the single `POST /api/tasks/bulk` endpoint; `add_task_comment`, `list_task_comments`, `delete_task_comment` (v2.19.0); `log_habit_checkin`, `undo_habit_checkin`, `get_habit_checkins` (v2.19.0); and `get_habits` (full habits dashboard with streak, done-today, weekly progress; v2.19.0). `assign_task_to_project` / `bulk_assign_to_project` / `set_task_labels` accept a name as an alternative to an id (resolved server-side). `create_task` and `update_task` accept an RRULE-shaped `recurrence` string (v2.14.0), an `isHabit` flag (v2.16.0), and a `weeklyTarget` (1-7) for "x times a week" habits (v2.18.0). `create_project` / `rename_project` accept an optional `color` hex (v2.19.0). The time family (v2.19.0) covers `start_timer`, `stop_timer`, `get_active_timer`, `log_time`, `edit_time_entry`, `delete_time_entry`, and `get_time_summary` (totals by task for a date range). Each tool is a thin wrapper around the corresponding Tasklog `/api` endpoint via `api-client.ts`. Input schemas use Zod and are inlined per tool. The `runTool()` helper in `result.ts` converts thrown `ApiError`s into MCP `isError: true` tool results (not JSON-RPC protocol errors), so the LLM can see and react to failures.
 
 The `list_tasks` tool accepts an optional filter object (project, inbox, labels, deadline range, completion, title substring) that `api-client.ts` serializes into a query string on `GET /api/tasks`. Completion is a single `set_task_completion(id, isCompleted)` tool - the earlier `complete_task` / `uncomplete_task` split was consolidated in v2.10.1.
 

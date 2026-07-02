@@ -10,7 +10,7 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildTaskQuery, type Task } from './api-client.js';
+import { buildTaskQuery, type Task, type Subtask } from './api-client.js';
 
 // dueStatus is computed server-side and passed through unchanged by the client
 // (api-client does not transform response bodies). The compile-time guarantee is
@@ -346,5 +346,43 @@ describe('buildTaskQuery', () => {
     assert.match(qs, /dueBefore=2026-12-31/);
     assert.match(qs, /completed=false/);
     assert.match(qs, /text=urgent/);
+  });
+});
+
+// Subtasks (#78): the tool layer builds these request bodies inline; document the
+// wire shape so a subtask create/update/reorder stays aligned with the backend.
+describe('subtask wire contract', () => {
+  test('Subtask type carries the expected fields', () => {
+    const s: Subtask = {
+      id: 1,
+      title: 'step',
+      isCompleted: false,
+      position: 0,
+      deadline: null,
+      createdAt: '2026-07-02T00:00:00Z',
+      taskId: 9,
+    };
+    assert.equal(s.taskId, 9);
+    assert.equal(s.isCompleted, false);
+  });
+
+  test('create body omits deadline when not given, includes it when given', () => {
+    assert.equal(JSON.stringify({ title: 'x' }), '{"title":"x"}');
+    assert.equal(
+      JSON.stringify({ title: 'x', deadline: '2026-09-01' }),
+      '{"title":"x","deadline":"2026-09-01"}',
+    );
+  });
+
+  test('update body carries only the present keys (deadline null clears)', () => {
+    assert.equal(JSON.stringify({ isCompleted: true }), '{"isCompleted":true}');
+    assert.equal(JSON.stringify({ deadline: null }), '{"deadline":null}');
+  });
+
+  test('reorder body carries the ordered ids', () => {
+    assert.equal(
+      JSON.stringify({ orderedIds: [3, 1, 2] }),
+      '{"orderedIds":[3,1,2]}',
+    );
   });
 });

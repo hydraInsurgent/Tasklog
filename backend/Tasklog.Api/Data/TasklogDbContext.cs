@@ -13,6 +13,7 @@ namespace Tasklog.Api.Data
         public DbSet<TaskComment> Comments => Set<TaskComment>();
         public DbSet<CheckIn> CheckIns => Set<CheckIn>();
         public DbSet<TimeEntry> TimeEntries => Set<TimeEntry>();
+        public DbSet<Subtask> Subtasks => Set<Subtask>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -58,6 +59,15 @@ namespace Tasklog.Api.Data
                 .OnDelete(DeleteBehavior.Cascade);
             modelBuilder.Entity<TimeEntry>().HasIndex(e => e.EndedAt);
             modelBuilder.Entity<TimeEntry>().HasIndex(e => e.TaskId);
+
+            // A task's subtasks cascade-delete with the task (#78). Index on TaskId speeds
+            // the per-task load (GetById) and the list's subtask-count/projection queries.
+            modelBuilder.Entity<Subtask>()
+                .HasOne(s => s.Task)
+                .WithMany(t => t.Subtasks)
+                .HasForeignKey(s => s.TaskId)
+                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<Subtask>().HasIndex(s => s.TaskId);
         }
     }
 }

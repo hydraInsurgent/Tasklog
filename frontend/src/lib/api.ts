@@ -70,6 +70,19 @@ export interface Task {
   weeklyTarget: number | null;
   // Timestamped comments. Present on getTask (detail); absent on the list.
   comments?: Comment[];
+  // Subtask progress counts, present on every task (0 when none) - drives the card's
+  // "2/5" badge. The full rows (subtasks[]) are present only on getTask.
+  subtaskCount?: number;
+  completedSubtaskCount?: number;
+  subtasks?: Subtask[];
+  // Projected-subtask fields (#78). Set only on the synthetic rows the list returns for a
+  // dated subtask: isSubtask flags it, parentTaskId/parentTitle identify the owner (rendered
+  // as a breadcrumb). Absent/false on a normal task. The row's id is the SUBTASK id, so the
+  // frontend keys the list by `${isSubtask ? "s" : "t"}-${id}` and routes its toggle to the
+  // subtask endpoint.
+  isSubtask?: boolean;
+  parentTaskId?: number | null;
+  parentTitle?: string;
 }
 
 // A timestamped free-text note on a task.
@@ -77,6 +90,18 @@ export interface Comment {
   id: number;
   body: string;
   createdAt: string;
+}
+
+// A lightweight checklist item under a task: title + done flag + manual order +
+// optional deadline. Project/labels are inherited from the parent for filtering.
+export interface Subtask {
+  id: number;
+  title: string;
+  isCompleted: boolean;
+  position: number;
+  deadline: string | null;
+  createdAt: string;
+  taskId: number;
 }
 
 // A single daily check-in on a habit. checkInDate is date-only (local midnight).
@@ -112,8 +137,10 @@ export interface Habit {
 }
 
 // GET /api/tasks - fetch all tasks ordered by creation date (newest first).
+// includeSubtasks=true asks the backend to also project dated, incomplete subtasks
+// into the list as their own synthetic cards (the web list wants these; MCP does not).
 export async function getTasks(): Promise<Task[]> {
-  const res = await fetch(`${getApiUrl()}/api/tasks`, { cache: "no-store" });
+  const res = await fetch(`${getApiUrl()}/api/tasks?includeSubtasks=true`, { cache: "no-store" });
   if (!res.ok) throw new Error("Failed to fetch tasks.");
   return res.json();
 }
@@ -185,14 +212,78 @@ export async function updateTask(
 }
 
 // PATCH /api/tasks/:id/complete - mark a task complete or incomplete.
-// Returns the updated task.
-export async function completeTask(id: number, isCompleted: boolean): Promise<Task> {
+// subtaskMode decides what happens to a completed parent's still-open subtasks:
+// "completeAll" (default) ticks them, "pullOut" graduates them into standalone tasks.
+// Ignored when reopening or when the task has no open subtasks. Returns the updated task.
+export async function completeTask(
+  id: number,
+  isCompleted: boolean,
+  subtaskMode?: "completeAll" | "pullOut",
+): Promise<Task> {
   const res = await fetch(`${getApiUrl()}/api/tasks/${id}/complete`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ isCompleted }),
+    body: JSON.stringify({ isCompleted, subtaskMode }),
   });
   if (!res.ok) throw new Error(`Failed to update task ${id}.`);
+  return res.json();
+}
+
+// --- Subtasks ---
+
+// POST /api/tasks/:taskId/subtasks - add a checklist item. Returns the created subtask.
+export async function createSubtask(taskId: number, title: string, deadline?: string | null): Promise<Subtask> {
+  const res = await fetch(`${getApiUrl()}/api/tasks/${taskId}/subtasks`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ title, deadline: deadline ?? null }),
+  });
+  if (!res.ok) {
+    const b = await res.json().then((x) => x?.message).catch(() => null);
+    throw new Error(b || "Failed to add subtask.");
+  }
+  return res.json();
+}
+
+// PATCH /api/tasks/:taskId/subtasks/:id - partial update (title / deadline / isCompleted).
+// Only the present keys are sent; deadline: null clears it. Returns the updated subtask.
+export async function updateSubtask(
+  taskId: number,
+  subtaskId: number,
+  fields: { title?: string; deadline?: string | null; isCompleted?: boolean },
+): Promise<Subtask> {
+  const res = await fetch(`${getApiUrl()}/api/tasks/${taskId}/subtasks/${subtaskId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(fields),
+  });
+  if (!res.ok) {
+    const b = await res.json().then((x) => x?.message).catch(() => null);
+    throw new Error(b || "Failed to update subtask.");
+  }
+  return res.json();
+}
+
+// Convenience wrapper for the most common subtask op: tick it off / reopen.
+export function toggleSubtask(taskId: number, subtaskId: number, isCompleted: boolean): Promise<Subtask> {
+  return updateSubtask(taskId, subtaskId, { isCompleted });
+}
+
+// DELETE /api/tasks/:taskId/subtasks/:id - remove a subtask.
+export async function deleteSubtask(taskId: number, subtaskId: number): Promise<void> {
+  const res = await fetch(`${getApiUrl()}/api/tasks/${taskId}/subtasks/${subtaskId}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Failed to delete subtask.");
+}
+
+// POST /api/tasks/:taskId/subtasks/reorder - rewrite order from an ordered id array.
+// orderedIds must be exactly the task's subtask ids in the desired order. Returns the list.
+export async function reorderSubtasks(taskId: number, orderedIds: number[]): Promise<Subtask[]> {
+  const res = await fetch(`${getApiUrl()}/api/tasks/${taskId}/subtasks/reorder`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ orderedIds }),
+  });
+  if (!res.ok) throw new Error("Failed to reorder subtasks.");
   return res.json();
 }
 

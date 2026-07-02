@@ -5,7 +5,7 @@
  * and recurring/habit glyphs. Click opens the edit sheet; a hover trash deletes. Trimmed
  * of Tasklog Business's bits we don't have (assignee/status/work-session). */
 
-import { Trash2, Loader2, Flame } from "lucide-react";
+import { Trash2, Loader2, Flame, ListChecks } from "lucide-react";
 import { Task, Project, Habit } from "@/lib/api";
 import { priorityMeta, formatDeadline, deadlineColorClass, labelColor } from "@/lib/format";
 import TaskDoneControl from "./TaskDoneControl";
@@ -91,11 +91,22 @@ export default function BoardCard({
         </span>
       </div>
 
-      {/* Row 2: habit/recurring glyphs + labels + deadline */}
-      {(task.isHabit || task.recurrence || task.labels.length > 0 || task.deadline) && (
+      {/* Row 2: habit/recurring glyphs + subtask progress + labels + deadline */}
+      {(task.isHabit || task.recurrence || task.labels.length > 0 || task.deadline || (task.subtaskCount ?? 0) > 0) && (
         <div className="flex items-center gap-2 flex-wrap pl-7 text-xs">
           {task.isHabit && <Flame size={12} className="text-amber-500" aria-hidden="true" />}
           <RecurringBadge recurrence={task.recurrence} />
+          {(task.subtaskCount ?? 0) > 0 && (
+            <span
+              className={`inline-flex items-center gap-0.5 ${
+                (task.completedSubtaskCount ?? 0) === task.subtaskCount ? "text-success" : "text-text-muted"
+              }`}
+              title="Subtask progress"
+            >
+              <ListChecks size={12} aria-hidden="true" />
+              {task.completedSubtaskCount ?? 0}/{task.subtaskCount ?? 0}
+            </span>
+          )}
           {task.labels.map((l) => (
             <span key={l.id} className="font-medium" style={{ color: labelColor(l.colorIndex) }}>
               #{l.name}

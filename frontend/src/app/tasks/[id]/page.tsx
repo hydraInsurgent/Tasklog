@@ -14,6 +14,7 @@ import AssignProjectButton from "@/components/AssignProjectButton";
 import AssignLabelsButton from "@/components/AssignLabelsButton";
 import TaskComments from "@/components/TaskComments";
 import RecurringBadge from "@/components/RecurringBadge";
+import SubtaskSection from "@/components/SubtaskSection";
 
 // Format an ISO date string to a readable local date (e.g. "12 Mar 2026").
 function formatDate(iso: string): string {
@@ -170,6 +171,11 @@ export default async function TaskDetailPage({ params }: PageProps) {
           />
           <TimerControl task={task} alwaysVisible />
           <DeleteTaskButton taskId={task.id} taskTitle={task.title} />
+        </div>
+
+        {/* Subtasks - interactive checklist (Client Component). */}
+        <div className="px-6 py-5 border-t border-border">
+          <SubtaskSection taskId={task.id} initialSubtasks={task.subtasks ?? []} />
         </div>
 
         {/* Comments - interactive add/delete (Client Component). */}

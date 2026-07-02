@@ -58,12 +58,29 @@ export interface Task {
   weeklyTarget: number | null;
   // Timestamped comments. Present on get_task (single task); absent on list_tasks.
   comments?: Comment[];
+  // Subtask progress counts, present on every task (0 when none). The full rows
+  // (subtasks[]) are present only on get_task, absent on list_tasks.
+  subtaskCount?: number;
+  completedSubtaskCount?: number;
+  subtasks?: Subtask[];
 }
 
 export interface Comment {
   id: number;
   body: string;
   createdAt: string;
+}
+
+// A lightweight checklist item under a task. Title + done flag + manual order +
+// optional deadline. Present on get_task; managed via the subtask tools.
+export interface Subtask {
+  id: number;
+  title: string;
+  isCompleted: boolean;
+  position: number;
+  deadline: string | null;
+  createdAt: string;
+  taskId: number;
 }
 
 // A single daily check-in on a habit task. CheckInDate is date-only (local
@@ -262,6 +279,49 @@ export const listTaskComments = (taskId: number): Promise<Comment[]> =>
 
 export const deleteTaskComment = (taskId: number, commentId: number): Promise<void> =>
   request(`/api/tasks/${taskId}/comments/${commentId}`, { method: 'DELETE' });
+
+// --- Subtasks ---
+
+// Add a checklist item to a task. deadline is an optional ISO date; omit for none.
+// Returns the created subtask (positioned at the bottom of the list).
+export const addSubtask = (
+  taskId: number,
+  title: string,
+  deadline?: string,
+): Promise<Subtask> =>
+  request(`/api/tasks/${taskId}/subtasks`, {
+    method: 'POST',
+    body: JSON.stringify(deadline ? { title, deadline } : { title }),
+  });
+
+export const listSubtasks = (taskId: number): Promise<Subtask[]> =>
+  request(`/api/tasks/${taskId}/subtasks`);
+
+// Partial update: any of title / deadline (null clears) / isCompleted. Omit a
+// field to leave it unchanged. Returns the updated subtask.
+export const updateSubtask = (
+  taskId: number,
+  subtaskId: number,
+  body: { title?: string; deadline?: string | null; isCompleted?: boolean },
+): Promise<Subtask> =>
+  request(`/api/tasks/${taskId}/subtasks/${subtaskId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+
+export const deleteSubtask = (taskId: number, subtaskId: number): Promise<void> =>
+  request(`/api/tasks/${taskId}/subtasks/${subtaskId}`, { method: 'DELETE' });
+
+// Rewrite subtask order. orderedIds must be exactly the task's subtask ids in
+// the desired order. Returns the reordered list.
+export const reorderSubtasks = (
+  taskId: number,
+  orderedIds: number[],
+): Promise<Subtask[]> =>
+  request(`/api/tasks/${taskId}/subtasks/reorder`, {
+    method: 'POST',
+    body: JSON.stringify({ orderedIds }),
+  });
 
 // Mark a habit done for a day (default today). Idempotent: logging the same day
 // twice returns the existing check-in rather than creating a duplicate. date is

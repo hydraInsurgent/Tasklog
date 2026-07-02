@@ -2,6 +2,26 @@
 
 ---
 
+## v2.20.0 - Subtasks
+*July 2026*
+
+### Added
+
+- **Subtasks** (#78) - break a task into a checklist of one-line items, each with a done state, a manual order, and an optional deadline.
+  - On a task **card** (mobile + board) the subtasks show inline as tickable circles with a **"2/5" progress** badge; tap a circle to tick a step without opening anything. The desktop table shows the "2/5" chip (click it to open the detail).
+  - The **task detail** (modal + `/tasks/:id` page) has a full subtask editor: add inline, tick, set/clear a per-subtask deadline, delete, and **drag-reorder**.
+  - A subtask that has a **deadline** also surfaces as its **own card** in the task list / due views, breadcrumbed back to its parent ("↳ Plan launch event") and filtered by the parent's project + labels. Undated subtasks stay nested on the parent. The parent's own due-status is unaffected by its subtasks' deadlines.
+  - **Completing a parent** that still has open subtasks asks what to do: **complete them all**, or **move them out** as their own standalone tasks (kept in the parent's project, with a back-reference). Recurring tasks get the same prompt, then the next occurrence spawns with a fresh, all-unchecked copy of the checklist.
+- **MCP: 6 new subtask tools** bringing total to 35: `add_subtask`, `list_subtasks`, `set_subtask_completion`, `update_subtask`, `delete_subtask`, `reorder_subtasks`.
+
+### Notes
+
+- New `Subtasks` table (`Tasks` 1-to-many, cascade delete) mirroring the `TaskComment`/`CheckIn` pattern. Tasks gain response-only `subtaskCount` / `completedSubtaskCount` (always present) and a `subtasks[]` array (loaded on the detail, and on the list only when the web passes `?includeSubtasks=true`; MCP's `list_tasks` stays pure tasks).
+- New frontend components: `SubtaskChecklist` (inline card list), `SubtaskSection` (full editor with @dnd-kit drag-reorder), `CompleteWithSubtasksDialog` (the complete-all vs pull-out prompt). First drag-and-drop dependency: `@dnd-kit`.
+- Dated subtasks are projected into the list response as synthetic task-shaped rows flagged `isSubtask` (+ `parentTaskId`/`parentTitle`), inheriting the parent's project/labels so the existing client filters just work.
+
+---
+
 ## v2.19.0 - Time tracking + project colors
 *June 2026*
 

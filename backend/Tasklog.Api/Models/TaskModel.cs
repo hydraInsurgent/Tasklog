@@ -34,6 +34,13 @@ namespace Tasklog.Api.Models
         // (not the list) - see the controller. Cascade-deleted with the task.
         public ICollection<TaskComment> Comments { get; set; } = new List<TaskComment>();
 
+        // Checklist items under this task (#78). Serialized as `subtasks` whenever loaded:
+        // always by GetById (the detail view), and by the list only when the caller passes
+        // includeSubtasks=true (the web list, which renders the inline checklist). MCP's
+        // list_tasks does not load them, so they serialize as an empty array there. The two
+        // counts below are always populated so a card can show "2/5" cheaply. Cascade-deleted.
+        public ICollection<Subtask> Subtasks { get; set; } = new List<Subtask>();
+
         // Recurrence rule, RRULE-shaped (e.g. "FREQ=DAILY", "FREQ=WEEKLY;BYDAY=MO,WE").
         // Null = the task does not repeat. Parsed/advanced by the RecurrenceRule helper.
         // The grammar is validated on write so we never store a rule we cannot expand.
@@ -75,6 +82,27 @@ namespace Tasklog.Api.Models
         // mirroring DueStatus - clients get `isRecurring` on every task with no extra wiring.
         [NotMapped]
         public bool IsRecurring => Recurrence != null;
+
+        // Subtask progress counts (#78). [NotMapped] settable (not pure getters) because the
+        // full Subtasks collection is NOT loaded in the list - the controller stitches these
+        // on from a lightweight grouped count query there, and sets them from the loaded
+        // collection in GetById. Serialized on every task so the card can show "2/5".
+        [NotMapped]
+        public int SubtaskCount { get; set; }
+        [NotMapped]
+        public int CompletedSubtaskCount { get; set; }
+
+        // Projected-subtask fields (#78). Normally false/null. When GetAll projects a dated,
+        // incomplete subtask into the list as its own card, it builds a TaskModel with these
+        // set: IsSubtask=true, ParentTaskId + ParentTitle identify the owner (rendered as a
+        // breadcrumb), and the row inherits the parent's ProjectId/Labels for filtering while
+        // carrying the subtask's own Id + Deadline. [NotMapped] - response-only, never stored.
+        [NotMapped]
+        public bool IsSubtask { get; set; }
+        [NotMapped]
+        public int? ParentTaskId { get; set; }
+        [NotMapped]
+        public string? ParentTitle { get; set; }
 
         // Read-only "due bucket" relative to now. [NotMapped] keeps EF Core from
         // treating it as a column (so it is always computed fresh, never stored);
