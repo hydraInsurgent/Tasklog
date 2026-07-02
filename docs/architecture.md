@@ -53,7 +53,7 @@ Tasklog/
 │       ├── Data/                  EF Core DbContext
 │       ├── Migrations/            EF Core schema migrations
 │       ├── Models/                Data model classes
-│       ├── Services/              Pure domain helpers (RecurrenceRule - parse/validate/advance RRULE + OccursOn schedule membership, v2.14.0/#73; HabitStreak - schedule-aware day streak from check-in dates, v2.16.0/#73; HabitFrequency - "x times a week" weekly count/streak/week-status, v2.18.0/#75)
+│       ├── Services/              Pure domain helpers (RecurrenceRule - parse/validate/advance RRULE + OccursOn schedule membership, v2.14.0/#73; HabitStreak - schedule-aware day streak from check-in dates, v2.16.0/#73; HabitFrequency - "x times a week" weekly count/streak/week-status, v2.18.0/#75; JournalMarkdown - render a day's journal to an Obsidian-compatible markdown note, v3.0/#79; JournalTemplates - code-defined journal template definitions upserted at startup, v3.0/#79)
 │       ├── Properties/            Launch settings (ports)
 │       ├── Program.cs             App startup and service registration
 │       ├── appsettings.json       Config (connection string, logging)
@@ -121,13 +121,24 @@ Tasklog/
 │       │   ├── SubtaskChecklist.tsx  Inline tickable subtask circles clubbed under a parent (card + table sub-row + board), cap + "+N more" (#78)
 │       │   ├── SubtaskSection.tsx  Full subtask editor (detail modal + /tasks/:id): add/tick/deadline/delete + @dnd-kit drag-reorder (#78)
 │       │   ├── CompleteWithSubtasksDialog.tsx  Complete-all vs pull-out prompt when completing a parent with open subtasks (#78)
+│       │   ├── journal/           The /journal page (v3.0/#79): JournalClient (orchestrator: date,
+│       │   │                      contents, debounced autosave), note sections (Checkins/Prose/
+│       │   │                      Projects/Plan/Evening/List + shared SectionCard), rail widgets
+│       │   │                      (Calendar, MoodArc, Mind x2, TodaySoFar), FeelingsWheelModal
+│       │   │                      (3-ring SVG picker, derived MoC), JournalPreview (react-markdown)
 │       │   (list is representative - other components: TaskCard, FilterPanel, LabelsClient, etc.)
 │       └── lib/
 │           ├── api.ts             Typed API call functions (used by both server and client)
 │           ├── time.ts            Pure time-tracking geometry: PX_PER_MIN, daySegment(), dayColumns(),
 │           │                      dayTotalSeconds(), perTaskTotals(), clockLabel(), dateKey(), addDays() (v2.19.0)
 │           ├── quickAdd.ts        Pure parseQuickAdd(): NL title -> {deadline, recurrence, project, labels, priority} + token spans (chrono-node for dates; recurrence/tokens hand-rolled) (v2.15.0)
-│           └── deadlinePresets.ts Pure resolvePreset() for the quick-deadline popover (v2.10.2)
+│           ├── deadlinePresets.ts Pure resolvePreset() for the quick-deadline popover (v2.10.2)
+│           ├── journal.ts         Journal content shapes (per-section-kind contracts, mirrored by
+│           │                      Services/JournalMarkdown.cs) + derived helpers: moodShift(),
+│           │                      energyEod(), rolloverCandidates() (v3.0/#79)
+│           └── feelingsWheel.ts   Curated feelings-wheel dataset: 7 cores / 41 secondaries /
+│                                  82 tertiaries, each with a Hawkins MoC level + deriveMoc()/
+│                                  mocBand(). Sourced in docs/research/feelings-wheel-moc.md (v3.0/#79)
 │
 ├── docs/
 │   ├── architecture.md            This file
@@ -153,7 +164,8 @@ Tasklog/
 HTTP request
     │
     ▼
-Controllers              Tasks / Projects / Labels / Comments / CheckIns / Habits.
+Controllers              Tasks / Projects / Labels / Comments / CheckIns / Habits /
+                         Subtasks / TimeEntries / Journal / MoodCheckins.
                          Handle routing, validation, HTTP response codes; no business
                          logic beyond input checking (pure helpers like RecurrenceRule
                          and HabitStreak live in Services/).
@@ -163,7 +175,8 @@ TasklogDbContext         EF Core context. Direct DbSet access - no repository la
     │
     ▼
 TasklogDatabase.db       SQLite file. Tables: Tasks, Projects, Labels, LabelTaskModel,
-                         Comments, CheckIns, TimeEntries, Subtasks.
+                         Comments, CheckIns, TimeEntries, Subtasks, JournalTemplates,
+                         JournalEntries, MoodCheckins.
 ```
 
 ### Data model
@@ -247,13 +260,49 @@ TimeEntries  (v2.19.0 - one interval per start+stop cycle)
   (response-only) ProjectColor  string?  denormalized from Task.Project.Color. NOT a column.
   Single-timer invariant: at most one row has EndedAt == null at any time. POST /start auto-stops
   any running entry before opening the new one (StopAllRunning helper).
+
+JournalTemplates  (v3.0/#79 - a journal note type: Daily, Gratitude, Affirmations)
+  Id           INTEGER  primary key, autoincrement
+  Key          TEXT     not null, UNIQUE ("daily" / "gratitude" / "affirmations")
+  Name         TEXT     not null
+  Periodicity  TEXT     not null ("daily"; leaves room for weekly later)
+  SectionsJson TEXT     not null  (ordered section defs as a JSON array of
+                        { key, title, kind, optional? }; kind: checkins / prose /
+                        projects / plan / mind / evening / list. First JSON-as-TEXT
+                        columns in the codebase - opaque to SQL by design.)
+  SortOrder    INTEGER  not null  (display order)
+  CreatedAt    TEXT     not null
+  Definitions live in code (Services/JournalTemplates.cs) and are UPSERTED by Key at
+  startup in Program.cs - editing a definition updates the row on next run, no migration.
+
+JournalEntries  (v3.0/#79 - one template filled in for one calendar day)
+  Id          INTEGER  primary key, autoincrement
+  TemplateId  INTEGER  not null  foreign key -> JournalTemplates.Id (cascade delete)
+  EntryDate   TEXT     not null  (date-only, local midnight - same convention as CheckIns)
+  ContentJson TEXT     not null  (JSON object keyed by section key; value shape per
+                       section kind - the client contract is frontend/src/lib/journal.ts
+                       and the renderer mirror is Services/JournalMarkdown.cs)
+  CreatedAt   TEXT     not null
+  UpdatedAt   TEXT     not null
+  UNIQUE (TemplateId, EntryDate)  (one note per template per day - the API upserts,
+                       never duplicates)
+
+MoodCheckins  (v3.0/#79 - timestamped mood check-ins, several per day)
+  Id          INTEGER  primary key, autoincrement
+  CheckinAt   TEXT     not null, indexed  (local ISO datetime, TimeEntry convention)
+  WordsJson   TEXT     not null  (the user's mood words as a JSON string array)
+  Energy      INTEGER  not null  (0-10)
+  MocLevel    INTEGER  nullable  (Map of Consciousness level, DERIVED client-side from
+                       feelings-wheel picks - never self-tagged; null = free words only)
+  CreatedAt   TEXT     not null
+  First table with no Task FK - mood belongs to the day, not to a task.
 ```
 
 ### API endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/tasks` | Filtered/sorted task list. Filter params: `projectIds` (repeated key), `inbox`, `labelIds` (repeated key), `dueBefore`, `dueAfter`, `createdAfter`, `createdBefore`, `completed`, `text`, `priorities` (repeated key, P1-P4). Sort: `sort` (`created`/`deadline`/`priority`, default `created`) + `order` (`asc`/`desc`, default `desc`; deadline sorts nulls-last, priority asc = P1 first). `limit` caps to the first N after sorting (`<1` → 400). Arrays use repeated keys, not comma-separated. AND across dimensions, OR within id arrays. No params = all tasks, newest-first. `inbox=true` + `projectIds` → 400. `includeSubtasks=true` (v2.20.0, web-only) loads each task's `subtasks[]` so the web can render the inline checklist; MCP omits it so `list_tasks` stays lean (counts only). |
+| GET | `/api/tasks` | Filtered/sorted task list. Filter params: `projectIds` (repeated key), `inbox`, `labelIds` (repeated key), `dueBefore`, `dueAfter`, `createdAfter`, `createdBefore`, `completed`, `text`, `priorities` (repeated key, P1-P4). Sort: `sort` (`created`/`deadline`/`priority`, default `created`) + `order` (`asc`/`desc`, default `desc`; deadline sorts nulls-last, priority asc = P1 first). `limit` caps to the first N after sorting (`<1` → 400). Arrays use repeated keys, not comma-separated. AND across dimensions, OR within id arrays. No params = all tasks, newest-first. `inbox=true` + `projectIds` → 400. `includeSubtasks=true` (v2.20.0, web-only) loads each task's `subtasks[]` so the web can render the inline checklist; MCP omits it so `list_tasks` stays lean (counts only). `completedOn=yyyy-MM-dd` (v3.0/#79) filters to tasks completed that calendar day - feeds the journal's derived "Unplanned, got done" bucket. |
 | GET | `/api/tasks/{id}` | Single task by ID, including its `comments[]` (newest first) and `subtasks[]` (by Position). 404 if not found |
 | GET | `/api/subtasks` | Global subtask search across all tasks (absolute route). Query: `text` (case-insensitive title substring), `completed`. Each match carries its parent `taskId` + `taskTitle`. Backs the MCP `find` tool so "I finished X" resolves without knowing the parent (v2.20.0) |
 | GET | `/api/tasks/{taskId}/subtasks` | List a task's subtasks in manual order. 404 if task missing (v2.20.0) |
@@ -286,6 +335,15 @@ TimeEntries  (v2.19.0 - one interval per start+stop cycle)
 | PATCH | `/api/labels/{id}` | Update label name and/or color. Body: `{ name, colorIndex }`. Returns updated label |
 | DELETE | `/api/labels/{id}` | Delete label. Unlinks from all tasks (does not delete tasks). 204 on success |
 | PATCH | `/api/tasks/{id}/labels` | Replace task's label set. Body: `{ labelIds?: int[], labelNames?: string[] }`. labelNames is resolved by name and wins over labelIds; 0/multiple matches → 400. Empty/absent both clear. Returns updated task |
+| GET | `/api/journal/templates` | All journal templates in display order, section definitions parsed (v3.0/#79) |
+| GET | `/api/journal/entries?date=` | The day's entries across all templates (empty array = blank day; reads never auto-create). Default today (v3.0/#79) |
+| GET | `/api/journal/entries/dates?from=&to=` | Days in the range having at least one entry - the calendar's dots. Max 400 days; defaults to the current month (v3.0/#79) |
+| PUT | `/api/journal/entries/{templateKey}/{date}` | Upsert the day's note for a template. Body: `{ content: { ... } }` (JSON object keyed by section key). 200 with the stored entry; 404 unknown template; 400 non-object content. Never duplicates (unique index) (v3.0/#79) |
+| GET | `/api/journal/export?date=` | The day's full note (all templates) rendered to markdown, as a `yyyy-MM-dd.md` download. The preview pane fetches this same output (v3.0/#79) |
+| GET | `/api/journal/export/all` | Every entry day as one `.md` each, zipped (`journal-export.zip`) (v3.0/#79) |
+| GET | `/api/mood-checkins?date=` | That day's mood check-ins, oldest first (the arc reads left to right). Default today (v3.0/#79) |
+| POST | `/api/mood-checkins` | Log a check-in. Body: `{ words: string[], energy: 0-10, mocLevel?, checkinAt? }` (checkinAt defaults to now; mocLevel 20-1000). 400 on empty words / out-of-range values (v3.0/#79) |
+| DELETE | `/api/mood-checkins/{id}` | Remove a mistaken check-in. 204; 404 if not found (v3.0/#79) |
 | GET | `/api/tasks/{taskId}/checkins` | List a habit's check-in dates, newest first. 404 if task missing (v2.16.0) |
 | POST | `/api/tasks/{taskId}/checkins` | Log a check-in. Body: `{ date? }` (default today, reduced to date-only). Idempotent: existing day → 200 with that check-in; new day → 201. 404 if task missing (v2.16.0) |
 | DELETE | `/api/tasks/{taskId}/checkins` | Undo a check-in. Query `?date=yyyy-MM-dd` (default today). 204 on success; 404 if there was no check-in that day (v2.16.0) |
@@ -334,6 +392,10 @@ src/app/
   time/
     page.tsx           Server Component. Route: /time. Renders <TimelineView /> wrapped in
                        TimeTrackingProvider. (v2.19.0)
+
+  journal/
+    page.tsx           Server Component. Route: /journal. Renders <JournalClient />
+                       (client-fetched; owns date, entries, check-ins). (v3.0/#79)
 ```
 
 `TimeTrackingContext` (v2.19.0) - React context provider mounted at app root in `layout.tsx`.
@@ -470,6 +532,17 @@ stopTimer(id)             POST /api/time-entries/:id/stop Used by TimeTrackingCo
 addTimeEntry(...)         POST /api/time-entries          Used by TimelineView (manual log) (v2.19.0)
 updateTimeEntry(id, ...)  PATCH /api/time-entries/:id     Used by TimelineView (edit) (v2.19.0)
 deleteTimeEntry(id)       DELETE /api/time-entries/:id    Used by TimelineView (delete) (v2.19.0)
+getJournalTemplates()     GET /api/journal/templates      Used by JournalClient (v3.0)
+getJournalEntries(date)   GET /api/journal/entries        Used by JournalClient (day + yesterday) (v3.0)
+getJournalEntryDates(f,t) GET /api/journal/entries/dates  Used by JournalClient (calendar dots) (v3.0)
+upsertJournalEntry(...)   PUT /api/journal/entries/:k/:d  Used by JournalClient (debounced autosave) (v3.0)
+getMoodCheckins(date)     GET /api/mood-checkins          Used by JournalClient (v3.0)
+addMoodCheckin(...)       POST /api/mood-checkins         Used by FeelingsWheelModal save (v3.0)
+deleteMoodCheckin(id)     DELETE /api/mood-checkins/:id   Used by CheckinsSection (v3.0)
+getJournalDayMarkdown(d)  GET /api/journal/export?date=   Used by JournalPreview (v3.0)
+journalExportUrl(date?)   (URL builder)                   Header download link / zip-all (v3.0)
+getTasksCompletedOn(d)    GET /api/tasks?completedOn=     Used by JournalClient (Unplanned bucket) (v3.0)
+searchOpenTasks(text)     GET /api/tasks?text=&completed=false  Server-side type-ahead (currently unused - the plan combobox filters the loaded list locally) (v3.0)
 ```
 
 **Known issue:** `getTask()` uses `NEXT_PUBLIC_API_URL` which resolves to `localhost`
