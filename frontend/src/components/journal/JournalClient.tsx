@@ -11,7 +11,7 @@
 // fresh while the page is open.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Download, PanelLeft, X } from "lucide-react";
+import { ChevronDown, Download, HeartPulse, PanelLeft, X } from "lucide-react";
 import {
   getJournalTemplates,
   getJournalEntries,
@@ -74,6 +74,8 @@ export default function JournalClient() {
   const [wheelOpen, setWheelOpen] = useState(false);
   // Mobile-only: widgets live in a left swipe-out drawer (desktop shows the right rail).
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // Header quick action: the date pill opens the calendar without the drawer.
+  const [calOpen, setCalOpen] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -279,6 +281,7 @@ export default function JournalClient() {
     setMode("edit");
     setDate(d);
     setDrawerOpen(false); // picking a day is a destination - show the note
+    setCalOpen(false);
     if (d.getMonth() !== date.getMonth() || d.getFullYear() !== date.getFullYear()) {
       loadMonthDots(d);
     }
@@ -301,7 +304,12 @@ export default function JournalClient() {
   };
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setDrawerOpen(false);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setDrawerOpen(false);
+        setCalOpen(false);
+      }
+    };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, []);
@@ -362,17 +370,31 @@ export default function JournalClient() {
           <PanelLeft size={16} aria-hidden="true" />
         </button>
         <h1 className="font-heading text-xl font-bold">Journal</h1>
-        <span className="text-sm rounded-full border border-j-line bg-j-card px-3.5 py-1.5">
+        <button
+          onClick={() => setCalOpen(true)}
+          aria-label="Change date"
+          aria-haspopup="dialog"
+          className="inline-flex items-center gap-1.5 text-sm rounded-full border border-j-line bg-j-card px-3.5 py-1.5 hover:bg-j-accent-soft cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-j-accent"
+        >
           {date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
-          {!isToday && (
-            <button
-              onClick={() => selectDate(new Date())}
-              className="ml-2 text-j-accent font-medium cursor-pointer focus:outline-none focus:underline"
-            >
-              today
-            </button>
-          )}
-        </span>
+          <ChevronDown size={13} aria-hidden="true" className="text-j-muted" />
+        </button>
+        {!isToday && (
+          <button
+            onClick={() => selectDate(new Date())}
+            className="text-sm text-j-accent font-medium cursor-pointer focus:outline-none focus:underline"
+          >
+            today
+          </button>
+        )}
+        <button
+          onClick={() => setWheelOpen(true)}
+          aria-label="Log a mood check-in"
+          className="inline-flex items-center gap-1.5 text-sm rounded-full border border-j-line bg-j-card px-3 py-1.5 text-j-accent font-medium hover:bg-j-accent-soft cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-j-accent"
+        >
+          <HeartPulse size={14} aria-hidden="true" />
+          <span className="hidden sm:inline">Check in</span>
+        </button>
         <span className="text-xs text-j-muted min-w-14" role="status">
           {saveState === "saving" ? "saving…" : saveState === "saved" ? "saved" : saveState === "error" ? "save failed - retrying on next edit" : ""}
         </span>
@@ -552,6 +574,18 @@ export default function JournalClient() {
         </div>
         {railContent}
       </aside>
+
+      {/* Quick calendar: opened from the header date pill, no drawer needed */}
+      {calOpen && (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4 tl-fade"
+          onClick={(e) => e.target === e.currentTarget && setCalOpen(false)}
+        >
+          <div role="dialog" aria-modal="true" aria-label="Pick a date" className="w-full max-w-[340px] tl-pop">
+            <CalendarWidget selected={date} entryDates={entryDates} onSelect={selectDate} onMonthChange={loadMonthDots} />
+          </div>
+        </div>
+      )}
 
       {wheelOpen && (
         <FeelingsWheelModal onSave={handleSaveCheckin} onClose={() => setWheelOpen(false)} />
