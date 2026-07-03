@@ -24,8 +24,10 @@ export const metadata: Metadata = {
 };
 
 // Reads localStorage before hydration to apply the saved theme class immediately,
-// preventing a flash of the wrong theme on load.
-const themeScript = `(function(){try{var t=localStorage.getItem('tasklog:theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark');}}catch(e){}})();`;
+// preventing a flash of the wrong theme on load. Light is the default: dark applies
+// ONLY when the user has explicitly chosen it via the toggle (no OS-preference
+// fallback - a first-time visitor always gets light).
+const themeScript = `(function(){try{if(localStorage.getItem('tasklog:theme')==='dark'){document.documentElement.classList.add('dark');}}catch(e){}})();`;
 
 export default function RootLayout({
   children,
