@@ -5,6 +5,7 @@ import { DoppelWidget } from "@/components/DoppelWidget";
 import { TimeTrackingProvider } from "@/contexts/TimeTrackingContext";
 import TrackingBar from "@/components/TrackingBar";
 import ThemeToggle from "@/components/ThemeToggle";
+import NavTabs from "@/components/NavTabs";
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
@@ -38,13 +39,16 @@ export default function RootLayout({
       <body className={`${spaceGrotesk.variable} ${dmSans.variable} antialiased min-h-screen bg-bg`}>
         {/* Site header */}
         <header className="sticky top-0 z-30 border-b border-border bg-surface/95 backdrop-blur-sm">
-          <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
+          <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-3">
             <a
               href="/"
               className="font-heading text-lg font-bold text-text-primary hover:text-accent transition-colors duration-150"
             >
               Tasklog
             </a>
+            <div className="flex-1 flex justify-center">
+              <NavTabs />
+            </div>
             <ThemeToggle />
           </div>
         </header>

@@ -544,9 +544,10 @@ export default function JournalClient() {
       )}
 
       {/* Mobile: floating evening jump */}
+      {/* bottom-20 clears the full-width TrackingBar pinned at the viewport bottom */}
       <button
         onClick={jumpToEvening}
-        className="lg:hidden fixed bottom-5 right-4 z-40 rounded-full bg-j-ink text-j-paper px-5 py-3 text-sm font-semibold shadow-lg cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-j-accent"
+        className="lg:hidden fixed bottom-20 right-4 z-40 rounded-full bg-j-ink text-j-paper px-5 py-3 text-sm font-semibold shadow-lg cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-j-accent"
         style={{ display: mode === "preview" ? "none" : undefined }}
       >
         Evening ↓
