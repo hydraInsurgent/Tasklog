@@ -11,6 +11,12 @@ import { Doppel } from "@manucompiles/doppel";
 // overrides the endpoint if the API is ever moved to a standalone server.
 const DOPPEL_API = process.env.NEXT_PUBLIC_DOPPEL_API ?? "/api/doppel";
 
+// Hidden until the persona is finished (#84): the avatar is still placeholder
+// art, and its fixed bottom-right corner collides with the journal's Evening
+// pill on mobile. Set NEXT_PUBLIC_DOPPEL_ENABLED=true to bring it back.
+const DOPPEL_ENABLED = process.env.NEXT_PUBLIC_DOPPEL_ENABLED === "true";
+
 export function DoppelWidget() {
+  if (!DOPPEL_ENABLED) return null;
   return <Doppel persona="manu" theme="warm-beach" apiEndpoint={DOPPEL_API} />;
 }
