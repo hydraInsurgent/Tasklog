@@ -121,6 +121,8 @@ Tasklog/
 │       │   ├── SubtaskChecklist.tsx  Inline tickable subtask circles clubbed under a parent (card + table sub-row + board), cap + "+N more" (#78)
 │       │   ├── SubtaskSection.tsx  Full subtask editor (detail modal + /tasks/:id): add/tick/deadline/delete + @dnd-kit drag-reorder (#78)
 │       │   ├── CompleteWithSubtasksDialog.tsx  Complete-all vs pull-out prompt when completing a parent with open subtasks (#78)
+│       │   ├── NavTabs.tsx        Header section tabs Tasks / Time / Journal, active by pathname -
+│       │   │                      the first cross-section nav available on every page (v3.0/#79)
 │       │   ├── journal/           The /journal page (v3.0/#79): JournalClient (orchestrator: date,
 │       │   │                      contents, debounced autosave), note sections (Checkins/Prose/
 │       │   │                      Projects/Plan/Evening/List + shared SectionCard), rail widgets
