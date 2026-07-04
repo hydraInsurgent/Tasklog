@@ -69,15 +69,25 @@ COLUMNS = [
     ("JournalEntries", "EntryDate"), ("JournalEntries", "CreatedAt"), ("JournalEntries", "UpdatedAt"),
     ("MoodCheckins", "CheckinAt"), ("MoodCheckins", "CreatedAt"),
 ]
-shifted = 0
-for table, col in COLUMNS:
-    if table not in tables:
-        continue
-    cur = db.execute(
-        f"UPDATE {table} SET {col} = date(substr({col},1,10), '+{days} days') || substr({col},11) "
-        f"WHERE {col} IS NOT NULL"
-    )
-    shifted += cur.rowcount
+# Two-phase shift: dates move row by row, and unique indexes like
+# CheckIns(TaskId, CheckInDate) reject a row landing on a date another row
+# still occupies. Jumping everything +100000 days into empty space first,
+# then back down to (original + days), never collides.
+OFFSET = 100000
+def shift(col_expr_days):
+    total = 0
+    for table, col in COLUMNS:
+        if table not in tables:
+            continue
+        cur = db.execute(
+            f"UPDATE {table} SET {col} = date(substr({col},1,10), '{col_expr_days} days') || substr({col},11) "
+            f"WHERE {col} IS NOT NULL"
+        )
+        total += cur.rowcount
+    return total
+
+shift(f"+{OFFSET}")
+shifted = shift(f"-{OFFSET - days}")
 db.commit()
 print(f"re-date: shifted {shifted} values by +{days} days (anchor {anchor})")
 PYEOF
