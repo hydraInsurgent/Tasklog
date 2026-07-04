@@ -2,7 +2,8 @@
 
 ---
 
-## Unreleased - Journaling (#79)
+## v3.0.0 - Journaling
+*July 2026*
 
 ### Added
 
