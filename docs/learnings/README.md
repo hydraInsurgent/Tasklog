@@ -43,6 +43,8 @@ Inspired by the split in [album-to-movies](https://github.com/...) which separat
 | [proot-signal-propagation.md](proot-signal-propagation.md) | Signals don't cross the proot boundary; `sv restart` ships stale code. Restart by killing the inner guest. | MCP filter feature #57 (2026-05) |
 | [server-local-time-vs-utc.md](server-local-time-vs-utc.md) | Server "today" depends on the process timezone (usually UTC on headless hosts); store instants in UTC but compute calendar-day logic in a known local zone. | dueStatus field #61 (2026-05) |
 | [orm-migration-default-values.md](orm-migration-default-values.md) | A migration's column default comes from the type zero-value, not your model initializer; existing rows backfill with 0/""/false unless you set the DB default explicitly. | Task priority #64 (2026-05) |
+| [stale-closures-in-debounced-saves.md](stale-closures-in-debounced-saves.md) | A scheduled callback is a message to the future: snapshot every input at schedule time; reading shared state at fire time pairs fresh data with a stale destination. | Journaling #79 (2026-07) |
+| [json-as-text-columns.md](json-as-text-columns.md) | Store shape-flexible content as a JSON string column; queryable values get real columns. Flexibility without migrations, at the cost of SQL access to the blob. | Journaling #79 (2026-07) |
 
 <!--
 TODO future learnings, add as encountered:
