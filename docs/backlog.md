@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| P79-journaling.md | #79 | feature/journaling-#79 | In Progress |
+| - | - | - | - |
 
 ---
 
@@ -80,6 +80,7 @@ Recently completed work (keep last 10):
 
 | # | Title | Type | Closed |
 |---|-------|------|--------|
+| #79 | Journaling | feature | 2026-07-04 |
 | #78 | Subtasks: lightweight checklist items under a task (v2.20.0) | feature | 2026-07-02 |
 | #77 | Time tracking per task + timeline dashboard + project colors (v2.19.0) | feature | 2026-06-12 |
 | #76 | Fix: frequency habit check-in showed stale weekly progress (optimistic update) (v2.18.1) | bug | 2026-06-01 |
