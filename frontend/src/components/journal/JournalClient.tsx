@@ -28,10 +28,12 @@ import {
   addMoodCheckin,
   deleteMoodCheckin,
   journalExportUrl,
+  getLabels,
   JournalTemplateDef,
   MoodCheckinDto,
   Task,
   Project,
+  Label,
 } from "@/lib/api";
 import { dateKey, addDays, dayTotalSeconds } from "@/lib/time";
 import {
@@ -53,6 +55,8 @@ import MindWidget from "./MindWidget";
 import TodaySoFarWidget from "./TodaySoFarWidget";
 import FeelingsWheelModal from "./FeelingsWheelModal";
 import JournalPreview from "./JournalPreview";
+import TaskDetailModal from "../TaskDetailModal";
+import TaskSheet from "../TaskSheet";
 
 type Contents = Record<string, Record<string, unknown>>;
 
@@ -72,6 +76,10 @@ export default function JournalClient() {
   const [habitsDone, setHabitsDone] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
   const [timeSeconds, setTimeSeconds] = useState(0);
   const [wheelOpen, setWheelOpen] = useState(false);
+  // Task detail/edit opened from the plan (#85) - same chaining as TasksClient.
+  const [openingTask, setOpeningTask] = useState<Task | null>(null);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [allLabels, setAllLabels] = useState<Label[]>([]);
   // Mobile-only: widgets live in a left swipe-out drawer (desktop shows the right rail).
   const [drawerOpen, setDrawerOpen] = useState(false);
   // Header quick action: the date pill opens the calendar without the drawer.
@@ -95,10 +103,16 @@ export default function JournalClient() {
   // ---------- loading ----------
 
   const loadStatic = useCallback(async () => {
-    const [tpls, allTasks, projs] = await Promise.all([getJournalTemplates(), getTasks(), getProjects()]);
+    const [tpls, allTasks, projs, labels] = await Promise.all([
+      getJournalTemplates(),
+      getTasks(),
+      getProjects(),
+      getLabels(),
+    ]);
     setTemplates(tpls);
     setTasks(allTasks);
     setProjects(projs);
+    setAllLabels(labels);
   }, []);
 
   const loadDay = useCallback(async (day: Date) => {
@@ -246,6 +260,17 @@ export default function JournalClient() {
       } catch {
         setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, isCompleted: !isCompleted } : t)));
       }
+    },
+    [key],
+  );
+
+  // A task saved from the detail modal or sheet: reconcile the journal's task list
+  // and the derived Unplanned bucket (completion may have changed).
+  const handleTaskSaved = useCallback(
+    async (task: Task) => {
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? task : t)));
+      setOpeningTask((prev) => (prev && prev.id === task.id ? task : prev));
+      setCompletedOnDate(await getTasksCompletedOn(key));
     },
     [key],
   );
@@ -489,6 +514,7 @@ export default function JournalClient() {
                           onCreateTask={handleCreateTask}
                           onToggleTask={handleToggleTask}
                           onSearch={(text) => Promise.resolve(searchLocal(tasks, text, planIds))}
+                          onOpenTask={setOpeningTask}
                         />
                       );
                     case "evening":
@@ -590,6 +616,33 @@ export default function JournalClient() {
 
       {wheelOpen && (
         <FeelingsWheelModal onSave={handleSaveCheckin} onClose={() => setWheelOpen(false)} />
+      )}
+
+      {/* Task detail + edit sheet, opened from the plan (#85) - TasksClient's chaining */}
+      {openingTask && (
+        <TaskDetailModal
+          task={openingTask}
+          projects={projects}
+          allLabels={allLabels}
+          onClose={() => setOpeningTask(null)}
+          onEdit={(task) => {
+            setOpeningTask(null);
+            setEditingTask(task);
+          }}
+          onSaved={handleTaskSaved}
+        />
+      )}
+      {editingTask && (
+        <TaskSheet
+          task={editingTask}
+          projects={projects}
+          allLabels={allLabels}
+          onSaved={(task) => {
+            handleTaskSaved(task);
+            setEditingTask(null);
+          }}
+          onClose={() => setEditingTask(null)}
+        />
       )}
     </div>
   );

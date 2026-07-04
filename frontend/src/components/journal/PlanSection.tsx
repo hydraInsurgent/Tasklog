@@ -23,10 +23,13 @@ interface Props {
   onCreateTask: (title: string) => Promise<Task>;
   onToggleTask: (id: number, isCompleted: boolean) => void;
   onSearch: (text: string) => Promise<Task[]>;
+  // Opens the task's detail sheet in the journal (#85) - plan items are real tasks,
+  // so full task powers are one tap away.
+  onOpenTask: (task: Task) => void;
 }
 
 export default function PlanSection({
-  title, plan, tasksById, unplanned, isToday, onChange, onCreateTask, onToggleTask, onSearch,
+  title, plan, tasksById, unplanned, isToday, onChange, onCreateTask, onToggleTask, onSearch, onOpenTask,
 }: Props) {
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<Task[]>([]);
@@ -109,9 +112,12 @@ export default function PlanSection({
                   >
                     <Check size={11} aria-hidden="true" />
                   </button>
-                  <span className={`text-[0.95rem] ${task.isCompleted ? "line-through text-j-muted" : "text-j-ink"}`}>
+                  <button
+                    onClick={() => onOpenTask(task)}
+                    className={`text-left text-[0.95rem] cursor-pointer hover:underline decoration-j-muted/50 underline-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-j-accent rounded ${task.isCompleted ? "line-through text-j-muted" : "text-j-ink"}`}
+                  >
                     {task.title}
-                  </span>
+                  </button>
                   <span className="ml-auto flex items-center gap-2">
                     {justAdded === task.id && (
                       <span className="inline-flex items-center gap-1 font-mono text-[0.62rem] text-j-muted whitespace-nowrap">
@@ -202,7 +208,12 @@ export default function PlanSection({
               <span className="grid place-items-center w-[18px] h-[18px] rounded-[5px] border-[1.6px] border-dashed border-j-muted text-j-muted">
                 <Check size={11} aria-hidden="true" />
               </span>
-              <span className="text-[0.95rem] text-j-muted line-through">{t.title}</span>
+              <button
+                onClick={() => onOpenTask(t)}
+                className="text-left text-[0.95rem] text-j-muted line-through cursor-pointer hover:underline underline-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-j-accent rounded"
+              >
+                {t.title}
+              </button>
             </div>
           ))}
         </div>
