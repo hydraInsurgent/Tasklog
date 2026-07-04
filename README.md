@@ -67,6 +67,13 @@ I wanted a task system I understood completely - one where the data, the workflo
 - Natural-language quick-add - type "Email Mark friday #Work @urgent p1 every week" and the date, repeat, project, label, and priority are parsed inline as you type
 - Daily habits - flag any task a habit and check it in each day from the Habits view; see your current streak and a last-7-days dot row
 
+**Journal your day (v3.0)**
+- A structured daily journal at `/journal` - morning check-in, mind dump, today's plan, gratitude, affirmations, and an evening review, all on one page with a calendar to browse any day
+- Mood check-ins through an interactive feelings wheel; the day renders as a "mood arc" chart, and your emotional shift and end-of-day energy are derived from what you logged, never typed
+- The day's plan links real tasks - tick them from the journal, and anything you finished off-plan appears automatically under "Unplanned, got done"
+- Front of mind / Back of mind lists you clear by the end of the day; anything left rolls into tomorrow until you consciously keep or close it
+- Every day exports as a clean, Obsidian-compatible markdown note - one day or your whole journal as a zip
+
 **Works everywhere**
 - Clean table on desktop, card view on mobile
 - Background auto-refresh - changes from other devices appear without a reload

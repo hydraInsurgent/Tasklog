@@ -9,7 +9,10 @@ and update this document - not to automatically reject the idea.
 
 ## What Tasklog is
 
-Tasklog is a personal, self-hosted task management tool.
+Tasklog is a personal, self-hosted task management tool that, as of v3.0, grew
+into a broader **day-tracking system**: tasks, time, habits, and a daily journal
+share one data layer, so the day's plan, its execution, and its reflection live
+on the same surface.
 
 It exists to replace subscription-based task apps for a single user who wants
 full ownership of their data and a system they can understand end to end.
@@ -109,6 +112,16 @@ A reminder or alert system would be a meaningful scope addition.
 - Snap-to-5-min / exact granularity setting; an Inbox color picker (localStorage) so Inbox tasks have a distinguishable color on the timeline.
 - A per-task totals breakdown shows below the grid for the visible range.
 - Time entries are never merged or edited automatically - the user has full control over the log.
+
+**Journaling** (v3.0, #79)
+- A **Journal** section (`/journal`) holds one structured note per day, built from three fixed templates: **Daily** (check-ins, What's going on, Mind dump, Projects today, Today's plan, Front/Back of mind, Daily review, Evening review, Journal), **Gratitude**, and **Affirmations** (a daily list, meant to be revisited at the evening close to celebrate wins). Templates are code-defined; there is no template editor.
+- Entries are **structured data rendered to markdown**, never stored as markdown. Preview mode and the export download both show the same backend-rendered, Obsidian-compatible note. Export = one day as `.md` or all days as a zip; sync to a vault is a later phase, Tasklog stays the source of truth.
+- **Mood check-ins** are timestamped moments (several per day). Logging opens a **feelings wheel** (three concentric rings, multi-select, own words always allowed); the **Map of Consciousness score is derived from the picked feelings, never self-tagged**. The rail shows the day as a "mood arc" chart colored by MoC band, with a reference line at 200 (courage). Emotion shift and energy-at-EOD are derived from the first and last check-ins, never typed.
+- **Today's plan references real tasks** - a combobox searches open tasks; creating is always an explicit "+ Create task" row (born due-today, Inbox). Rolled-over state comes from live task data. An **"Unplanned, got done"** bucket is derived automatically: tasks completed that day that were never planned.
+- **Front of mind / Back of mind** are transient rail lists meant to be **cleared by the end of day**; anything uncleared resurfaces tomorrow as a "rolled over - keep?" candidate that must be consciously re-adopted.
+- Empty sections stay quietly collapsed ("earned depth only" - the Journal section is not prompted for daily). After 6pm, opening today's journal lands on the evening cluster - the evening close is designed to be the cheapest ritual of the day.
+- The journal page carries its **own scoped visual identity** (fog paper / plum accent / serif prose voice, with a soft dark mode) via `--color-j-*` tokens; the rest of the app is unchanged. Journal prose is bilingual-friendly (Hinglish + Devanagari fall through to system fonts).
+- **Sensitivity note:** journal prose and mood history are the most sensitive data the app holds. They stay LAN-only; the MCP surface does NOT expose journal endpoints yet, and minimal auth (v3.1) is planned before it ever does.
 
 **Projects**
 - Projects let the user categorize tasks.

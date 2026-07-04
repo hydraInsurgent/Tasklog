@@ -32,6 +32,23 @@
   --color-warning-bg: #fefce8;
   --color-danger: #dc2626;
   --color-danger-bg: #fef2f2;
+
+  /* Journal-scoped identity (#79) - the approved fog/plum/serif look. Deliberately
+     separate tokens (j- prefix) so the journal page carries its own atmosphere without
+     touching the rest of the app; app-wide adoption is a later, explicit decision. */
+  --color-j-paper: #f5f4ef;        /* fog paper page ground */
+  --color-j-card: #fdfcf9;         /* note + widget cards */
+  --color-j-ink: #24261f;          /* text */
+  --color-j-muted: #676b61;        /* labels, captions (>= 4.5:1 on j-paper AND j-card) */
+  --color-j-line: #e3e3da;         /* borders */
+  --color-j-accent: #5a4b70;       /* plum accent */
+  --color-j-accent-soft: #efebf4;  /* chip/hover tint */
+
+  /* Map of Consciousness bands (mood arc + wheel) - semantic, not accent.
+     moc-high darkened for AA when used as text on the card. */
+  --color-moc-low: #bf463e;
+  --color-moc-mid: #ce9433;
+  --color-moc-high: #3d7a4e;
 }
 
 /* Dark mode - applied when <html class="dark">.
@@ -58,6 +75,25 @@ html.dark {
   --color-warning-bg: #1c1000;
   --color-danger: #f87171;
   --color-danger-bg: #1c0000;
+
+  /* Journal identity, night mode - deliberately soft for the 11pm close (#79) */
+  --color-j-paper: #17161b;
+  --color-j-card: #1f1e25;
+  --color-j-ink: #e6e3dc;
+  --color-j-muted: #908d96;
+  --color-j-line: #2f2e37;
+  --color-j-accent: #b3a2ce;
+  --color-j-accent-soft: rgba(179, 162, 206, 0.13);
+
+  --color-moc-low: #d06a62;
+  --color-moc-mid: #d8a954;
+  --color-moc-high: #6fb584;
+}
+
+/* The journal's prose voice (#79): a serif stack - no font dependency; system serifs
+   cover Latin and fall through to system fonts for Devanagari. Chrome stays in app sans. */
+.font-journal-serif {
+  font-family: "Charter", "Iowan Old Style", Georgia, "Times New Roman", serif;
 }
 
 /* Base styles */

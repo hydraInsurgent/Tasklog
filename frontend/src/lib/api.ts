@@ -554,3 +554,148 @@ export async function deleteTimeEntry(id: number): Promise<void> {
   const res = await fetch(`${getApiUrl()}/api/time-entries/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error(`Failed to delete time entry ${id}.`);
 }
+
+// --- Journal (#79) ---
+
+// A section definition inside a journal template (parsed server-side from SectionsJson).
+export interface JournalSectionDef {
+  key: string;
+  title: string;
+  kind: "checkins" | "prose" | "projects" | "plan" | "mind" | "evening" | "list";
+  // Optional sections stay silent when empty ("earned depth only" - e.g. the Journal section).
+  optional?: boolean;
+}
+
+export interface JournalTemplateDef {
+  id: number;
+  key: string; // "daily" | "gratitude" | "affirmations"
+  name: string;
+  periodicity: string;
+  sortOrder: number;
+  sections: JournalSectionDef[];
+}
+
+// One template's note for one day. Content is a JSON object keyed by section key;
+// value shapes per kind live in lib/journal.ts.
+export interface JournalEntryDto {
+  id: number;
+  templateKey: string;
+  entryDate: string; // "yyyy-MM-dd"
+  content: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// A timestamped mood check-in. mocLevel is derived from feelings-wheel picks
+// (null when only free words were logged) - never self-tagged.
+export interface MoodCheckinDto {
+  id: number;
+  checkinAt: string; // local ISO datetime
+  words: string[];
+  energy: number; // 0-10
+  mocLevel: number | null;
+}
+
+// GET /api/journal/templates - all templates in display order.
+export async function getJournalTemplates(): Promise<JournalTemplateDef[]> {
+  const res = await fetch(`${getApiUrl()}/api/journal/templates`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Failed to load journal templates.");
+  return res.json();
+}
+
+// GET /api/journal/entries?date= - the day's entries (any template). Empty array = blank day.
+export async function getJournalEntries(date: string): Promise<JournalEntryDto[]> {
+  const res = await fetch(`${getApiUrl()}/api/journal/entries?date=${date}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Failed to load journal entries.");
+  return res.json();
+}
+
+// GET /api/journal/entries/dates?from=&to= - days having entries (calendar dots).
+export async function getJournalEntryDates(from: string, to: string): Promise<string[]> {
+  const res = await fetch(`${getApiUrl()}/api/journal/entries/dates?from=${from}&to=${to}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Failed to load journal entry dates.");
+  return res.json();
+}
+
+// PUT /api/journal/entries/:templateKey/:date - upsert the day's note for a template.
+// One entry per template per date is an API guarantee; this never duplicates.
+export async function upsertJournalEntry(
+  templateKey: string,
+  date: string,
+  content: Record<string, unknown>,
+): Promise<JournalEntryDto> {
+  const res = await fetch(`${getApiUrl()}/api/journal/entries/${templateKey}/${date}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.message ?? "Failed to save the journal entry.");
+  }
+  return res.json();
+}
+
+// GET /api/mood-checkins?date= - that day's check-ins, oldest first.
+export async function getMoodCheckins(date: string): Promise<MoodCheckinDto[]> {
+  const res = await fetch(`${getApiUrl()}/api/mood-checkins?date=${date}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Failed to load mood check-ins.");
+  return res.json();
+}
+
+// POST /api/mood-checkins - log a check-in (checkinAt defaults to now server-side).
+export async function addMoodCheckin(
+  words: string[],
+  energy: number,
+  mocLevel?: number | null,
+  // Local ISO datetime to backfill a past day; omitted = now (server default).
+  checkinAt?: string,
+): Promise<MoodCheckinDto> {
+  const res = await fetch(`${getApiUrl()}/api/mood-checkins`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ words, energy, mocLevel: mocLevel ?? null, checkinAt: checkinAt ?? null }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.message ?? "Failed to log the mood check-in.");
+  }
+  return res.json();
+}
+
+// DELETE /api/mood-checkins/:id - remove a mistaken check-in.
+export async function deleteMoodCheckin(id: number): Promise<void> {
+  const res = await fetch(`${getApiUrl()}/api/mood-checkins/${id}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(`Failed to delete mood check-in ${id}.`);
+}
+
+// GET /api/journal/export?date= - the day's rendered markdown (preview + download share it).
+export async function getJournalDayMarkdown(date: string): Promise<string> {
+  const res = await fetch(`${getApiUrl()}/api/journal/export?date=${date}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Failed to render the journal markdown.");
+  return res.text();
+}
+
+// Download URLs for <a href> (browser handles the file save).
+export function journalExportUrl(date?: string): string {
+  return date
+    ? `${getApiUrl()}/api/journal/export?date=${date}`
+    : `${getApiUrl()}/api/journal/export/all`;
+}
+
+// GET /api/tasks?text=&completed=false - open tasks matching a title substring,
+// for the plan combobox. Small limit: it is a type-ahead, not a browse.
+export async function searchOpenTasks(text: string): Promise<Task[]> {
+  const params = new URLSearchParams({ text, completed: "false", limit: "6" });
+  const res = await fetch(`${getApiUrl()}/api/tasks?${params}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Failed to search tasks.");
+  return res.json();
+}
+
+// GET /api/tasks?completedOn= - tasks completed that calendar day, for the journal's
+// derived "Unplanned, got done" bucket (#79).
+export async function getTasksCompletedOn(date: string): Promise<Task[]> {
+  const res = await fetch(`${getApiUrl()}/api/tasks?completedOn=${date}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Failed to load completed tasks.");
+  return res.json();
+}
