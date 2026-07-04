@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| - | - | - | - |
+| P85-journal-qol.md (pending) | #85 | feature/journal-qol-#85 | Planning |
 
 ---
 
