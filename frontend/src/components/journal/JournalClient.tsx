@@ -51,6 +51,7 @@ import EveningSection from "./EveningSection";
 import ListSection from "./ListSection";
 import CalendarWidget from "./CalendarWidget";
 import MoodArcWidget from "./MoodArcWidget";
+import MocLadderWidget from "./MocLadderWidget";
 import MindWidget from "./MindWidget";
 import TodaySoFarWidget from "./TodaySoFarWidget";
 import FeelingsWheelModal from "./FeelingsWheelModal";
@@ -353,6 +354,7 @@ export default function JournalClient() {
     <>
       <CalendarWidget selected={date} entryDates={entryDates} onSelect={selectDate} onMonthChange={loadMonthDots} />
       <MoodArcWidget checkins={checkins} onLog={() => { setDrawerOpen(false); setWheelOpen(true); }} />
+      <MocLadderWidget checkins={checkins} />
       <MindWidget
         title="Front of mind"
         items={fom}

@@ -13,6 +13,8 @@ Two contained journal improvements: (1) replace the all-130-at-once feelings whe
 
 ## Tasks
 
+- [x] 🟩 **Step 1b (added): Hints + MoC ladder** - differentiating gloss on all 123 secondaries/tertiaries (hint field, dataset test); MocLadderWidget (log-scaled vertical ladder, major anchors labeled + minor dots, courage line, today marker from day picks, lens-not-measurement microcopy) in rail + drawer
+
 - [x] 🟩 **Step 1: Drill-down wheel** `[sequential]`
   - [x] 🟩 Rework FeelingsWheelModal: level-based rendering (path state), full-circle levels, center-pick, breadcrumb + back + "all" return, zoom crossfade (reduced-motion safe), "N deeper ›" cues, add-another hint, desktop 560px
 - [x] 🟩 **Step 2: Task sheet from plan** `[sequential]` → depends on: Step 1 (same files as JournalClient wiring)

@@ -204,11 +204,22 @@ export default function FeelingsWheelModal({ onSave, onClose }: Props) {
                 >
                   <title>{`${node.name} · MoC ${node.moc}${hasChildren ? ` · ${node.children!.length} deeper` : ""}`}</title>
                 </path>
-                <text x={lx} y={ly} textAnchor="middle" dominantBaseline="middle"
+                <text x={lx} y={node.hint ? ly - 10 : ly} textAnchor="middle" dominantBaseline="middle"
                   fontSize={depth === 0 ? 18 : nodes.length > 7 ? 13 : 16}
                   fontWeight={600} fill="#2E2A24" pointerEvents="none">
                   {node.name}
                 </text>
+                {/* The differentiating gloss (#85): what sets this word apart from its
+                    siblings - "infuriated: boiled over" vs "annoyed: still in control". */}
+                {node.hint &&
+                  splitTwo(node.hint).map((line, li) => (
+                    <text key={li} x={lx} y={ly + 5 + li * 11}
+                      textAnchor="middle" dominantBaseline="middle"
+                      fontSize={nodes.length > 7 ? 8.5 : 10} fontStyle="italic"
+                      fill="#2E2A24" opacity={0.72} pointerEvents="none">
+                      {line}
+                    </text>
+                  ))}
                 {hasChildren && (
                   <text x={cx} y={cy} textAnchor="middle" fontSize={10}
                     fill="#2E2A24" opacity={0.55} fontFamily="monospace" pointerEvents="none">
@@ -317,6 +328,17 @@ export default function FeelingsWheelModal({ onSave, onClose }: Props) {
       </div>
     </div>
   );
+}
+
+// Balance a short gloss onto up to two lines (split at the most central space).
+function splitTwo(hint: string): string[] {
+  if (hint.length <= 20) return [hint];
+  const mid = hint.length / 2;
+  let best = -1;
+  for (let i = 0; i < hint.length; i++) {
+    if (hint[i] === " " && (best === -1 || Math.abs(i - mid) < Math.abs(best - mid))) best = i;
+  }
+  return best === -1 ? [hint] : [hint.slice(0, best), hint.slice(best + 1)];
 }
 
 // ---------- geometry ----------
