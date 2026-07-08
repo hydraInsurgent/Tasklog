@@ -1,6 +1,6 @@
 # P85 Journal QoL - Implementation Plan
 
-**Overall Progress:** `90%`
+**Overall Progress:** `100%`
 
 ## TLDR
 Two contained journal improvements: (1) replace the all-130-at-once feelings wheel with a drill-down wheel - focused single-path zoom (each level fills the whole circle), tap navigates / center picks / leaves pick on tap, stay-put after pick + one-tap "all" return for cross-family multi-select, bigger on desktop; (2) tapping a task in Today's Plan or Unplanned opens the existing TaskDetailModal (chained to TaskSheet for full edit) right in the journal. Design settled via interactive mockup (artifact 0834b7b8) - stage-multi-select variant rejected (union stages recrowd the wheel).
@@ -20,8 +20,12 @@ Two contained journal improvements: (1) replace the all-130-at-once feelings whe
 - [x] 🟩 **Step 2: Task sheet from plan** `[sequential]` → depends on: Step 1 (same files as JournalClient wiring)
   - [x] 🟩 PlanSection: task titles open the task (button + aria); Unplanned rows too
   - [x] 🟩 JournalClient: labels fetch, TaskDetailModal + TaskSheet chaining, onSaved reconciliation
-- [x] 🟨 **Step 3: Verify** `[sequential]` → depends on: Steps 1, 2
-  - [x] 🟨 tsc + jest green (6 new wheel tests); live device check pending user + production build; live check on dev server (desktop + phone)
+- [x] 🟩 **Step 3: Verify** `[sequential]` → depends on: Steps 1, 2
+  - [x] 🟩 tsc + jest green (6 new wheel tests); live device check pending user + production build; live check on dev server (desktop + phone)
 
 ## Outcomes
-<!-- fill after execution -->
+
+- Built as designed via two mockup rounds: drill-down wheel (pick logs + resets to cores; center shows current word + gloss, or the collection at the cores), 130 differentiating hints (incl. 7 core glosses added mid-build for the center display), MoC reference ladder moved from a rail widget INTO the check-in popup behind an info button (user's call - a reference belongs at the moment of tagging), task sheet from plan/unplanned via TaskDetailModal + TaskSheet chaining.
+- Deviations: "N deeper" visual cue removed after device testing (overlapped, unnecessary - aria labels keep it); "tap to pick this" replaced by the feeling's gloss (demo copy, not interface copy).
+- Review: single-pass, no blockers; wheel keyboard focusability remains tracked in #80.
+- Tests: 187 frontend (7 new wheel-interaction + hints-integrity), 3 pre-existing TaskCard failures (#83) unrelated.

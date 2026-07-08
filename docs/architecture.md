@@ -127,6 +127,9 @@ Tasklog/
 │       │   │                      contents, debounced autosave), note sections (Checkins/Prose/
 │       │   │                      Projects/Plan/Evening/List + shared SectionCard), rail widgets
 │       │   │                      (Calendar, MoodArc, Mind x2, TodaySoFar), FeelingsWheelModal
+│       │   │                      (drill-down wheel #85: one level per screen, pick logs +
+│       │   │                      resets to cores, hints under names + in center, ⓘ opens
+│       │   │                      MocLadder - log-scaled Hawkins reference with today marker),
 │       │   │                      (3-ring SVG picker, derived MoC), JournalPreview (react-markdown)
 │       │   (list is representative - other components: TaskCard, FilterPanel, LabelsClient, etc.)
 │       └── lib/
@@ -139,6 +142,7 @@ Tasklog/
 │           │                      Services/JournalMarkdown.cs) + derived helpers: moodShift(),
 │           │                      energyEod(), rolloverCandidates() (v3.0/#79)
 │           └── feelingsWheel.ts   Curated feelings-wheel dataset: 7 cores / 41 secondaries /
+│                                  (+ per-feeling differentiating `hint` glosses on all 130, #85)
 │                                  82 tertiaries, each with a Hawkins MoC level + deriveMoc()/
 │                                  mocBand(). Sourced in docs/research/feelings-wheel-moc.md (v3.0/#79)
 │
