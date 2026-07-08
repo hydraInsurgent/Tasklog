@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| P85-journal-qol.md (pending) | #85 | feature/journal-qol-#85 | Planning |
+| - | - | - | - |
 
 ---
 
@@ -80,6 +80,7 @@ Recently completed work (keep last 10):
 
 | # | Title | Type | Closed |
 |---|-------|------|--------|
+| #85 | Journal QoL (wheel drill-down + task sheet) | improvement | 2026-07-08 |
 | #79 | Journaling | feature | 2026-07-04 |
 | #78 | Subtasks: lightweight checklist items under a task (v2.20.0) | feature | 2026-07-02 |
 | #77 | Time tracking per task + timeline dashboard + project colors (v2.19.0) | feature | 2026-06-12 |
