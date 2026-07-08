@@ -2,6 +2,23 @@
 
 ---
 
+## v3.1.0 - Journal QoL: drill-down feelings wheel
+*July 2026*
+
+### Changed
+
+- **The feelings wheel now drills down** (#85) - instead of all 130 feelings at once (unreadable slivers on a phone), one level fills the whole circle at a time: the seven cores first, then a tapped feeling's finer shades, with a zoom in/out animation. **Picking a word logs it and resets the wheel to the cores**, ready for the next feeling; deepest slices pick on tap, the center picks the word you're standing on. Back and "all" navigate without picking.
+- **Every feeling explains itself** - all 130 wheel entries carry a short differentiating gloss ("infuriated: boiled over, seeing red" vs "annoyed: small irritation, still in control"), shown under slice names and in the wheel's center to ease finding the right word.
+- **Map of Consciousness reference ladder** - an info button beside the derived score opens a full-spectrum, log-scaled ladder (major Hawkins anchors labeled, courage line marked, your current picks-average positioned). Captioned honestly: "a lens, not a measurement".
+- **Plan tasks open their sheet in the journal** - tap a task title in Today's Plan or the Unplanned bucket to open the full task detail (subtasks, comments, pickers) and edit sheet without leaving the page.
+- The check-in modal is bigger on desktop (640px).
+
+### Notes
+
+- Wheel dataset (`feelingsWheel.ts`) gains a `hint` field on every core, secondary, and tertiary, pinned by a dataset test. New `MocLadder` component; the rail gained no widget - the ladder lives inside the check-in popup where tagging happens. 7 new component tests cover the drill-down interaction.
+
+---
+
 ## v3.0.0 - Journaling
 *July 2026*
 

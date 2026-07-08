@@ -39,6 +39,19 @@ describe('FEELINGS_WHEEL dataset', () => {
     }
   })
 
+  it('gives every secondary and tertiary a short differentiating hint (#85)', () => {
+    for (const core of FEELINGS_WHEEL) {
+      for (const sec of core.children) {
+        expect(sec.hint).toBeTruthy()
+        expect(sec.hint!.length).toBeLessThanOrEqual(42)
+        for (const ter of sec.children ?? []) {
+          expect(ter.hint).toBeTruthy()
+          expect(ter.hint!.length).toBeLessThanOrEqual(42)
+        }
+      }
+    }
+  })
+
   it('keeps the locked cross-case: Proud sits in Happy but maps to Pride 175', () => {
     const happy = FEELINGS_WHEEL.find((c) => c.core === 'Happy')!
     const proud = happy.children.find((s) => s.name === 'Proud')

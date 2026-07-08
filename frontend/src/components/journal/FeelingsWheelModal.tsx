@@ -1,20 +1,28 @@
 "use client";
 
-// The feelings wheel check-in (#79, user's design): three concentric rings (core ->
-// secondary -> tertiary, the full Roberts wheel from lib/feelingsWheel.ts). Tap segments
-// to multi-select; the Map of Consciousness score is DERIVED from the picks (average of
-// each selected node's level), never self-tagged. Free words remain first-class alongside
-// the wheel - the user leads the labeling.
+// The feelings wheel check-in (#79, drill-down redesign in #85): instead of all 130
+// feelings at once (which made tertiary slices ~12px on a phone), the wheel shows ONE
+// level at a time, each filling the whole circle:
 //
-// Selection is keyed by tree path (e.g. "2/1/0"), never by name: the Roberts wheel
-// genuinely repeats four names in different sectors with different levels.
+//   - the seven cores first ("the right word may not land at first - start coarse")
+//   - tap a slice with finer shades  -> zoom INTO it (its children become the wheel)
+//   - tap a deepest slice            -> that IS the pick
+//   - tap the center while deep      -> pick the word you're standing on
+//
+// Picking LOGS the word and RESETS the wheel to the cores (user's design): a check-in
+// usually combines feelings from different families, so after every pick you're already
+// where the next search starts. Collected words show in the center at the cores level
+// and as removable chips below. Back steps out one ring; "all" jumps home without picking.
+//
+// The Map of Consciousness score stays DERIVED from the picks (average of each picked
+// node's level), never self-tagged; free words remain first-class alongside the wheel.
 
-import { useEffect, useMemo, useState } from "react";
-import { Check } from "lucide-react";
-import { FEELINGS_WHEEL, MOC_ANCHORS, deriveMoc } from "@/lib/feelingsWheel";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Check, ChevronLeft, Info, X } from "lucide-react";
+import { FEELINGS_WHEEL, MOC_ANCHORS, WheelFeeling, deriveMoc } from "@/lib/feelingsWheel";
+import MocLadder from "./MocLadder";
 
 interface Picked {
-  key: string;
   name: string;
   moc: number;
 }
@@ -24,33 +32,97 @@ interface Props {
   onClose: () => void;
 }
 
-const SIZE = 460;
+const SIZE = 520;
 const CENTER = SIZE / 2;
-// Ring radii: [inner, outer] for core / secondary / tertiary.
-const RINGS: [number, number][] = [[46, 96], [98, 158], [160, 222]];
-const LABEL_R = [72, 128, 190];
+const R_INNER = 88;
+const R_OUTER = 248;
+const ANIM_MS = 220;
 
 export default function FeelingsWheelModal({ onSave, onClose }: Props) {
+  // Path into FEELINGS_WHEEL: [] = cores, [ci] = that core's secondaries, [ci, si] = tertiaries.
+  const [path, setPath] = useState<number[]>([]);
   const [picked, setPicked] = useState<Picked[]>([]);
   const [words, setWords] = useState("");
   const [energy, setEnergy] = useState(5);
   const [saving, setSaving] = useState(false);
+  // The MoC reference ladder, opened from the info button beside the derived score.
+  const [ladderOpen, setLadderOpen] = useState(false);
+  // Crossfade direction while a level transition is animating ("deep" | "up" | null).
+  const [anim, setAnim] = useState<"deep" | "up" | null>(null);
+  const animTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    // Escape peels one layer: the ladder first if it's open, then the whole modal.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setLadderOpen((open) => {
+        if (!open) onClose();
+        return false;
+      });
+    };
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      if (animTimer.current) clearTimeout(animTimer.current);
+    };
   }, [onClose]);
 
-  const toggle = (key: string, name: string, moc: number) => {
-    setPicked((prev) => {
-      const i = prev.findIndex((p) => p.key === key);
-      return i >= 0 ? prev.filter((p) => p.key !== key) : [...prev, { key, name, moc }];
-    });
+  const navigate = (nextPath: number[], direction: "deep" | "up") => {
+    setPath(nextPath);
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    setAnim(direction);
+    if (animTimer.current) clearTimeout(animTimer.current);
+    animTimer.current = setTimeout(() => setAnim(null), ANIM_MS);
+  };
+
+  // The finalized interaction: a pick logs the word and resets the wheel to the cores.
+  const pick = (name: string, moc: number) => {
+    setPicked((prev) => [...prev, { name, moc }]);
+    navigate([], "up");
+  };
+
+  // ---------- current level ----------
+
+  const { nodes, crumbs, currentHint } = useMemo(() => {
+    const crumbNames: string[] = [];
+    let children: WheelFeeling[];
+    let hint: string | undefined;
+    if (path.length === 0) {
+      children = FEELINGS_WHEEL.map((c) => ({ name: c.core, moc: c.moc, children: c.children }));
+    } else {
+      const core = FEELINGS_WHEEL[path[0]];
+      crumbNames.push(core.core);
+      children = core.children;
+      hint = core.hint;
+      if (path.length === 2) {
+        const sec = children[path[1]];
+        crumbNames.push(sec.name);
+        hint = sec.hint;
+        children = sec.children ?? [];
+      }
+    }
+    return { nodes: children, crumbs: crumbNames, currentHint: hint };
+  }, [path]);
+
+  const depth = path.length;
+  const coreColor = depth ? FEELINGS_WHEEL[path[0]].color : null;
+  const currentName = crumbs[crumbs.length - 1] ?? "";
+  const currentMoc = depth === 1
+    ? FEELINGS_WHEEL[path[0]].moc
+    : depth === 2
+      ? FEELINGS_WHEEL[path[0]].children[path[1]].moc
+      : null;
+
+  const tapSlice = (i: number) => {
+    const node = nodes[i];
+    if (!node.children || node.children.length === 0) {
+      pick(node.name, node.moc); // deepest ring: the tap IS the pick
+    } else {
+      navigate([...path, i], "deep");
+    }
   };
 
   const derived = deriveMoc(picked.map((p) => p.moc));
-  // Nearest anchor name gives the number meaning ("333 · near Willingness").
   const anchor = derived === null
     ? null
     : MOC_ANCHORS.reduce((best, a) =>
@@ -68,7 +140,9 @@ export default function FeelingsWheelModal({ onSave, onClose }: Props) {
     }
   };
 
-  const segments = useMemo(() => buildSegments(picked), [picked]);
+  // Center summary at the cores level: the last few collected words.
+  const centerPicks = picked.slice(-3);
+  const centerExtra = picked.length - centerPicks.length;
 
   return (
     <div
@@ -76,64 +150,167 @@ export default function FeelingsWheelModal({ onSave, onClose }: Props) {
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div role="dialog" aria-modal="true" aria-label="Log a mood check-in"
-        className="w-full max-w-[480px] max-h-[94vh] overflow-y-auto rounded-2xl border border-j-line bg-j-card text-j-ink p-5 shadow-2xl tl-pop">
+        className="w-full max-w-[480px] lg:max-w-[640px] max-h-[94vh] overflow-y-auto rounded-2xl border border-j-line bg-j-card text-j-ink p-5 shadow-2xl tl-pop">
         <h2 className="font-mono text-[0.68rem] uppercase tracking-[0.13em] text-j-muted">
           Check in · how does it feel right now?
         </h2>
-        <p className="text-xs text-j-muted mt-0.5">
-          tap the wheel - core inside, nuance outside. Multi-select is fine.
-        </p>
 
-        <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="block w-full my-2" role="group" aria-label="Feelings wheel">
-          {segments.map((s) => (
-            <g key={s.key}>
-              <path
-                d={s.path}
-                fill={s.fill}
-                stroke={s.selected ? "var(--color-j-ink)" : "var(--color-j-card)"}
-                strokeWidth={s.selected ? 2.2 : 1.1}
-                opacity={s.selected ? 1 : 0.85}
-                className="cursor-pointer hover:opacity-100 transition-opacity duration-150"
-                onClick={() => toggle(s.key, s.name, s.moc)}
-                role="checkbox"
-                aria-checked={s.selected}
-                aria-label={`${s.name}, level ${s.moc}`}
-              >
-                <title>{`${s.name} · MoC ${s.moc}`}</title>
-              </path>
-              <text
-                x={s.lx}
-                y={s.ly}
-                textAnchor="middle"
-                dominantBaseline="middle"
-                transform={s.rotate ? `rotate(${s.rotate} ${s.lx} ${s.ly})` : undefined}
-                fontSize={s.ring === 0 ? 11 : s.ring === 1 ? 8.6 : 7.2}
-                fontWeight={s.ring === 0 ? 700 : 400}
-                fill="#2E2A24"
-                pointerEvents="none"
-              >
-                {s.name}
-              </text>
-            </g>
-          ))}
+        {/* Back + breadcrumb: the way out is always visible */}
+        <div className="flex items-center gap-2.5 mt-2 min-h-8">
+          <button
+            onClick={() => depth && navigate(path.slice(0, -1), "up")}
+            disabled={!depth}
+            aria-label="Back one level"
+            className="inline-flex items-center gap-0.5 rounded-full border border-j-line px-2.5 py-1 text-[0.78rem] font-semibold text-j-accent disabled:opacity-35 cursor-pointer disabled:cursor-default focus:outline-none focus-visible:ring-2 focus-visible:ring-j-accent"
+          >
+            <ChevronLeft size={13} aria-hidden="true" /> back
+          </button>
+          <span className="font-mono text-[0.7rem] text-j-muted truncate">
+            <button
+              onClick={() => depth && navigate([], "up")}
+              disabled={!depth}
+              className={`focus:outline-none focus-visible:ring-2 focus-visible:ring-j-accent rounded ${depth ? "text-j-accent cursor-pointer hover:underline" : ""}`}
+            >
+              all
+            </button>
+            {depth === 0 && <span> feelings</span>}
+            {crumbs.map((c, i) => (
+              <span key={i}>
+                {" › "}
+                {i === crumbs.length - 1 ? <b className="text-j-ink">{c}</b> : c}
+              </span>
+            ))}
+          </span>
+        </div>
+
+        <svg
+          viewBox={`0 0 ${SIZE} ${SIZE}`}
+          className="block w-full my-1 motion-safe:transition-[transform,opacity] motion-safe:duration-200"
+          role="group"
+          aria-label={depth ? `Shades of ${currentName}` : "Core feelings"}
+          style={{
+            transformOrigin: "50% 50%",
+            transform: anim === "deep" ? "scale(1.05)" : anim === "up" ? "scale(0.95)" : undefined,
+            opacity: anim ? 0.4 : 1,
+          }}
+        >
+          {nodes.map((node, i) => {
+            const per = (2 * Math.PI) / nodes.length;
+            const a0 = -Math.PI / 2 + i * per;
+            const mid = a0 + per / 2;
+            const hasChildren = !!node.children?.length;
+            const fill = depth === 0 ? FEELINGS_WHEEL[i].color : shade(coreColor!, depth === 1 ? 0.32 : 0.52);
+            const labelR = (R_INNER + R_OUTER) / 2 + (depth === 0 ? 4 : 0);
+            const [lx, ly] = polar(labelR, mid);
+            return (
+              <g key={`${path.join("/")}-${i}`}>
+                <path
+                  d={annularSector(a0, a0 + per)}
+                  fill={fill}
+                  stroke="var(--color-j-card)"
+                  strokeWidth={2}
+                  className="cursor-pointer hover:brightness-105"
+                  onClick={() => tapSlice(i)}
+                  role="button"
+                  aria-label={hasChildren ? `${node.name} - open ${node.children!.length} finer shades` : `Pick ${node.name}`}
+                >
+                  <title>{`${node.name} · MoC ${node.moc}${hasChildren ? ` · ${node.children!.length} deeper` : ""}`}</title>
+                </path>
+                <text x={lx} y={node.hint ? ly - 10 : ly} textAnchor="middle" dominantBaseline="middle"
+                  fontSize={depth === 0 ? 18 : nodes.length > 7 ? 13 : 16}
+                  fontWeight={600} fill="#2E2A24" pointerEvents="none">
+                  {node.name}
+                </text>
+                {/* The differentiating gloss (#85): what sets this word apart from its
+                    siblings - "infuriated: boiled over" vs "annoyed: still in control". */}
+                {node.hint &&
+                  splitTwo(node.hint).map((line, li) => (
+                    <text key={li} x={lx} y={ly + 5 + li * 11}
+                      textAnchor="middle" dominantBaseline="middle"
+                      fontSize={nodes.length > 7 ? 8.5 : 10} fontStyle="italic"
+                      fill="#2E2A24" opacity={0.72} pointerEvents="none">
+                      {line}
+                    </text>
+                  ))}
+              </g>
+            );
+          })}
+
+          {/* Center: deep = pick the word you're on; at the cores = your collection so far */}
+          <g
+            className={depth ? "cursor-pointer" : undefined}
+            onClick={() => depth && currentMoc !== null && pick(currentName, currentMoc)}
+            role={depth ? "button" : undefined}
+            aria-label={depth ? `Pick ${currentName}` : undefined}
+          >
+            <circle cx={CENTER} cy={CENTER} r={R_INNER - 10}
+              fill="var(--color-j-card)"
+              stroke={depth ? "var(--color-j-accent)" : "var(--color-j-line)"}
+              strokeWidth={depth ? 1.8 : 1.5} />
+            {depth > 0 ? (
+              <>
+                {/* The word you're standing on + its meaning - the center eases labeling.
+                    Tapping it picks (the accent ring is the affordance; no standing
+                    instruction - that was demo copy, not interface copy). */}
+                <text x={CENTER} y={CENTER - 12} textAnchor="middle" fontSize={17} fontWeight={700}
+                  fill="var(--color-j-ink)" pointerEvents="none">{currentName}</text>
+                {splitTwo(currentHint ?? "").map((line, li) => (
+                  <text key={li} x={CENTER} y={CENTER + 7 + li * 13} textAnchor="middle" fontSize={10.5}
+                    fontStyle="italic" fill="var(--color-j-muted)" pointerEvents="none">
+                    {line}
+                  </text>
+                ))}
+              </>
+            ) : picked.length === 0 ? (
+              <>
+                <text x={CENTER} y={CENTER - 4} textAnchor="middle" fontSize={13} fontWeight={700}
+                  fill="var(--color-j-ink)" pointerEvents="none">how does it</text>
+                <text x={CENTER} y={CENTER + 14} textAnchor="middle" fontSize={13}
+                  fill="var(--color-j-muted)" pointerEvents="none">feel right now?</text>
+              </>
+            ) : (
+              <>
+                <text x={CENTER} y={CENTER - centerPicks.length * 9 - 6} textAnchor="middle" fontSize={8.5}
+                  fontFamily="monospace" fill="var(--color-j-muted)" pointerEvents="none">so far</text>
+                {centerPicks.map((p, j) => (
+                  <text key={j} x={CENTER} y={CENTER - centerPicks.length * 9 + 12 + j * 18}
+                    textAnchor="middle" fontSize={13} fontWeight={600}
+                    fill="var(--color-j-accent)" pointerEvents="none">{p.name}</text>
+                ))}
+                {centerExtra > 0 && (
+                  <text x={CENTER} y={CENTER + centerPicks.length * 9 + 12} textAnchor="middle" fontSize={9.5}
+                    fill="var(--color-j-muted)" pointerEvents="none">+{centerExtra} more</text>
+                )}
+              </>
+            )}
+          </g>
         </svg>
 
         <div className="flex flex-wrap gap-1.5 min-h-7" aria-live="polite">
           {picked.length === 0 ? (
-            <span className="font-mono text-[0.66rem] text-j-muted self-center">nothing picked yet</span>
+            <span className="font-mono text-[0.66rem] text-j-muted self-center">nothing picked yet - tap a feeling to zoom in</span>
           ) : (
-            picked.map((p) => (
-              <button key={p.key} onClick={() => toggle(p.key, p.name, p.moc)}
+            picked.map((p, i) => (
+              <button key={`${p.name}-${i}`} onClick={() => setPicked((prev) => prev.filter((_, j) => j !== i))}
                 className="rounded-full bg-j-accent-soft px-2.5 py-0.5 text-[0.8rem] font-medium text-j-accent cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-j-accent"
-                aria-label={`Deselect ${p.name}`}>
+                aria-label={`Remove ${p.name}`}>
                 {p.name} <span className="opacity-60">{p.moc}</span>
               </button>
             ))
           )}
         </div>
-        <p className="font-mono text-[0.7rem] text-j-muted mt-1.5 mb-2">
-          Map of Consciousness: <b className="text-j-ink">{derived ?? "-"}</b>{" "}
-          {derived !== null && anchor ? `· near ${anchor.name} · derived from your picks` : "· derived from your picks, not self-tagged"}
+        <p className="flex items-center gap-1.5 font-mono text-[0.7rem] text-j-muted mt-1.5 mb-2">
+          <span>
+            Map of Consciousness: <b className="text-j-ink">{derived ?? "-"}</b>{" "}
+            {derived !== null && anchor ? `· near ${anchor.name} · derived from your picks` : "· derived from your picks, not self-tagged"}
+          </span>
+          <button
+            onClick={() => setLadderOpen(true)}
+            aria-label="What do these levels mean? Open the reference ladder"
+            className="grid place-items-center w-7 h-7 -my-1 rounded-full text-j-accent hover:bg-j-accent-soft cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-j-accent"
+          >
+            <Info size={14} aria-hidden="true" />
+          </button>
         </p>
 
         <input
@@ -171,100 +348,67 @@ export default function FeelingsWheelModal({ onSave, onClose }: Props) {
           </button>
         </div>
       </div>
+
+      {/* MoC reference ladder: a layer above the check-in, opened from the info button */}
+      {ladderOpen && (
+        <div
+          className="fixed inset-0 z-[60] grid place-items-center bg-black/45 p-4 tl-fade"
+          onClick={(e) => e.target === e.currentTarget && setLadderOpen(false)}
+        >
+          <div role="dialog" aria-modal="true" aria-label="Map of Consciousness reference"
+            className="w-full max-w-[360px] max-h-[92vh] overflow-y-auto rounded-2xl border border-j-line bg-j-card text-j-ink p-5 shadow-2xl tl-pop">
+            <div className="flex items-center mb-1">
+              <h3 className="font-mono text-[0.68rem] uppercase tracking-[0.13em] text-j-muted">
+                Map of Consciousness · reference
+              </h3>
+              <button
+                onClick={() => setLadderOpen(false)}
+                aria-label="Close reference"
+                className="ml-auto grid place-items-center w-9 h-9 -my-1 rounded-lg text-j-muted hover:text-j-ink cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-j-accent"
+              >
+                <X size={16} aria-hidden="true" />
+              </button>
+            </div>
+            <MocLadder current={derived} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-// ---------- wheel geometry ----------
-
-interface Segment {
-  key: string;
-  name: string;
-  moc: number;
-  ring: 0 | 1 | 2;
-  path: string;
-  fill: string;
-  lx: number;
-  ly: number;
-  rotate: number | null;
-  selected: boolean;
+// Balance a short gloss onto up to two lines (split at the most central space).
+function splitTwo(hint: string): string[] {
+  if (hint.length <= 20) return [hint];
+  const mid = hint.length / 2;
+  let best = -1;
+  for (let i = 0; i < hint.length; i++) {
+    if (hint[i] === " " && (best === -1 || Math.abs(i - mid) < Math.abs(best - mid))) best = i;
+  }
+  return best === -1 ? [hint] : [hint.slice(0, best), hint.slice(best + 1)];
 }
+
+// ---------- geometry ----------
 
 function polar(r: number, a: number): [number, number] {
   return [CENTER + r * Math.cos(a), CENTER + r * Math.sin(a)];
 }
 
-function annularSector(r0: number, r1: number, a0: number, a1: number): string {
+function annularSector(a0: number, a1: number): string {
   const large = a1 - a0 > Math.PI ? 1 : 0;
-  const [x0, y0] = polar(r1, a0);
-  const [x1, y1] = polar(r1, a1);
-  const [x2, y2] = polar(r0, a1);
-  const [x3, y3] = polar(r0, a0);
-  return `M${x0},${y0} A${r1},${r1} 0 ${large} 1 ${x1},${y1} L${x2},${y2} A${r0},${r0} 0 ${large} 0 ${x3},${y3} Z`;
+  const [x0, y0] = polar(R_OUTER, a0);
+  const [x1, y1] = polar(R_OUTER, a1);
+  const [x2, y2] = polar(R_INNER, a1);
+  const [x3, y3] = polar(R_INNER, a0);
+  return `M${x0},${y0} A${R_OUTER},${R_OUTER} 0 ${large} 1 ${x1},${y1} L${x2},${y2} A${R_INNER},${R_INNER} 0 ${large} 0 ${x3},${y3} Z`;
 }
 
-// Lighten a hex color toward white (secondary/tertiary rings derive from the core hex).
+// Lighten the core hex toward white for deeper rings. Label ink stays a fixed dark
+// (#2E2A24): slice fills are data-driven pastels, not theme tokens, so the label must
+// not follow the dark-mode ink token (that would fail contrast on these light fills).
 function shade(hex: string, f: number): string {
   const n = parseInt(hex.slice(1), 16);
   const r = n >> 16, g = (n >> 8) & 255, b = n & 255;
   const mix = (c: number) => Math.round(c + (255 - c) * f);
   return `rgb(${mix(r)},${mix(g)},${mix(b)})`;
-}
-
-function label(ring: 0 | 1 | 2, mid: number): { lx: number; ly: number; rotate: number | null } {
-  const [lx, ly] = polar(LABEL_R[ring], mid);
-  if (ring === 0) return { lx, ly, rotate: null };
-  // Rotate outer labels along their spoke; flip the left half so text stays upright.
-  const deg = (mid * 180) / Math.PI;
-  const flip = deg > 90 && deg < 270;
-  return { lx, ly, rotate: flip ? deg + 180 : deg };
-}
-
-function buildSegments(picked: Picked[]): Segment[] {
-  const selectedKeys = new Set(picked.map((p) => p.key));
-  // Tertiary count drives the angular unit so leaf segments are equal width.
-  const leaves = (children?: { length: number }) => children?.length || 1;
-  const totalLeaves = FEELINGS_WHEEL.reduce(
-    (n, core) => n + core.children.reduce((m, s) => m + leaves(s.children), 0), 0);
-  const unit = (2 * Math.PI) / totalLeaves;
-
-  const segments: Segment[] = [];
-  let a = -Math.PI / 2;
-  FEELINGS_WHEEL.forEach((core, ci) => {
-    const coreSpan = core.children.reduce((m, s) => m + leaves(s.children), 0) * unit;
-    const coreKey = `${ci}`;
-    segments.push({
-      key: coreKey, name: core.core, moc: core.moc, ring: 0,
-      path: annularSector(RINGS[0][0], RINGS[0][1], a, a + coreSpan),
-      fill: core.color,
-      selected: selectedKeys.has(coreKey),
-      ...label(0, a + coreSpan / 2),
-    });
-    let sa = a;
-    core.children.forEach((sec, si) => {
-      const secSpan = leaves(sec.children) * unit;
-      const secKey = `${ci}/${si}`;
-      segments.push({
-        key: secKey, name: sec.name, moc: sec.moc, ring: 1,
-        path: annularSector(RINGS[1][0], RINGS[1][1], sa, sa + secSpan),
-        fill: shade(core.color, 0.35),
-        selected: selectedKeys.has(secKey),
-        ...label(1, sa + secSpan / 2),
-      });
-      (sec.children ?? []).forEach((ter, ti) => {
-        const ta = sa + ti * unit;
-        const terKey = `${ci}/${si}/${ti}`;
-        segments.push({
-          key: terKey, name: ter.name, moc: ter.moc, ring: 2,
-          path: annularSector(RINGS[2][0], RINGS[2][1], ta, ta + unit),
-          fill: shade(core.color, 0.55),
-          selected: selectedKeys.has(terKey),
-          ...label(2, ta + unit / 2),
-        });
-      });
-      sa += secSpan;
-    });
-    a += coreSpan;
-  });
-  return segments;
 }

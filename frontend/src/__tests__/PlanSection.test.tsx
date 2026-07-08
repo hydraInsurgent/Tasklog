@@ -35,6 +35,7 @@ function setup(over: Partial<React.ComponentProps<typeof PlanSection>> = {}) {
     onCreateTask: jest.fn().mockResolvedValue(task(42, 'call bank')),
     onToggleTask: jest.fn(),
     onSearch: jest.fn().mockResolvedValue([task(7, 'Dotnetarium slot')]),
+    onOpenTask: jest.fn(),
     ...over,
   }
   render(<PlanSection {...props} />)

@@ -16,11 +16,16 @@
 export interface WheelFeeling {
   name: string;
   moc: number; // Hawkins level assigned per research file
+  // Short differentiating gloss shown under the name in the wheel (#85) - what sets
+  // this word apart from its siblings. Cores carry none (they differentiate themselves).
+  hint?: string;
   children?: WheelFeeling[]; // tertiary ring
 }
 
 export interface WheelCore {
   core: string;
+  // Broad gloss for the center display when standing on this core (#85).
+  hint?: string;
   moc: number;
   color: string; // hex, locked from the approved prototype
   children: WheelFeeling[]; // secondary ring, each with tertiary children
@@ -29,377 +34,753 @@ export interface WheelCore {
 export const FEELINGS_WHEEL: WheelCore[] = [
   {
     core: "Happy",
+    hint: "things feel good, calm to lit up",
     moc: 540,
     color: "#F2D06B",
     children: [
       {
         name: "Optimistic",
         moc: 310,
+        hint: "the future looks workable from here",
         children: [
-          { name: "Inspired", moc: 540 },
-          { name: "Hopeful", moc: 310 },
+          {
+            name: "Inspired",
+            moc: 540,
+            hint: "lit up, ideas want out",
+          },
+          {
+            name: "Hopeful",
+            moc: 310,
+            hint: "it could genuinely go well",
+          },
         ],
       },
       {
         name: "Trusting",
         moc: 250,
+        hint: "safe enough to open up",
         children: [
-          { name: "Intimate", moc: 500 },
-          { name: "Sensitive", moc: 250 },
+          {
+            name: "Intimate",
+            moc: 500,
+            hint: "close, letting them see you",
+          },
+          {
+            name: "Sensitive",
+            moc: 250,
+            hint: "soft-skinned, touched by small things",
+          },
         ],
       },
       {
         name: "Peaceful",
         moc: 600,
+        hint: "nothing needs to change right now",
         children: [
-          { name: "Thankful", moc: 540 },
-          { name: "Loving", moc: 500 },
+          {
+            name: "Thankful",
+            moc: 540,
+            hint: "warm about what's already here",
+          },
+          {
+            name: "Loving",
+            moc: 500,
+            hint: "care flowing outward, no agenda",
+          },
         ],
       },
       {
         name: "Powerful",
         moc: 200,
+        hint: "able to act on what matters",
         children: [
-          { name: "Creative", moc: 400 },
-          { name: "Courageous", moc: 200 },
+          {
+            name: "Creative",
+            moc: 400,
+            hint: "making something only you would",
+          },
+          {
+            name: "Courageous",
+            moc: 200,
+            hint: "afraid maybe, moving anyway",
+          },
         ],
       },
       {
         name: "Accepted",
         moc: 350,
+        hint: "you belong as you are",
         children: [
-          { name: "Valued", moc: 350 },
-          { name: "Respected", moc: 350 },
+          {
+            name: "Valued",
+            moc: 350,
+            hint: "your presence counts to them",
+          },
+          {
+            name: "Respected",
+            moc: 350,
+            hint: "taken seriously, given weight",
+          },
         ],
       },
       {
         name: "Proud",
         moc: 175,
+        hint: "you did that, and it shows",
         children: [
-          { name: "Confident", moc: 200 },
-          { name: "Successful", moc: 175 },
+          {
+            name: "Confident",
+            moc: 200,
+            hint: "sure of your next move",
+          },
+          {
+            name: "Successful",
+            moc: 175,
+            hint: "it worked, the result landed",
+          },
         ],
       },
       {
         name: "Interested",
         moc: 310,
+        hint: "something is pulling you closer",
         children: [
-          { name: "Inquisitive", moc: 310 },
-          { name: "Curious", moc: 310 },
+          {
+            name: "Inquisitive",
+            moc: 310,
+            hint: "asking, digging, wanting the why",
+          },
+          {
+            name: "Curious",
+            moc: 310,
+            hint: "drawn to look a little longer",
+          },
         ],
       },
       {
         name: "Content",
         moc: 350,
+        hint: "enough, and it feels like enough",
         children: [
-          { name: "Joyful", moc: 540 },
-          { name: "Free", moc: 540 },
+          {
+            name: "Joyful",
+            moc: 540,
+            hint: "bubbling over, hard to hide",
+          },
+          {
+            name: "Free",
+            moc: 540,
+            hint: "nothing pinning you down",
+          },
         ],
       },
       {
         name: "Playful",
         moc: 540,
+        hint: "light, silly, up for fun",
         children: [
-          { name: "Cheeky", moc: 540 },
-          { name: "Aroused", moc: 125 },
+          {
+            name: "Cheeky",
+            moc: 540,
+            hint: "mischief with a grin",
+          },
+          {
+            name: "Aroused",
+            moc: 125,
+            hint: "charged, wanting, bodily pull",
+          },
         ],
       },
     ],
   },
   {
     core: "Surprised",
+    hint: "something unexpected landed",
     moc: 250,
     color: "#8FC7B4",
     children: [
       {
         name: "Excited",
         moc: 310,
+        hint: "good thing coming, can't sit still",
         children: [
-          { name: "Energetic", moc: 310 },
-          { name: "Eager", moc: 310 },
+          {
+            name: "Energetic",
+            moc: 310,
+            hint: "engine running, ready to move",
+          },
+          {
+            name: "Eager",
+            moc: 310,
+            hint: "leaning toward it, start now",
+          },
         ],
       },
       {
         name: "Amazed",
         moc: 540,
+        hint: "bigger than you expected",
         children: [
-          { name: "Awe", moc: 540 },
-          { name: "Astonished", moc: 250 },
+          {
+            name: "Awe",
+            moc: 540,
+            hint: "small before something vast",
+          },
+          {
+            name: "Astonished",
+            moc: 250,
+            hint: "didn't see that coming at all",
+          },
         ],
       },
       {
         name: "Confused",
         moc: 100,
+        hint: "the pieces don't fit yet",
         children: [
-          { name: "Perplexed", moc: 100 },
-          { name: "Disillusioned", moc: 75 },
+          {
+            name: "Perplexed",
+            moc: 100,
+            hint: "turning it over, still stuck",
+          },
+          {
+            name: "Disillusioned",
+            moc: 75,
+            hint: "it wasn't what they said",
+          },
         ],
       },
       {
         name: "Startled",
         moc: 100,
+        hint: "jolted before you could think",
         children: [
-          { name: "Dismayed", moc: 100 },
-          { name: "Shocked", moc: 100 },
+          {
+            name: "Dismayed",
+            moc: 100,
+            hint: "unpleasant surprise, heart sank",
+          },
+          {
+            name: "Shocked",
+            moc: 100,
+            hint: "system still catching up",
+          },
         ],
       },
     ],
   },
   {
     core: "Bad",
+    hint: "run down, stretched, or flat",
     moc: 50,
     color: "#B9C0A9",
     children: [
       {
         name: "Tired",
         moc: 50,
+        hint: "the tank is empty",
         children: [
-          { name: "Unfocused", moc: 50 },
-          { name: "Sleepy", moc: 50 },
+          {
+            name: "Unfocused",
+            moc: 50,
+            hint: "attention slides off everything",
+          },
+          {
+            name: "Sleepy",
+            moc: 50,
+            hint: "body asking for sleep, not effort",
+          },
         ],
       },
       {
         name: "Stressed",
         moc: 100,
+        hint: "more load than capacity",
         children: [
-          { name: "Out of control", moc: 100 },
-          { name: "Overwhelmed", moc: 100 },
+          {
+            name: "Out of control",
+            moc: 100,
+            hint: "the wheel isn't responding",
+          },
+          {
+            name: "Overwhelmed",
+            moc: 100,
+            hint: "too much at once to hold",
+          },
         ],
       },
       {
         name: "Busy",
         moc: 100,
+        hint: "no room between the tasks",
         children: [
-          { name: "Rushed", moc: 100 },
-          { name: "Pressured", moc: 100 },
+          {
+            name: "Rushed",
+            moc: 100,
+            hint: "no time to do it properly",
+          },
+          {
+            name: "Pressured",
+            moc: 100,
+            hint: "something is squeezing you",
+          },
         ],
       },
       {
         name: "Bored",
         moc: 50,
+        hint: "nothing here holds you",
         children: [
-          { name: "Apathetic", moc: 50 },
-          { name: "Indifferent", moc: 50 },
+          {
+            name: "Apathetic",
+            moc: 50,
+            hint: "can't be made to care",
+          },
+          {
+            name: "Indifferent",
+            moc: 50,
+            hint: "noticed it, felt nothing",
+          },
         ],
       },
     ],
   },
   {
     core: "Fearful",
+    hint: "threat, doubt, or dread",
     moc: 100,
     color: "#C9A6D6",
     children: [
       {
         name: "Scared",
         moc: 100,
+        hint: "danger feels close",
         children: [
-          { name: "Helpless", moc: 50 },
-          { name: "Frightened", moc: 100 },
+          {
+            name: "Helpless",
+            moc: 50,
+            hint: "nothing you do would matter",
+          },
+          {
+            name: "Frightened",
+            moc: 100,
+            hint: "the fear has a face",
+          },
         ],
       },
       {
         name: "Anxious",
         moc: 100,
+        hint: "dread without a clear address",
         children: [
-          { name: "Overwhelmed", moc: 100 },
-          { name: "Worried", moc: 100 },
+          {
+            name: "Overwhelmed",
+            moc: 100,
+            hint: "worry stacked past capacity",
+          },
+          {
+            name: "Worried",
+            moc: 100,
+            hint: "running bad futures on loop",
+          },
         ],
       },
       {
         name: "Insecure",
         moc: 100,
+        hint: "not sure you measure up",
         children: [
-          { name: "Inadequate", moc: 20 },
-          { name: "Inferior", moc: 20 },
+          {
+            name: "Inadequate",
+            moc: 20,
+            hint: "not enough for the task",
+          },
+          {
+            name: "Inferior",
+            moc: 20,
+            hint: "everyone else seems more",
+          },
         ],
       },
       {
         name: "Weak",
         moc: 50,
+        hint: "no strength for what's needed",
         children: [
-          { name: "Worthless", moc: 20 },
-          { name: "Insignificant", moc: 20 },
+          {
+            name: "Worthless",
+            moc: 20,
+            hint: "as if you don't count",
+          },
+          {
+            name: "Insignificant",
+            moc: 20,
+            hint: "too small to matter here",
+          },
         ],
       },
       {
         name: "Rejected",
         moc: 75,
+        hint: "pushed out, not wanted",
         children: [
-          { name: "Excluded", moc: 75 },
-          { name: "Persecuted", moc: 100 },
+          {
+            name: "Excluded",
+            moc: 75,
+            hint: "the circle closed without you",
+          },
+          {
+            name: "Persecuted",
+            moc: 100,
+            hint: "singled out and hunted",
+          },
         ],
       },
       {
         name: "Threatened",
         moc: 100,
+        hint: "something is coming at you",
         children: [
-          { name: "Nervous", moc: 100 },
-          { name: "Exposed", moc: 100 },
+          {
+            name: "Nervous",
+            moc: 100,
+            hint: "on edge, braced for it",
+          },
+          {
+            name: "Exposed",
+            moc: 100,
+            hint: "defenses down, seen too much",
+          },
         ],
       },
     ],
   },
   {
     core: "Angry",
+    hint: "something is wrong and it burns",
     moc: 150,
     color: "#E08B7B",
     children: [
       {
         name: "Let down",
         moc: 150,
+        hint: "they didn't hold their end",
         children: [
-          { name: "Betrayed", moc: 150 },
-          { name: "Resentful", moc: 150 },
+          {
+            name: "Betrayed",
+            moc: 150,
+            hint: "trust broken from inside it",
+          },
+          {
+            name: "Resentful",
+            moc: 150,
+            hint: "keeping score, quietly burning",
+          },
         ],
       },
       {
         name: "Humiliated",
         moc: 20,
+        hint: "made small in front of others",
         children: [
-          { name: "Disrespected", moc: 20 },
-          { name: "Ridiculed", moc: 20 },
+          {
+            name: "Disrespected",
+            moc: 20,
+            hint: "treated as less than you are",
+          },
+          {
+            name: "Ridiculed",
+            moc: 20,
+            hint: "laughed at, made the joke",
+          },
         ],
       },
       {
         name: "Bitter",
         moc: 150,
+        hint: "old anger gone hard",
         children: [
-          { name: "Indignant", moc: 150 },
-          { name: "Violated", moc: 150 },
+          {
+            name: "Indignant",
+            moc: 150,
+            hint: "this is plainly unfair",
+          },
+          {
+            name: "Violated",
+            moc: 150,
+            hint: "a line was crossed on you",
+          },
         ],
       },
       {
         name: "Mad",
         moc: 150,
+        hint: "heat rising, plain anger",
         children: [
-          { name: "Furious", moc: 150 },
-          { name: "Jealous", moc: 125 },
+          {
+            name: "Furious",
+            moc: 150,
+            hint: "full blaze, hard to steer",
+          },
+          {
+            name: "Jealous",
+            moc: 125,
+            hint: "someone has what feels yours",
+          },
         ],
       },
       {
         name: "Aggressive",
         moc: 150,
+        hint: "wanting to push back hard",
         children: [
-          { name: "Provoked", moc: 150 },
-          { name: "Hostile", moc: 150 },
+          {
+            name: "Provoked",
+            moc: 150,
+            hint: "poked until it sparked",
+          },
+          {
+            name: "Hostile",
+            moc: 150,
+            hint: "guard up, ready to strike",
+          },
         ],
       },
       {
         name: "Frustrated",
         moc: 150,
+        hint: "blocked from what you're trying to do",
         children: [
-          { name: "Infuriated", moc: 150 },
-          { name: "Annoyed", moc: 150 },
+          {
+            name: "Infuriated",
+            moc: 150,
+            hint: "boiled over, seeing red",
+          },
+          {
+            name: "Annoyed",
+            moc: 150,
+            hint: "small irritation, still in control",
+          },
         ],
       },
       {
         name: "Distant",
         moc: 50,
+        hint: "pulled back behind glass",
         children: [
-          { name: "Withdrawn", moc: 50 },
-          { name: "Numb", moc: 50 },
+          {
+            name: "Withdrawn",
+            moc: 50,
+            hint: "gone quiet, door shut",
+          },
+          {
+            name: "Numb",
+            moc: 50,
+            hint: "feeling switched off entirely",
+          },
         ],
       },
       {
         name: "Critical",
         moc: 175,
+        hint: "finding fault everywhere you look",
         children: [
-          { name: "Skeptical", moc: 175 },
-          { name: "Dismissive", moc: 175 },
+          {
+            name: "Skeptical",
+            moc: 175,
+            hint: "not buying it yet",
+          },
+          {
+            name: "Dismissive",
+            moc: 175,
+            hint: "decided it's beneath notice",
+          },
         ],
       },
     ],
   },
   {
     core: "Disgusted",
+    hint: "aversion - this is not okay",
     moc: 150,
     color: "#A9B7C9",
     children: [
       {
         name: "Disapproving",
         moc: 175,
+        hint: "this shouldn't be happening",
         children: [
-          { name: "Judgmental", moc: 175 },
-          { name: "Embarrassed", moc: 20 },
+          {
+            name: "Judgmental",
+            moc: 175,
+            hint: "measuring them, and they fail",
+          },
+          {
+            name: "Embarrassed",
+            moc: 20,
+            hint: "cringing at what's on display",
+          },
         ],
       },
       {
         name: "Disappointed",
         moc: 75,
+        hint: "hoped for more than this",
         children: [
-          { name: "Appalled", moc: 150 },
-          { name: "Revolted", moc: 150 },
+          {
+            name: "Appalled",
+            moc: 150,
+            hint: "worse than you thought possible",
+          },
+          {
+            name: "Revolted",
+            moc: 150,
+            hint: "your stomach turns at it",
+          },
         ],
       },
       {
         name: "Awful",
         moc: 150,
+        hint: "sick about it, through and through",
         children: [
-          { name: "Nauseated", moc: 150 },
-          { name: "Detestable", moc: 150 },
+          {
+            name: "Nauseated",
+            moc: 150,
+            hint: "physically sickened by it",
+          },
+          {
+            name: "Detestable",
+            moc: 150,
+            hint: "hate it to the core",
+          },
         ],
       },
       {
         name: "Repelled",
         moc: 150,
+        hint: "want distance from it, now",
         children: [
-          { name: "Horrified", moc: 100 },
-          { name: "Hesitant", moc: 100 },
+          {
+            name: "Horrified",
+            moc: 100,
+            hint: "recoiling, can't unsee it",
+          },
+          {
+            name: "Hesitant",
+            moc: 100,
+            hint: "holding back, something's off",
+          },
         ],
       },
     ],
   },
   {
     core: "Sad",
+    hint: "loss, hurt, or heaviness",
     moc: 75,
     color: "#8FAECF",
     children: [
       {
         name: "Hurt",
         moc: 75,
+        hint: "someone's act left a mark",
         children: [
-          { name: "Embarrassed", moc: 20 },
-          { name: "Disappointed", moc: 75 },
+          {
+            name: "Embarrassed",
+            moc: 20,
+            hint: "wounded, and it showed",
+          },
+          {
+            name: "Disappointed",
+            moc: 75,
+            hint: "they mattered and didn't come through",
+          },
         ],
       },
       {
         name: "Depressed",
         moc: 50,
+        hint: "grey weight on everything",
         children: [
-          { name: "Inferior", moc: 20 },
-          { name: "Empty", moc: 50 },
+          {
+            name: "Inferior",
+            moc: 20,
+            hint: "sunk below everyone",
+          },
+          {
+            name: "Empty",
+            moc: 50,
+            hint: "nothing left inside",
+          },
         ],
       },
       {
         name: "Guilty",
         moc: 30,
+        hint: "you did the harm",
         children: [
-          { name: "Remorseful", moc: 30 },
-          { name: "Ashamed", moc: 20 },
+          {
+            name: "Remorseful",
+            moc: 30,
+            hint: "would undo it if you could",
+          },
+          {
+            name: "Ashamed",
+            moc: 20,
+            hint: "the fault feels like who you are",
+          },
         ],
       },
       {
         name: "Despair",
         moc: 50,
+        hint: "no way out visible",
         children: [
-          { name: "Powerless", moc: 50 },
-          { name: "Grief", moc: 75 },
+          {
+            name: "Powerless",
+            moc: 50,
+            hint: "hands tied, nothing works",
+          },
+          {
+            name: "Grief",
+            moc: 75,
+            hint: "a loss that must be carried",
+          },
         ],
       },
       {
         name: "Vulnerable",
         moc: 100,
+        hint: "unprotected where it matters",
         children: [
-          { name: "Fragile", moc: 100 },
-          { name: "Victimized", moc: 75 },
+          {
+            name: "Fragile",
+            moc: 100,
+            hint: "one knock from breaking",
+          },
+          {
+            name: "Victimized",
+            moc: 75,
+            hint: "harm was done to you",
+          },
         ],
       },
       {
         name: "Lonely",
         moc: 75,
+        hint: "missing company where it should be",
         children: [
-          { name: "Abandoned", moc: 75 },
-          { name: "Isolated", moc: 75 },
+          {
+            name: "Abandoned",
+            moc: 75,
+            hint: "left by someone who used to stay",
+          },
+          {
+            name: "Isolated",
+            moc: 75,
+            hint: "cut off from everyone",
+          },
         ],
       },
     ],
