@@ -24,6 +24,8 @@ export interface WheelFeeling {
 
 export interface WheelCore {
   core: string;
+  // Broad gloss for the center display when standing on this core (#85).
+  hint?: string;
   moc: number;
   color: string; // hex, locked from the approved prototype
   children: WheelFeeling[]; // secondary ring, each with tertiary children
@@ -32,6 +34,7 @@ export interface WheelCore {
 export const FEELINGS_WHEEL: WheelCore[] = [
   {
     core: "Happy",
+    hint: "things feel good, calm to lit up",
     moc: 540,
     color: "#F2D06B",
     children: [
@@ -192,6 +195,7 @@ export const FEELINGS_WHEEL: WheelCore[] = [
   },
   {
     core: "Surprised",
+    hint: "something unexpected landed",
     moc: 250,
     color: "#8FC7B4",
     children: [
@@ -267,6 +271,7 @@ export const FEELINGS_WHEEL: WheelCore[] = [
   },
   {
     core: "Bad",
+    hint: "run down, stretched, or flat",
     moc: 50,
     color: "#B9C0A9",
     children: [
@@ -342,6 +347,7 @@ export const FEELINGS_WHEEL: WheelCore[] = [
   },
   {
     core: "Fearful",
+    hint: "threat, doubt, or dread",
     moc: 100,
     color: "#C9A6D6",
     children: [
@@ -451,6 +457,7 @@ export const FEELINGS_WHEEL: WheelCore[] = [
   },
   {
     core: "Angry",
+    hint: "something is wrong and it burns",
     moc: 150,
     color: "#E08B7B",
     children: [
@@ -594,6 +601,7 @@ export const FEELINGS_WHEEL: WheelCore[] = [
   },
   {
     core: "Disgusted",
+    hint: "aversion - this is not okay",
     moc: 150,
     color: "#A9B7C9",
     children: [
@@ -669,6 +677,7 @@ export const FEELINGS_WHEEL: WheelCore[] = [
   },
   {
     core: "Sad",
+    hint: "loss, hurt, or heaviness",
     moc: 75,
     color: "#8FAECF",
     children: [

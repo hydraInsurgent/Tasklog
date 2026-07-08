@@ -18,8 +18,9 @@
 // node's level), never self-tagged; free words remain first-class alongside the wheel.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronLeft } from "lucide-react";
+import { Check, ChevronLeft, Info, X } from "lucide-react";
 import { FEELINGS_WHEEL, MOC_ANCHORS, WheelFeeling, deriveMoc } from "@/lib/feelingsWheel";
+import MocLadder from "./MocLadder";
 
 interface Picked {
   name: string;
@@ -44,12 +45,21 @@ export default function FeelingsWheelModal({ onSave, onClose }: Props) {
   const [words, setWords] = useState("");
   const [energy, setEnergy] = useState(5);
   const [saving, setSaving] = useState(false);
+  // The MoC reference ladder, opened from the info button beside the derived score.
+  const [ladderOpen, setLadderOpen] = useState(false);
   // Crossfade direction while a level transition is animating ("deep" | "up" | null).
   const [anim, setAnim] = useState<"deep" | "up" | null>(null);
   const animTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    // Escape peels one layer: the ladder first if it's open, then the whole modal.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setLadderOpen((open) => {
+        if (!open) onClose();
+        return false;
+      });
+    };
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("keydown", onKey);
@@ -73,22 +83,25 @@ export default function FeelingsWheelModal({ onSave, onClose }: Props) {
 
   // ---------- current level ----------
 
-  const { nodes, crumbs } = useMemo(() => {
+  const { nodes, crumbs, currentHint } = useMemo(() => {
     const crumbNames: string[] = [];
     let children: WheelFeeling[];
+    let hint: string | undefined;
     if (path.length === 0) {
       children = FEELINGS_WHEEL.map((c) => ({ name: c.core, moc: c.moc, children: c.children }));
     } else {
       const core = FEELINGS_WHEEL[path[0]];
       crumbNames.push(core.core);
       children = core.children;
+      hint = core.hint;
       if (path.length === 2) {
         const sec = children[path[1]];
         crumbNames.push(sec.name);
+        hint = sec.hint;
         children = sec.children ?? [];
       }
     }
-    return { nodes: children, crumbs: crumbNames };
+    return { nodes: children, crumbs: crumbNames, currentHint: hint };
   }, [path]);
 
   const depth = path.length;
@@ -189,7 +202,6 @@ export default function FeelingsWheelModal({ onSave, onClose }: Props) {
             const fill = depth === 0 ? FEELINGS_WHEEL[i].color : shade(coreColor!, depth === 1 ? 0.32 : 0.52);
             const labelR = (R_INNER + R_OUTER) / 2 + (depth === 0 ? 4 : 0);
             const [lx, ly] = polar(labelR, mid);
-            const [cx, cy] = polar(labelR + 30, mid);
             return (
               <g key={`${path.join("/")}-${i}`}>
                 <path
@@ -220,12 +232,6 @@ export default function FeelingsWheelModal({ onSave, onClose }: Props) {
                       {line}
                     </text>
                   ))}
-                {hasChildren && (
-                  <text x={cx} y={cy} textAnchor="middle" fontSize={10}
-                    fill="#2E2A24" opacity={0.55} fontFamily="monospace" pointerEvents="none">
-                    {node.children!.length} deeper ›
-                  </text>
-                )}
               </g>
             );
           })}
@@ -243,10 +249,17 @@ export default function FeelingsWheelModal({ onSave, onClose }: Props) {
               strokeWidth={depth ? 1.8 : 1.5} />
             {depth > 0 ? (
               <>
-                <text x={CENTER} y={CENTER - 8} textAnchor="middle" fontSize={17} fontWeight={700}
+                {/* The word you're standing on + its meaning - the center eases labeling.
+                    Tapping it picks (the accent ring is the affordance; no standing
+                    instruction - that was demo copy, not interface copy). */}
+                <text x={CENTER} y={CENTER - 12} textAnchor="middle" fontSize={17} fontWeight={700}
                   fill="var(--color-j-ink)" pointerEvents="none">{currentName}</text>
-                <text x={CENTER} y={CENTER + 15} textAnchor="middle" fontSize={10.5}
-                  fill="var(--color-j-accent)" pointerEvents="none">tap to pick this</text>
+                {splitTwo(currentHint ?? "").map((line, li) => (
+                  <text key={li} x={CENTER} y={CENTER + 7 + li * 13} textAnchor="middle" fontSize={10.5}
+                    fontStyle="italic" fill="var(--color-j-muted)" pointerEvents="none">
+                    {line}
+                  </text>
+                ))}
               </>
             ) : picked.length === 0 ? (
               <>
@@ -286,9 +299,18 @@ export default function FeelingsWheelModal({ onSave, onClose }: Props) {
             ))
           )}
         </div>
-        <p className="font-mono text-[0.7rem] text-j-muted mt-1.5 mb-2">
-          Map of Consciousness: <b className="text-j-ink">{derived ?? "-"}</b>{" "}
-          {derived !== null && anchor ? `· near ${anchor.name} · derived from your picks` : "· derived from your picks, not self-tagged"}
+        <p className="flex items-center gap-1.5 font-mono text-[0.7rem] text-j-muted mt-1.5 mb-2">
+          <span>
+            Map of Consciousness: <b className="text-j-ink">{derived ?? "-"}</b>{" "}
+            {derived !== null && anchor ? `· near ${anchor.name} · derived from your picks` : "· derived from your picks, not self-tagged"}
+          </span>
+          <button
+            onClick={() => setLadderOpen(true)}
+            aria-label="What do these levels mean? Open the reference ladder"
+            className="grid place-items-center w-7 h-7 -my-1 rounded-full text-j-accent hover:bg-j-accent-soft cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-j-accent"
+          >
+            <Info size={14} aria-hidden="true" />
+          </button>
         </p>
 
         <input
@@ -326,6 +348,31 @@ export default function FeelingsWheelModal({ onSave, onClose }: Props) {
           </button>
         </div>
       </div>
+
+      {/* MoC reference ladder: a layer above the check-in, opened from the info button */}
+      {ladderOpen && (
+        <div
+          className="fixed inset-0 z-[60] grid place-items-center bg-black/45 p-4 tl-fade"
+          onClick={(e) => e.target === e.currentTarget && setLadderOpen(false)}
+        >
+          <div role="dialog" aria-modal="true" aria-label="Map of Consciousness reference"
+            className="w-full max-w-[360px] max-h-[92vh] overflow-y-auto rounded-2xl border border-j-line bg-j-card text-j-ink p-5 shadow-2xl tl-pop">
+            <div className="flex items-center mb-1">
+              <h3 className="font-mono text-[0.68rem] uppercase tracking-[0.13em] text-j-muted">
+                Map of Consciousness · reference
+              </h3>
+              <button
+                onClick={() => setLadderOpen(false)}
+                aria-label="Close reference"
+                className="ml-auto grid place-items-center w-9 h-9 -my-1 rounded-lg text-j-muted hover:text-j-ink cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-j-accent"
+              >
+                <X size={16} aria-hidden="true" />
+              </button>
+            </div>
+            <MocLadder current={derived} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
