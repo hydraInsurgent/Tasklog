@@ -658,8 +658,12 @@ export default function TasksClient({
           </div>
         ) : (
           <>
-          {/* Desktop table - hidden on mobile to avoid horizontal scroll. */}
-          <div className="hidden md:block overflow-x-auto overflow-hidden rounded-b-lg">
+          {/* Desktop table - hidden on mobile to avoid horizontal scroll. The
+              wrapper scrolls horizontally when the table is wider than its card
+              (e.g. the All Tasks view adds a Project column), so the right-most
+              Actions column stays reachable. Do NOT add overflow-hidden here: it
+              overrides overflow-x and clips the Actions column with no scrollbar. */}
+          <div className="hidden md:block overflow-x-auto rounded-b-lg">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border-muted text-left">
