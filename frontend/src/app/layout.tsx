@@ -41,7 +41,7 @@ export default function RootLayout({
       <body className={`${spaceGrotesk.variable} ${dmSans.variable} antialiased min-h-screen bg-bg`}>
         {/* Site header */}
         <header className="sticky top-0 z-30 border-b border-border bg-surface/95 backdrop-blur-sm">
-          <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-3">
+          <div className="px-4 h-14 flex items-center gap-3">
             <a
               href="/"
               className="font-heading text-lg font-bold text-text-primary hover:text-accent transition-colors duration-150"
@@ -56,7 +56,10 @@ export default function RootLayout({
         </header>
 
         <TimeTrackingProvider>
-          <main className="max-w-6xl mx-auto px-4 pt-6 pb-28">{children}</main>
+          {/* Full-width shell. Each page sets its own reading width (document pages
+              like Journal/Time/Labels center themselves with max-w-* mx-auto); the
+              Tasks app-shell uses the full width so its table shows every column. */}
+          <main className="px-4 pt-6 pb-28">{children}</main>
           <TrackingBar />
         </TimeTrackingProvider>
 

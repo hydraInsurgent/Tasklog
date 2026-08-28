@@ -8,7 +8,7 @@ import JournalClient from "@/components/journal/JournalClient";
 
 export default function JournalPage() {
   return (
-    <div className="max-w-6xl space-y-4">
+    <div className="max-w-6xl mx-auto space-y-4">
       <Link
         href="/"
         className="inline-flex items-center gap-1.5 text-sm text-j-muted hover:text-j-ink focus:outline-none focus:underline transition-colors duration-150"

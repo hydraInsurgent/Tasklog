@@ -7,7 +7,7 @@ import HabitsClient from "@/components/HabitsClient";
 
 export default function HabitsPage() {
   return (
-    <div className="max-w-4xl space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6">
       <Link
         href="/"
         className="inline-flex items-center gap-1.5 text-sm text-text-muted hover:text-text-primary focus:outline-none focus:underline transition-colors duration-150"

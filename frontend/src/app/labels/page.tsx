@@ -6,7 +6,7 @@ import LabelsClient from "@/components/LabelsClient";
 
 export default function LabelsPage() {
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-2xl mx-auto space-y-6">
       <Link
         href="/"
         className="inline-flex items-center gap-1.5 text-sm text-text-muted hover:text-text-primary focus:outline-none focus:underline transition-colors duration-150"

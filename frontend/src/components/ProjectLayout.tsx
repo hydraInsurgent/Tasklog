@@ -246,7 +246,7 @@ export default function ProjectLayout() {
   }, [habits]);
 
   return (
-    <div className="flex min-h-screen -mx-4 -my-8">
+    <div className="flex min-h-screen -my-8">
       {/* Desktop sidebar - hidden on mobile */}
       <aside className="hidden md:flex md:flex-col md:w-56 bg-surface border-r border-border shrink-0">
         {loadingProjects ? (
