@@ -18,6 +18,14 @@ function getApiUrl(): string {
   return process.env.NEXT_PUBLIC_API_URL ?? `http://${window.location.hostname}:5115`;
 }
 
+// A client (#86): the grouping level above projects (a life area). Name + optional color.
+export interface Client {
+  id: number;
+  name: string;
+  color: string | null;
+  createdAt: string;
+}
+
 // The shape returned by the API for every project.
 export interface Project {
   id: number;
@@ -25,6 +33,11 @@ export interface Project {
   // Optional display color, a "#RRGGBB" hex string or null (#77). Drives timeline block
   // colors and a sidebar dot.
   color: string | null;
+  // The client (grouping level) this project belongs to, or null = Ungrouped (#86).
+  clientId: number | null;
+  client: Client | null;
+  // Manual sidebar sort order (#86); lower = higher in the list.
+  position: number;
   createdAt: string; // ISO 8601 datetime string
 }
 
@@ -370,26 +383,47 @@ export async function getProjects(): Promise<Project[]> {
   return res.json();
 }
 
-// POST /api/projects - create a new project (with optional color). Returns it.
-export async function createProject(name: string, color?: string | null): Promise<Project> {
+// POST /api/projects - create a new project (with optional color + client). Returns it.
+export async function createProject(name: string, color?: string | null, clientId?: number | null): Promise<Project> {
   const res = await fetch(`${getApiUrl()}/api/projects`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, color: color ?? null }),
+    body: JSON.stringify({ name, color: color ?? null, ...(clientId != null ? { clientId } : {}) }),
   });
   if (!res.ok) throw new Error("Failed to create project.");
   return res.json();
 }
 
-// PATCH /api/projects/:id - rename a project and/or set its color. A non-null color sets it;
-// null leaves the existing color unchanged (clearing isn't an exposed flow). Returns it.
-export async function renameProject(id: number, name: string, color?: string | null): Promise<Project> {
+// PATCH /api/projects/:id - present-key update of name / color / clientId (#86). Only the
+// keys present in `fields` are sent; the backend leaves omitted fields unchanged. color/
+// clientId: null clears (recolor default / Ungrouped). Returns the updated project.
+export async function updateProject(
+  id: number,
+  fields: { name?: string; color?: string | null; clientId?: number | null },
+): Promise<Project> {
   const res = await fetch(`${getApiUrl()}/api/projects/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, color: color ?? null }),
+    body: JSON.stringify(fields),
   });
-  if (!res.ok) throw new Error(`Failed to rename project ${id}.`);
+  if (!res.ok) throw new Error(`Failed to update project ${id}.`);
+  return res.json();
+}
+
+// Convenience wrapper kept for existing callers: rename and/or set color.
+export function renameProject(id: number, name: string, color?: string | null): Promise<Project> {
+  return updateProject(id, { name, ...(color != null ? { color } : {}) });
+}
+
+// POST /api/projects/reorder - rewrite sidebar order from an ordered id array (must be the
+// full set of project ids). Returns the reordered list.
+export async function reorderProjects(orderedIds: number[]): Promise<Project[]> {
+  const res = await fetch(`${getApiUrl()}/api/projects/reorder`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ orderedIds }),
+  });
+  if (!res.ok) throw new Error("Failed to reorder projects.");
   return res.json();
 }
 
@@ -397,6 +431,44 @@ export async function renameProject(id: number, name: string, color?: string | n
 export async function deleteProject(id: number): Promise<void> {
   const res = await fetch(`${getApiUrl()}/api/projects/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error(`Failed to delete project ${id}.`);
+}
+
+// --- Clients (#86) ---
+
+// GET /api/clients - all clients, alphabetical.
+export async function getClients(): Promise<Client[]> {
+  const res = await fetch(`${getApiUrl()}/api/clients`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Failed to fetch clients.");
+  return res.json();
+}
+
+// POST /api/clients - create a client (life area) with optional color. Returns it.
+export async function createClient(name: string, color?: string | null): Promise<Client> {
+  const res = await fetch(`${getApiUrl()}/api/clients`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, color: color ?? null }),
+  });
+  if (!res.ok) throw new Error("Failed to create client.");
+  return res.json();
+}
+
+// PATCH /api/clients/:id - rename and/or recolor a client. A non-null color sets it; null
+// leaves it unchanged (mirrors the project convention). Returns it.
+export async function renameClient(id: number, name: string, color?: string | null): Promise<Client> {
+  const res = await fetch(`${getApiUrl()}/api/clients/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, color: color ?? null }),
+  });
+  if (!res.ok) throw new Error(`Failed to rename client ${id}.`);
+  return res.json();
+}
+
+// DELETE /api/clients/:id - delete a client; its projects survive as Ungrouped.
+export async function deleteClient(id: number): Promise<void> {
+  const res = await fetch(`${getApiUrl()}/api/clients/${id}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(`Failed to delete client ${id}.`);
 }
 
 // PATCH /api/tasks/:taskId/project - assign a task to a project (or null for Inbox).
@@ -468,13 +540,27 @@ export async function deleteLabel(id: number): Promise<void> {
 // endedAt null = the entry is still running. Times are local ISO strings.
 export interface TimeEntry {
   id: number;
-  taskId: number;
-  taskTitle: string;
+  // Null (#86) = a task-free entry (life-logging like "Sleep"); the label is `description`.
+  taskId: number | null;
+  taskTitle: string; // "" when task-free
+  // Free-text label (#86). Null for a task-linked entry that just uses the task title.
+  description: string | null;
+  // Effective project = the entry's own, else the linked task's (#86).
   projectId: number | null;
   projectColor: string | null;
+  // The project's client, denormalized for grouped summaries (#86).
+  clientId: number | null;
+  clientName: string | null;
+  clientColor: string | null;
   startedAt: string;
   endedAt: string | null;
   durationSeconds: number;
+}
+
+// An autocomplete suggestion (#86): a past description + the project it was last used with.
+export interface EntrySuggestion {
+  description: string;
+  projectId: number | null;
 }
 
 async function timeEntryOrThrow(res: Response, fallback: string): Promise<TimeEntry> {
@@ -510,12 +596,17 @@ export async function getActiveTimeEntry(): Promise<TimeEntry | null> {
   return text ? JSON.parse(text) : null;
 }
 
-// POST /api/time-entries/start - start tracking a task (auto-stops any running timer).
-export async function startTimer(taskId: number): Promise<TimeEntry> {
+// POST /api/time-entries/start - start a timer (auto-stops any running timer). Accepts a
+// bare task id (legacy convenience) OR a body (#86): task-free entries pass a description
+// and/or projectId. Project defaults from the task when tracking one.
+export async function startTimer(
+  arg: number | { taskId?: number; description?: string; projectId?: number | null },
+): Promise<TimeEntry> {
+  const body = typeof arg === "number" ? { taskId: arg } : arg;
   const res = await fetch(`${getApiUrl()}/api/time-entries/start`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ taskId }),
+    body: JSON.stringify(body),
   });
   return timeEntryOrThrow(res, "Failed to start the timer.");
 }
@@ -526,20 +617,24 @@ export async function stopTimer(id: number): Promise<TimeEntry> {
   return timeEntryOrThrow(res, "Failed to stop the timer.");
 }
 
-// POST /api/time-entries - log a manual (retroactive) interval. Times are ISO strings.
-export async function addTimeEntry(taskId: number, startedAt: string, endedAt: string): Promise<TimeEntry> {
+// POST /api/time-entries - log a manual (retroactive) interval (#86). startedAt/endedAt are
+// required; task/description/project optional. Project defaults from the task when given.
+export async function addTimeEntry(
+  fields: { startedAt: string; endedAt: string; taskId?: number | null; description?: string | null; projectId?: number | null },
+): Promise<TimeEntry> {
   const res = await fetch(`${getApiUrl()}/api/time-entries`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ taskId, startedAt, endedAt }),
+    body: JSON.stringify(fields),
   });
   return timeEntryOrThrow(res, "Failed to add the time entry.");
 }
 
-// PATCH /api/time-entries/:id - edit an entry's start and/or end (ISO strings).
+// PATCH /api/time-entries/:id - present-key edit (#86): start/end, description, project, or
+// the linked task. Omit to keep; description/projectId/taskId null clears/unlinks.
 export async function updateTimeEntry(
   id: number,
-  fields: { startedAt?: string; endedAt?: string },
+  fields: { startedAt?: string; endedAt?: string; description?: string | null; projectId?: number | null; taskId?: number | null },
 ): Promise<TimeEntry> {
   const res = await fetch(`${getApiUrl()}/api/time-entries/${id}`, {
     method: "PATCH",
@@ -553,6 +648,18 @@ export async function updateTimeEntry(
 export async function deleteTimeEntry(id: number): Promise<void> {
   const res = await fetch(`${getApiUrl()}/api/time-entries/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error(`Failed to delete time entry ${id}.`);
+}
+
+// GET /api/time-entries/suggestions?text= - autocomplete over recent entry descriptions,
+// each with the project it was last used with (#86). Empty text = most recent overall.
+export async function getEntrySuggestions(text?: string, limit?: number): Promise<EntrySuggestion[]> {
+  const params = new URLSearchParams();
+  if (text) params.set("text", text);
+  if (limit !== undefined) params.set("limit", String(limit));
+  const qs = params.toString();
+  const res = await fetch(`${getApiUrl()}/api/time-entries/suggestions${qs ? `?${qs}` : ""}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Failed to fetch suggestions.");
+  return res.json();
 }
 
 // --- Journal (#79) ---
