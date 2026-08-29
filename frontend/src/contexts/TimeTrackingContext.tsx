@@ -7,11 +7,20 @@
  * server-side; we just replace the local active entry. */
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { TimeEntry, createTask, getActiveTimeEntry, startTimer, stopTimer } from "@/lib/api";
+import { TimeEntry, getActiveTimeEntry, startTimer, stopTimer, updateTimeEntry } from "@/lib/api";
 
-// Fired after quickStart creates a task so the task list (TasksClient) refetches and the
-// new task shows immediately, instead of waiting for the 30s poll.
+// Kept for backward compatibility: any listener that refetched tasks after a quick-start.
+// As of #86 quick-start no longer creates a task, so this is dispatched only if a caller
+// still wants it - currently unused, retained so imports elsewhere don't break.
 export const TASKS_CHANGED_EVENT = "tasklog:tasks-changed";
+
+// What a caller can start a timer with (#86): a task, a free-text description, a project -
+// any combination, all optional (a bare timer is valid, categorize it later).
+export interface StartEntryInput {
+  taskId?: number;
+  description?: string;
+  projectId?: number | null;
+}
 
 interface TimeTrackingValue {
   active: TimeEntry | null;
@@ -21,8 +30,12 @@ interface TimeTrackingValue {
   pending: boolean;
   isRunning: (taskId: number) => boolean;
   start: (taskId: number) => Promise<void>;
-  // Quick-create an Inbox task from a typed title and immediately start tracking it (#77).
-  quickStart: (title: string) => Promise<void>;
+  // Start a timer with any combination of task / description / project (#86).
+  startEntry: (input: StartEntryInput) => Promise<void>;
+  // Start a task-free entry from a typed label (+ optional project). No phantom task (#86).
+  quickStart: (description: string, projectId?: number | null) => Promise<void>;
+  // Edit the running entry's description and/or project without stopping it (#86).
+  updateActive: (fields: { description?: string | null; projectId?: number | null }) => Promise<void>;
   stop: () => Promise<void>;
 }
 
@@ -35,7 +48,9 @@ const NOOP: TimeTrackingValue = {
   pending: false,
   isRunning: () => false,
   start: async () => {},
+  startEntry: async () => {},
   quickStart: async () => {},
+  updateActive: async () => {},
   stop: async () => {},
 };
 
@@ -76,12 +91,19 @@ export function TimeTrackingProvider({ children }: { children: React.ReactNode }
   // Guard against overlapping start/stop clicks.
   const inFlight = useRef(false);
 
-  const start = useCallback(async (taskId: number) => {
+  // Start a timer from any combination of task / description / project (#86). The server
+  // auto-stops any previous timer; we just replace the local active entry.
+  const startEntry = useCallback(async (input: StartEntryInput) => {
     if (inFlight.current) return;
     inFlight.current = true;
     setPending(true);
     try {
-      const entry = await startTimer(taskId); // server auto-stops any previous timer
+      const body: StartEntryInput = {};
+      if (input.taskId !== undefined) body.taskId = input.taskId;
+      const desc = input.description?.trim();
+      if (desc) body.description = desc;
+      if (input.projectId != null) body.projectId = input.projectId;
+      const entry = await startTimer(body);
       setActive(entry);
       setNowMs(Date.now());
     } finally {
@@ -90,32 +112,25 @@ export function TimeTrackingProvider({ children }: { children: React.ReactNode }
     }
   }, []);
 
-  // Quick-create a task (Inbox) from a title and start its timer in one step. The created
-  // task behaves like any other - it shows in the list and accrues sessions like normal.
-  const quickStart = useCallback(async (title: string) => {
-    if (inFlight.current) return;
-    inFlight.current = true;
-    setPending(true);
-    let taskCreated = false;
-    try {
-      const task = await createTask(title.trim() || "Untitled");
-      taskCreated = true;
-      const entry = await startTimer(task.id); // server auto-stops any previous timer
-      setActive(entry);
-      setNowMs(Date.now());
-      if (typeof window !== "undefined") window.dispatchEvent(new Event(TASKS_CHANGED_EVENT));
-    } catch (err) {
-      // If the task was created but the timer failed, still refresh the list so the
-      // orphaned task shows up rather than disappearing silently.
-      if (taskCreated && typeof window !== "undefined") {
-        window.dispatchEvent(new Event(TASKS_CHANGED_EVENT));
-      }
-      throw err;
-    } finally {
-      setPending(false);
-      inFlight.current = false;
-    }
-  }, []);
+  const start = useCallback((taskId: number) => startEntry({ taskId }), [startEntry]);
+
+  // Start a task-free entry from a typed label (+ optional project). No phantom Inbox task
+  // is created anymore (#86) - the entry stands on its own as tracked actuals.
+  const quickStart = useCallback(
+    (description: string, projectId?: number | null) => startEntry({ description, projectId }),
+    [startEntry],
+  );
+
+  // Edit the running entry's description/project in place (present-key), keeping it running.
+  const updateActive = useCallback(
+    async (fields: { description?: string | null; projectId?: number | null }) => {
+      const current = active;
+      if (!current) return;
+      const updated = await updateTimeEntry(current.id, fields);
+      setActive(updated);
+    },
+    [active],
+  );
 
   const stop = useCallback(async () => {
     if (inFlight.current) return;
@@ -136,7 +151,7 @@ export function TimeTrackingProvider({ children }: { children: React.ReactNode }
 
   return (
     <TimeTrackingContext.Provider
-      value={{ active, elapsedSeconds, pending, isRunning, start, quickStart, stop }}
+      value={{ active, elapsedSeconds, pending, isRunning, start, startEntry, quickStart, updateActive, stop }}
     >
       {children}
     </TimeTrackingContext.Provider>

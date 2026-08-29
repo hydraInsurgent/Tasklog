@@ -34,8 +34,9 @@ import {
   Task,
   Project,
   Label,
+  TimeEntry,
 } from "@/lib/api";
-import { dateKey, addDays, dayTotalSeconds } from "@/lib/time";
+import { dateKey, addDays, dayTotalSeconds, perProjectTotals } from "@/lib/time";
 import {
   MindItem,
   PlanContent,
@@ -75,6 +76,8 @@ export default function JournalClient() {
   const [entryDates, setEntryDates] = useState<Set<string>>(new Set());
   const [habitsDone, setHabitsDone] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
   const [timeSeconds, setTimeSeconds] = useState(0);
+  // The day's raw time entries, kept so we can derive the client/project breakdown (#86).
+  const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
   const [wheelOpen, setWheelOpen] = useState(false);
   // Task detail/edit opened from the plan (#85) - same chaining as TasksClient.
   const [openingTask, setOpeningTask] = useState<Task | null>(null);
@@ -91,6 +94,12 @@ export default function JournalClient() {
 
   const key = dateKey(date);
   const isToday = key === dateKey(new Date());
+  // The day's actuals grouped by client/project (#86) - the "record of life" breakdown that
+  // unites task and non-task time. Derived, so it recomputes as entries/projects load.
+  const timeBreakdown = useMemo(
+    () => perProjectTotals(timeEntries, [date], new Date(), projects),
+    [timeEntries, projects, date],
+  );
   // Debounced save timers, per template key.
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   // Synchronous mirror of `contents`, updated in the same tick as every edit and on
@@ -135,6 +144,7 @@ export default function JournalClient() {
     setCompletedOnDate(completed);
     setYesterdayDaily(prevEntries.find((e) => e.templateKey === "daily")?.content ?? null);
     setTimeSeconds(dayTotalSeconds(timeEntries, day, new Date()));
+    setTimeEntries(timeEntries);
     setHabitsDone({ done: habits.filter((h) => h.doneToday).length, total: habits.length });
   }, []);
 
@@ -370,6 +380,7 @@ export default function JournalClient() {
         planTotal={planIds.size}
         unplannedDone={unplanned.length}
         timeSeconds={timeSeconds}
+        timeBreakdown={timeBreakdown}
         habitsDone={habitsDone.done}
         habitsTotal={habitsDone.total}
         checkinCount={checkins.length}

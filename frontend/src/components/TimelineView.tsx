@@ -17,7 +17,7 @@ import {
 import { formatDuration } from "@/lib/format";
 import {
   PX_PER_MIN, DAY_PX, dateKey, startOfDay, addDays, dayColumns,
-  daySegment, dayTotalSeconds, perTaskTotals, clockLabel,
+  daySegment, dayTotalSeconds, perActivityTotals, entryLabel, clockLabel,
 } from "@/lib/time";
 import { useTimeTracking } from "@/contexts/TimeTrackingContext";
 import ColorPickerButton from "@/components/ColorPickerButton";
@@ -34,11 +34,15 @@ function isoFromDayTime(day: Date, time: string): string {
   return `${dateKey(day)}T${time}:00`;
 }
 
-// Add/edit popover state. `entry` set => editing; else adding a new one on `day`.
+// Add/edit popover state. `entry` set => editing; else adding a new one on `day`. As of #86
+// an entry can be task-free: it carries a free-text description and its own project, and the
+// task link is optional (taskId "" = none).
 interface PopoverState {
   day: Date;
   topPx: number;
   taskId: number | "";
+  description: string;
+  projectId: number | "";
   start: string; // HH:mm
   end: string;   // HH:mm
   entry?: TimeEntry;
@@ -146,7 +150,9 @@ export default function TimelineView() {
     setPopover({
       day,
       topPx: rounded * PX_PER_MIN,
-      taskId: tasks[0]?.id ?? "",
+      taskId: "",
+      description: "",
+      projectId: "",
       start: hhmm(startD),
       end: hhmm(endD),
     });
@@ -159,7 +165,9 @@ export default function TimelineView() {
     setPopover({
       day: startOfDay(s),
       topPx: daySegment(entry.startedAt, entry.endedAt, startOfDay(s), now)?.topPx ?? 0,
-      taskId: entry.taskId,
+      taskId: entry.taskId ?? "",
+      description: entry.description ?? "",
+      projectId: entry.projectId ?? "",
       start: hhmm(s),
       end: hhmm(new Date(entry.endedAt)),
       entry,
@@ -168,7 +176,11 @@ export default function TimelineView() {
 
   async function saveForm() {
     if (!popover) return;
-    if (popover.taskId === "") { setFormError("Pick a task."); return; }
+    // #86: an entry needs SOMETHING to identify it - a task or a description.
+    if (popover.taskId === "" && !popover.description.trim()) {
+      setFormError("Add a description or pick a task.");
+      return;
+    }
     const startISO = isoFromDayTime(popover.day, popover.start);
     const endISO = isoFromDayTime(popover.day, popover.end);
     if (new Date(endISO).getTime() <= new Date(startISO).getTime()) {
@@ -189,12 +201,16 @@ export default function TimelineView() {
       return startMs < new Date(e.endedAt).getTime() && endMs > new Date(e.startedAt).getTime();
     });
     if (overlaps) { setFormError("This entry overlaps an existing one."); return; }
+    const taskId = popover.taskId === "" ? null : popover.taskId;
+    const projectId = popover.projectId === "" ? null : popover.projectId;
+    const description = popover.description.trim() || null;
     setSaving(true);
     try {
       if (popover.entry) {
-        await updateTimeEntry(popover.entry.id, { startedAt: startISO, endedAt: endISO });
+        // Present-key: send task/description/project too so edits (incl. clearing) stick.
+        await updateTimeEntry(popover.entry.id, { startedAt: startISO, endedAt: endISO, taskId, description, projectId });
       } else {
-        await addTimeEntry(popover.taskId as number, startISO, endISO);
+        await addTimeEntry({ startedAt: startISO, endedAt: endISO, taskId, description, projectId });
       }
       setPopover(null);
       await load();
@@ -220,7 +236,7 @@ export default function TimelineView() {
   }
 
   const rangeTotal = columns.reduce((sum, d) => sum + dayTotalSeconds(entries, d, now), 0);
-  const taskTotals = useMemo(() => perTaskTotals(entries, columns, now), [entries, columns, now]);
+  const activityTotals = useMemo(() => perActivityTotals(entries, columns, now), [entries, columns, now]);
 
   return (
     <div className="space-y-4">
@@ -401,7 +417,7 @@ export default function TimelineView() {
                           key={`${en.id}-${dateKey(day)}`}
                           type="button"
                           onClick={(e) => { e.stopPropagation(); openEdit(en); }}
-                          title={`${en.taskTitle} · ${clockLabel(en.startedAt)}${en.endedAt ? ` - ${clockLabel(en.endedAt)}` : " (running)"}`}
+                          title={`${entryLabel(en)} · ${clockLabel(en.startedAt)}${en.endedAt ? ` - ${clockLabel(en.endedAt)}` : " (running)"}`}
                           className={`absolute left-0.5 right-0.5 overflow-hidden rounded text-left px-1.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer transition-shadow duration-75 ${
                             isSelected ? "ring-2 ring-accent" : ""
                           }`}
@@ -413,7 +429,7 @@ export default function TimelineView() {
                           }}
                         >
                           <span className="block truncate text-[11px] font-medium text-text-primary">
-                            {en.taskTitle}{running ? " ·" : ""}
+                            {entryLabel(en)}{running ? " ·" : ""}
                           </span>
                           {seg.heightPx >= 32 && (
                             <span className="block truncate text-[10px] text-text-muted">
@@ -446,13 +462,13 @@ export default function TimelineView() {
         )}
       </div>
 
-      {/* Per-task breakdown for the visible range */}
-      {taskTotals.length > 0 && (
+      {/* Per-activity breakdown for the visible range (tasks + task-free entries) */}
+      {activityTotals.length > 0 && (
         <div className="bg-surface border border-border rounded-lg p-4">
-          <h2 className="font-heading text-sm font-semibold text-text-primary mb-2">By task</h2>
+          <h2 className="font-heading text-sm font-semibold text-text-primary mb-2">By activity</h2>
           <ul className="divide-y divide-border-muted">
-            {taskTotals.map((t) => (
-              <li key={t.taskId} className="flex items-center justify-between py-1.5 text-sm">
+            {activityTotals.map((t) => (
+              <li key={t.key} className="flex items-center justify-between py-1.5 text-sm">
                 <span className="truncate text-text-primary">{t.title}</span>
                 <span className="tabular-nums text-text-muted shrink-0 ml-3">{formatDuration(t.seconds)}</span>
               </li>
@@ -479,13 +495,21 @@ function EntryForm({
   onCancel: () => void;
 }) {
   // Keep the popover on-screen: clamp its top within the day.
-  const top = Math.min(state.topPx, DAY_PX - 230);
+  const top = Math.min(state.topPx, DAY_PX - 340);
 
   // Group tasks by project for the optgroup layout.
   const inboxTasks = tasks.filter((t) => !t.projectId);
   const projectGroups = projects
     .map((p) => ({ project: p, tasks: tasks.filter((t) => t.projectId === p.id) }))
     .filter((g) => g.tasks.length > 0);
+
+  // When a task is picked, default the entry's project from it (still overridable below).
+  function pickTask(value: string) {
+    if (!value) { onChange({ ...state, taskId: "" }); return; }
+    const id = Number(value);
+    const task = tasks.find((t) => t.id === id);
+    onChange({ ...state, taskId: id, projectId: state.projectId === "" ? (task?.projectId ?? "") : state.projectId });
+  }
 
   return (
     <div
@@ -494,13 +518,23 @@ function EntryForm({
       style={{ top: Math.max(0, top) }}
     >
       <div>
-        <label className="block text-xs font-medium text-text-muted mb-1">Task</label>
+        <label className="block text-xs font-medium text-text-muted mb-1">Description</label>
+        <input
+          type="text"
+          value={state.description}
+          onChange={(e) => onChange({ ...state, description: e.target.value })}
+          placeholder="e.g. Rise and Shine"
+          className="w-full px-2 py-1.5 text-sm border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent"
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-text-muted mb-1">Task (optional)</label>
         <select
           value={state.taskId}
-          onChange={(e) => onChange({ ...state, taskId: e.target.value ? Number(e.target.value) : "" })}
+          onChange={(e) => pickTask(e.target.value)}
           className="w-full px-2 py-1.5 text-sm border border-border rounded-md bg-surface text-text-primary focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer"
         >
-          <option value="">Select a task...</option>
+          <option value="">No task</option>
           {inboxTasks.length > 0 && (
             <optgroup label="Inbox">
               {inboxTasks.map((t) => (
@@ -514,6 +548,19 @@ function EntryForm({
                 <option key={t.id} value={t.id}>{t.title}</option>
               ))}
             </optgroup>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-text-muted mb-1">Project</label>
+        <select
+          value={state.projectId}
+          onChange={(e) => onChange({ ...state, projectId: e.target.value ? Number(e.target.value) : "" })}
+          className="w-full px-2 py-1.5 text-sm border border-border rounded-md bg-surface text-text-primary focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer"
+        >
+          <option value="">No project</option>
+          {projects.map((p) => (
+            <option key={p.id} value={p.id}>{p.client ? `${p.client.name} / ${p.name}` : p.name}</option>
           ))}
         </select>
       </div>

@@ -1,6 +1,6 @@
 # Flexible Time Tracking - Implementation Plan (#86)
 
-**Overall Progress:** `67%`
+**Overall Progress:** `100%`
 
 ## TLDR
 Make time tracking Toggl-grade flexible so Tasklog becomes a daily-use tool. Two structural changes: (1) add a **Client** grouping level above Project (`Client -> Project`), app-wide; (2) **decouple time entries from tasks** - `TimeEntry.TaskId` becomes optional and each entry carries its own free-text description and its own project. Plus composer autocomplete (from past entries + open tasks), a journal/actuals breakdown by Client/Project, and a mobile-first redesign of the tracking surface. This is the *actuals* half of the Toggl model; the plan-vs-actual calendar is the deliberate next build.
@@ -105,15 +105,27 @@ Make time tracking Toggl-grade flexible so Tasklog becomes a daily-use tool. Two
   - [x] 🟩 `ProjectSidebar` / `ProjectLayout`: per the user's answer, a **flat** project list (Position order) with a **per-row client chip** (name + swatch) rather than nested groups; "All Tasks"/"Inbox" pinned on top; project edit modal gains a Client dropdown (assign / Ungrouped). `ProjectLayout` loads + polls clients, holds client CRUD + reorder handlers.
   - [x] 🟩 Drag-reorder projects via `@dnd-kit` (drag handle so a tap still selects); Inbox/All Tasks not draggable; optimistic with revert-on-failure. Sidebar files typecheck clean.
 
-- [ ] 🟥 **Step 5: Tracking surface redesign (mobile-first)** `[UI]` `[sequential]` -> depends on: Step 4
-  - [ ] 🟥 `TimeTrackingContext`: `quickStart(description)` starts a **task-free** entry (no phantom task); add project assignment; keep `startForTask` (defaults project from task).
-  - [ ] 🟥 `TrackingBar` redesign, mobile-first: description input + project picker + autocomplete (past descriptions pre-filling project/client, and open tasks); running state can edit description/project. No more Inbox-task creation.
-  - [ ] 🟥 `TimelineView`: blocks colored by the entry's own project; edit popover gains description + project + optional-task; empty-slot add creates a task-free entry.
-  - [ ] 🟥 `lib/time.ts`: add `perProjectTotals` / `perClientTotals` alongside `perTaskTotals`; group ungrouped under a clear label.
+- [x] 🟩 **Step 5: Tracking surface redesign (mobile-first)** `[UI]` `[sequential]` -> depends on: Step 4
+  - [x] 🟩 `TimeTrackingContext`: `quickStart(description, projectId?)` starts a **task-free** entry (no phantom task); added `startEntry(input)` (any of task/description/project) + `updateActive` (edit the running entry in place); `start(taskId)` kept as a wrapper.
+  - [x] 🟩 `TrackingBar` fully rewritten: idle launcher -> composer (bottom sheet on mobile, floating card on desktop) with description input + merged autocomplete (past entries via `getEntrySuggestions` + open tasks via `searchOpenTasks`) + project picker; running state shows the entry label + project dot + live clock, tap-to-edit via `updateActive`. No more Inbox-task creation.
+  - [x] 🟩 `TimelineView`: blocks + tooltip use `entryLabel` (task-free entries show their description); edit/add form gains a description field, optional task ("No task"), and a project picker (defaulted from a picked task); save/add use the decoupled `addTimeEntry`/`updateTimeEntry` bodies. Breakdown renamed to "By activity".
+  - [x] 🟩 `lib/time.ts`: `perTaskTotals` -> `perActivityTotals` (groups task-free entries by description) + new `perProjectTotals` (client/project `GroupTotal`) + `entryLabel` helper. Frontend typechecks clean; `jest` 185 pass (3 failures are a pre-existing `TaskCard` drift, unrelated - confirmed by stashing my test edit).
 
-- [ ] 🟥 **Step 6: Journal / actuals breakdown** `[UI]` `[sequential]` -> depends on: Step 5
-  - [ ] 🟥 `JournalClient`: derive a Client/Project time breakdown for the day from the already-fetched entries.
-  - [ ] 🟥 Surface it in the "Today so far" area (compact breakdown beside the existing single total); Plan section stays task/habit intent-only (unchanged).
+- [x] 🟩 **Step 6: Journal / actuals breakdown** `[UI]` `[sequential]` -> depends on: Step 5
+  - [x] 🟩 `JournalClient`: keeps the day's `timeEntries` and derives `perProjectTotals` via a memo (recomputes as entries/projects load).
+  - [x] 🟩 `TodaySoFarWidget` gains a compact Client/Project breakdown (top 5 + "other" roll-up, thin proportion bars in the project color, journal `--color-j-*` tokens) beside the existing total. Plan section unchanged (intent-only). Production `next build` compiles.
 
 ## Outcomes
-<!-- Fill in after execution: decision-relevant deltas only. What changed vs. planned? Key decisions made? Assumptions invalidated? -->
+
+Built as planned across all 6 steps; backend + MCP fully tested (351 .NET, 106 MCP), frontend typechecks clean and `next build` compiles (185 jest pass; 3 pre-existing `TaskCard` failures are unrelated branch drift).
+
+Deltas vs. the plan worth recording:
+
+- **Sidebar model simplified to the user's answer.** The plan floated nested client groups; the user chose a **flat list with a per-row client chip** ordered by drag Position (not re-grouped on render). Implemented that way. A drag handle starts a drag so a plain tap still selects the project. Cross-client moves happen via the edit modal's Client dropdown, not by dragging across a boundary.
+- **Client CRUD lives in a collapsible "Clients" manager** in the sidebar (create/rename/recolor/delete) rather than a separate page - keeps it beside the projects it groups.
+- **Entry-carries-its-own-project** proved its worth: `TimelineView` and the tracking bar set the entry's `projectId` directly, and the projection falls back to the task's project for legacy entries. When a task is picked in the timeline form, its project defaults in (still overridable).
+- **`start`/`quickStart` signatures changed** (quickStart is now `(description, projectId?)` and starts a task-free entry). `startEntry` is the general primitive; `updateActive` lets the bar edit the running entry without stopping it.
+- **Delete->SetNull is DB-enforced only.** The EF InMemory test provider can't model relational SET NULL, so that guarantee is verified at the migration level, not in unit tests. If it ever needs unit coverage, switch that suite to a real SQLite in-memory connection.
+- **`get_time_summary` (MCP) regrouped by client/project** (was per-task); it fetches project names since the entry only carries `projectId` + `clientName`.
+- **Not yet verified in a running app.** Everything is typechecked/built/tested; the mobile-first surfaces (tracking bottom sheet, timeline form, sidebar drag) still want a live pass on a phone-width viewport. The timeline entry editor stays an anchored popover (full-width on mobile) rather than a dedicated bottom sheet - a reasonable follow-up polish if it feels cramped in use.
+- **Pre-existing `TaskCard` test drift** (3 failing) surfaced during this work; unrelated to #86, worth a separate fix.

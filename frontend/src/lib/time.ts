@@ -4,7 +4,13 @@
 // that crosses midnight is clamped per day, so a single interval renders as a segment in each
 // day column it touches.
 
-import { TimeEntry } from "./api";
+import { TimeEntry, Project } from "./api";
+
+// The human label for an entry (#86): a linked task's title, else its free-text
+// description, else a placeholder. Task-free entries carry only a description.
+export function entryLabel(en: Pick<TimeEntry, "taskTitle" | "description">): string {
+  return en.taskTitle || en.description || "Untitled";
+}
 
 export const PX_PER_MIN = 0.8; // 1 hour = 48px
 export const DAY_MINUTES = 24 * 60;
@@ -87,22 +93,61 @@ export function dayTotalSeconds(entries: TimeEntry[], day: Date, now: Date): num
   return entries.reduce((sum, en) => sum + secondsOnDay(en.startedAt, en.endedAt, day, now), 0);
 }
 
-// Per-task totals (taskId -> { title, seconds }) across the given days. Used by the breakdown.
-export function perTaskTotals(
+// Per-activity totals across the given days (#77, #86). Groups by task when the entry is
+// linked, otherwise by its description, so task-free entries ("Sleep") get their own row.
+// Used by the timeline's "By activity" breakdown.
+export function perActivityTotals(
   entries: TimeEntry[],
   days: Date[],
   now: Date,
-): { taskId: number; title: string; seconds: number }[] {
-  const totals = new Map<number, { title: string; seconds: number }>();
+): { key: string; title: string; seconds: number }[] {
+  const totals = new Map<string, { title: string; seconds: number }>();
   for (const en of entries) {
     const secs = days.reduce((sum, d) => sum + secondsOnDay(en.startedAt, en.endedAt, d, now), 0);
     if (secs <= 0) continue;
-    const prev = totals.get(en.taskId);
-    totals.set(en.taskId, { title: en.taskTitle, seconds: (prev?.seconds ?? 0) + secs });
+    // Task-linked entries collapse by task id; task-free entries collapse by description.
+    const key = en.taskId != null ? `t${en.taskId}` : `d${(en.description ?? "").toLowerCase()}`;
+    const prev = totals.get(key);
+    totals.set(key, { title: entryLabel(en), seconds: (prev?.seconds ?? 0) + secs });
   }
   return [...totals.entries()]
-    .map(([taskId, v]) => ({ taskId, title: v.title, seconds: v.seconds }))
+    .map(([key, v]) => ({ key, title: v.title, seconds: v.seconds }))
     .sort((a, b) => b.seconds - a.seconds);
+}
+
+// A grouped total for the client/project actuals breakdown (#86).
+export interface GroupTotal {
+  key: string;         // stable React key
+  label: string;       // "Client / Project", "Project", or "No project"
+  color: string | null;
+  seconds: number;
+}
+
+// Per-project totals across the given days, each labelled with its client (#86). Entries
+// with no project fall under "No project". `projects` supplies names/colors + the client,
+// which the entry itself doesn't carry (it only has projectId + clientName).
+export function perProjectTotals(
+  entries: TimeEntry[],
+  days: Date[],
+  now: Date,
+  projects: Project[],
+): GroupTotal[] {
+  const projectById = new Map(projects.map((p) => [p.id, p]));
+  const totals = new Map<string, GroupTotal>();
+  for (const en of entries) {
+    const secs = days.reduce((sum, d) => sum + secondsOnDay(en.startedAt, en.endedAt, d, now), 0);
+    if (secs <= 0) continue;
+    const key = en.projectId != null ? `p${en.projectId}` : "none";
+    const project = en.projectId != null ? projectById.get(en.projectId) : undefined;
+    const clientName = project?.client?.name ?? en.clientName ?? null;
+    const label = project
+      ? clientName ? `${clientName} / ${project.name}` : project.name
+      : "No project";
+    const color = project?.color ?? en.projectColor ?? null;
+    const prev = totals.get(key);
+    totals.set(key, { key, label, color, seconds: (prev?.seconds ?? 0) + secs });
+  }
+  return [...totals.values()].sort((a, b) => b.seconds - a.seconds);
 }
 
 // 12-hour clock label for a block, e.g. "4:40 AM".

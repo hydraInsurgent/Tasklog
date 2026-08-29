@@ -1,5 +1,5 @@
 import {
-  daySegment, secondsOnDay, dayTotalSeconds, perTaskTotals,
+  daySegment, secondsOnDay, dayTotalSeconds, perActivityTotals,
   mondayOf, dayColumns, PX_PER_MIN, MIN_BLOCK_PX,
 } from '@/lib/time'
 import { TimeEntry } from '@/lib/api'
@@ -10,7 +10,8 @@ const NOW = new Date(2026, 5, 8, 12, 0, 0) // 8 Jun 2026, 12:00 local
 
 function entry(over: Partial<TimeEntry> = {}): TimeEntry {
   return {
-    id: 1, taskId: 1, taskTitle: 'T', projectId: null, projectColor: null,
+    id: 1, taskId: 1, taskTitle: 'T', description: null, projectId: null, projectColor: null,
+    clientId: null, clientName: null, clientColor: null,
     startedAt: '2026-06-08T09:00:00', endedAt: '2026-06-08T10:30:00', durationSeconds: 5400,
     ...over,
   }
@@ -64,18 +65,27 @@ describe('secondsOnDay + dayTotalSeconds', () => {
   })
 })
 
-describe('perTaskTotals', () => {
+describe('perActivityTotals', () => {
   it('groups + sums by task, sorted descending', () => {
     const entries = [
       entry({ id: 1, taskId: 1, taskTitle: 'A', startedAt: '2026-06-08T09:00:00', endedAt: '2026-06-08T09:30:00' }), // 30m
       entry({ id: 2, taskId: 2, taskTitle: 'B', startedAt: '2026-06-08T10:00:00', endedAt: '2026-06-08T12:00:00' }), // 120m
       entry({ id: 3, taskId: 1, taskTitle: 'A', startedAt: '2026-06-08T13:00:00', endedAt: '2026-06-08T13:30:00' }), // 30m
     ]
-    const totals = perTaskTotals(entries, [day(2026, 6, 8)], NOW)
+    const totals = perActivityTotals(entries, [day(2026, 6, 8)], NOW)
     expect(totals).toEqual([
-      { taskId: 2, title: 'B', seconds: 7200 },
-      { taskId: 1, title: 'A', seconds: 3600 },
+      { key: 't2', title: 'B', seconds: 7200 },
+      { key: 't1', title: 'A', seconds: 3600 },
     ])
+  })
+
+  it('groups task-free entries by their description', () => {
+    const entries = [
+      entry({ id: 1, taskId: null, taskTitle: '', description: 'Sleep', startedAt: '2026-06-08T00:00:00', endedAt: '2026-06-08T06:00:00' }),
+      entry({ id: 2, taskId: null, taskTitle: '', description: 'Sleep', startedAt: '2026-06-08T13:00:00', endedAt: '2026-06-08T14:00:00' }),
+    ]
+    const totals = perActivityTotals(entries, [day(2026, 6, 8)], NOW)
+    expect(totals).toEqual([{ key: 'dsleep', title: 'Sleep', seconds: 7 * 3600 }])
   })
 })
 

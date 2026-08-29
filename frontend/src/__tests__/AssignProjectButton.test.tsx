@@ -16,8 +16,8 @@ const mockedAssign = assignTaskProject as jest.MockedFunction<typeof assignTaskP
 const mockedUseRouter = useRouter as jest.Mock
 
 const projects = [
-  { id: 1, name: 'Work', color: null, createdAt: '2024-01-01T00:00:00Z' },
-  { id: 2, name: 'Personal', color: null, createdAt: '2024-01-01T00:00:00Z' },
+  { id: 1, name: 'Work', color: null, clientId: null, client: null, position: 0, createdAt: '2024-01-01T00:00:00Z' },
+  { id: 2, name: 'Personal', color: null, clientId: null, client: null, position: 1, createdAt: '2024-01-01T00:00:00Z' },
 ]
 
 describe('AssignProjectButton', () => {
