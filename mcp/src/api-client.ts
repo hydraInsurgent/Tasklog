@@ -15,10 +15,23 @@ const API_BASE = process.env.TASKLOG_API_URL ?? 'http://localhost:5115';
 // Mirror the data model from docs/architecture.md. These types describe what
 // the .NET API returns, not what the MCP tools expose.
 
+// A client (#86): the grouping level above projects (a life area). Name + optional color.
+export interface Client {
+  id: number;
+  name: string;
+  color?: string | null;
+  createdAt: string;
+}
+
 export interface Project {
   id: number;
   name: string;
   color?: string | null;
+  // The client (grouping level) this project belongs to, or null = Ungrouped (#86).
+  clientId?: number | null;
+  client?: Client | null;
+  // Manual sidebar sort order (#86).
+  position?: number;
   createdAt: string;
 }
 
@@ -398,18 +411,42 @@ export const bulkTasks = (
     body: JSON.stringify({ operation, taskIds, data }),
   });
 
+// --- Clients (#86) ---
+
+export const listClients = (): Promise<Client[]> => request('/api/clients');
+
+export const createClient = (body: { name: string; color?: string }): Promise<Client> =>
+  request('/api/clients', { method: 'POST', body: JSON.stringify(body) });
+
+export const renameClient = (id: number, body: { name: string; color?: string | null }): Promise<Client> =>
+  request(`/api/clients/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+
+// Deletes a client and un-groups its projects (they survive as Ungrouped).
+export const deleteClient = (id: number): Promise<void> =>
+  request(`/api/clients/${id}`, { method: 'DELETE' });
+
 // --- Projects ---
 
 export const listProjects = (): Promise<Project[]> => request('/api/projects');
 
-export const createProject = (body: { name: string; color?: string }): Promise<Project> =>
+// clientId groups the project under a client (#86); omit for Ungrouped.
+export const createProject = (body: { name: string; color?: string; clientId?: number }): Promise<Project> =>
   request('/api/projects', { method: 'POST', body: JSON.stringify(body) });
 
-export const renameProject = (id: number, body: { name: string; color?: string | null }): Promise<Project> =>
+// Present-key update: omit a field to keep it; color/clientId null clears (recolor default /
+// Ungrouped).
+export const renameProject = (
+  id: number,
+  body: { name?: string; color?: string | null; clientId?: number | null },
+): Promise<Project> =>
   request(`/api/projects/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
 
 export const deleteProject = (id: number): Promise<void> =>
   request(`/api/projects/${id}`, { method: 'DELETE' });
+
+// Rewrite project sidebar order. orderedIds must be exactly the existing project ids.
+export const reorderProjects = (orderedIds: number[]): Promise<Project[]> =>
+  request('/api/projects/reorder', { method: 'POST', body: JSON.stringify({ orderedIds }) });
 
 // --- Labels ---
 
@@ -434,17 +471,35 @@ export const deleteLabel = (id: number): Promise<void> =>
 
 export interface TimeEntry {
   id: number;
-  taskId: number;
-  taskTitle: string;
+  // Null (#86) = a task-free entry (life-logging like "Sleep"); the label is `description`.
+  taskId: number | null;
+  taskTitle: string; // "" when task-free
+  // Free-text label (#86). Null for a task-linked entry that just uses the task title.
+  description: string | null;
+  // Effective project = the entry's own, else the linked task's (#86).
   projectId: number | null;
   projectColor: string | null;
+  // The project's client, denormalized for grouped summaries (#86).
+  clientId: number | null;
+  clientName: string | null;
+  clientColor: string | null;
   startedAt: string; // local ISO datetime
   endedAt: string | null; // null = currently running
   durationSeconds: number; // 0 while running
 }
 
-export const startTimer = (taskId: number): Promise<TimeEntry> =>
-  request('/api/time-entries/start', { method: 'POST', body: JSON.stringify({ taskId }) });
+// An autocomplete suggestion: a past description + the project it was last used with (#86).
+export interface EntrySuggestion {
+  description: string;
+  projectId: number | null;
+}
+
+// Start a timer (#86). Everything is optional: a task-free entry with just a description,
+// or a bare timer to categorize later. Project defaults from the task when started on one.
+export const startTimer = (
+  body: { taskId?: number; description?: string; projectId?: number } = {},
+): Promise<TimeEntry> =>
+  request('/api/time-entries/start', { method: 'POST', body: JSON.stringify(body) });
 
 export const stopTimer = (entryId: number): Promise<TimeEntry> =>
   request(`/api/time-entries/${entryId}/stop`, { method: 'POST' });
@@ -475,24 +530,32 @@ export async function getActiveTimeEntry(): Promise<TimeEntry | null> {
   return text ? (JSON.parse(text) as TimeEntry) : null;
 }
 
+// Manually log a closed interval (#86). task/description/project are optional; startedAt
+// and endedAt are required. Project defaults from the task when logged against one.
 export const addTimeEntry = (
-  taskId: number,
-  startedAt: string,
-  endedAt: string,
+  body: { startedAt: string; endedAt: string; taskId?: number; description?: string; projectId?: number },
 ): Promise<TimeEntry> =>
-  request('/api/time-entries', {
-    method: 'POST',
-    body: JSON.stringify({ taskId, startedAt, endedAt }),
-  });
+  request('/api/time-entries', { method: 'POST', body: JSON.stringify(body) });
 
 export const listTimeEntries = (from: string, to: string): Promise<TimeEntry[]> =>
   request(`/api/time-entries?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
 
+// Present-key edit (#86): omit to keep; description/projectId/taskId null clears/unlinks.
 export const updateTimeEntry = (
   id: number,
-  body: { startedAt?: string; endedAt?: string },
+  body: { startedAt?: string; endedAt?: string; description?: string | null; projectId?: number | null; taskId?: number | null },
 ): Promise<TimeEntry> =>
   request(`/api/time-entries/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
 
 export const deleteTimeEntry = (id: number): Promise<void> =>
   request(`/api/time-entries/${id}`, { method: 'DELETE' });
+
+// Autocomplete: distinct recent descriptions matching `text`, each with its most-recent
+// project (#86). A lookup over recent history - no managed "activity" entity.
+export const getEntrySuggestions = (text?: string, limit?: number): Promise<EntrySuggestion[]> => {
+  const params = new URLSearchParams();
+  if (text) params.set('text', text);
+  if (limit !== undefined) params.set('limit', String(limit));
+  const qs = params.toString();
+  return request(`/api/time-entries/suggestions${qs ? `?${qs}` : ''}`);
+};

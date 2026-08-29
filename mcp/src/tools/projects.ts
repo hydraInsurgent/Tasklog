@@ -14,8 +14,9 @@ export function registerProjectTools(server: McpServer): void {
     {
       title: 'List Projects',
       description:
-        'List all projects in Tasklog. Use to find project ids before ' +
-        'assigning tasks. Returns: array of projects, each with id, name, createdAt.',
+        'List all projects in Tasklog, in sidebar order. Use to find project ids before ' +
+        'assigning tasks. Returns: array of projects, each with id, name, color, clientId ' +
+        '(the client/life-area it is grouped under, or null = Ungrouped), position, createdAt.',
     },
     async () => runTool('list_projects', () => api.listProjects()),
   );
@@ -27,7 +28,8 @@ export function registerProjectTools(server: McpServer): void {
       description:
         'Create a new project. Projects group related tasks. Use when the ' +
         'user says "make a project for X" or "start a new project Y". ' +
-        'Returns: the created project { id, name, color, createdAt }.',
+        'Optionally group it under a client (life area) via clientId. ' +
+        'Returns: the created project { id, name, color, clientId, position, createdAt }.',
       inputSchema: {
         name: z
           .string()
@@ -38,10 +40,18 @@ export function registerProjectTools(server: McpServer): void {
           .regex(/^#[0-9a-fA-F]{6}$/)
           .optional()
           .describe('Optional hex color for the project, e.g. "#4f46e5". Omit for no color.'),
+        clientId: z
+          .number()
+          .int()
+          .positive()
+          .optional()
+          .describe('Optional client id to group this project under (see list_clients). Omit for Ungrouped.'),
       },
     },
-    async ({ name, color }) =>
-      runTool('create_project', () => api.createProject({ name, ...(color ? { color } : {}) })),
+    async ({ name, color, clientId }) =>
+      runTool('create_project', () =>
+        api.createProject({ name, ...(color ? { color } : {}), ...(clientId !== undefined ? { clientId } : {}) }),
+      ),
   );
 
   server.registerTool(
@@ -49,20 +59,34 @@ export function registerProjectTools(server: McpServer): void {
     {
       title: 'Rename Project',
       description:
-        'Change a project\'s name and/or color. Tasks within the project are not affected. ' +
-        'Returns: the updated project { id, name, color, createdAt }.',
+        "Change a project's name, color, and/or client grouping. Tasks within the project " +
+        'are not affected. Pass clientId to move it under a client, or clientId: null to ' +
+        'un-group it. Returns: the updated project { id, name, color, clientId, position, createdAt }.',
       inputSchema: {
         id: z.number().int().positive().describe('The project id to update.'),
-        name: z.string().min(1).describe('The new project name.'),
+        name: z.string().min(1).optional().describe('The new project name. Omit to keep it.'),
         color: z
           .string()
           .regex(/^#[0-9a-fA-F]{6}$/)
           .optional()
           .describe('Optional new hex color, e.g. "#4f46e5". Omit to keep the existing color.'),
+        clientId: z
+          .number()
+          .int()
+          .positive()
+          .nullable()
+          .optional()
+          .describe('Client id to group under; null to un-group (Ungrouped); omit to keep.'),
       },
     },
-    async ({ id, name, color }) =>
-      runTool('rename_project', () => api.renameProject(id, { name, ...(color !== undefined ? { color } : {}) })),
+    async ({ id, name, color, clientId }) =>
+      runTool('rename_project', () =>
+        api.renameProject(id, {
+          ...(name !== undefined ? { name } : {}),
+          ...(color !== undefined ? { color } : {}),
+          ...(clientId !== undefined ? { clientId } : {}),
+        }),
+      ),
   );
 
   server.registerTool(

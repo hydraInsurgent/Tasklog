@@ -34,20 +34,46 @@ function clockLabel(iso: string): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+// The human label for an entry (#86): a linked task's title, else its free-text description,
+// else a placeholder. Task-free entries carry only a description.
+function entryLabel(e: { taskTitle: string; description: string | null }): string {
+  return e.taskTitle || e.description || '(untitled)';
+}
+
 export function registerTimeTools(server: McpServer): void {
   server.tool(
     'start_timer',
-    'Start a timer for a task. Auto-stops any currently running timer first. ' +
-      'Returns the new time entry with the task name and start time.',
+    'Start a timer. Auto-stops any currently running timer first. Everything is optional: ' +
+      'track a task (taskId), or a task-free activity by passing just a description ' +
+      '(e.g. "Rise and Shine", "Sleep"). Optionally group it under a project. ' +
+      'Returns the new time entry.',
     {
-      taskId: z.number().int().positive().describe('ID of the task to start tracking.'),
+      taskId: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Optional task id to track. Omit for a task-free entry (use description).'),
+      description: z
+        .string()
+        .optional()
+        .describe('Free-text label for a task-free entry, e.g. "Rise and Shine".'),
+      projectId: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Optional project to group the entry under. Defaults from the task when tracking one.'),
     },
-    ({ taskId }) =>
-      runTool('start_timer', async () => {
-        const entry = await api.startTimer(taskId);
-        return entry;
-      }, (entry) =>
-        `Timer started: "${entry.taskTitle}" (task #${entry.taskId})\nStarted at: ${clockLabel(entry.startedAt)}`
+    ({ taskId, description, projectId }) =>
+      runTool('start_timer', () =>
+        api.startTimer({
+          ...(taskId !== undefined ? { taskId } : {}),
+          ...(description !== undefined ? { description } : {}),
+          ...(projectId !== undefined ? { projectId } : {}),
+        }),
+      (entry) =>
+        `Timer started: "${entryLabel(entry)}"${entry.taskId ? ` (task #${entry.taskId})` : ''}\nStarted at: ${clockLabel(entry.startedAt)}`
       ),
   );
 
@@ -70,7 +96,7 @@ export function registerTimeTools(server: McpServer): void {
       }, (entry) => {
         if (!entry) return 'No timer is currently running.';
         const duration = formatDuration(entry.durationSeconds);
-        return `Timer stopped: "${entry.taskTitle}"\nDuration: ${duration} (${clockLabel(entry.startedAt)} - ${clockLabel(entry.endedAt!)})`;
+        return `Timer stopped: "${entryLabel(entry)}"\nDuration: ${duration} (${clockLabel(entry.startedAt)} - ${clockLabel(entry.endedAt!)})`;
       }),
   );
 
@@ -83,36 +109,48 @@ export function registerTimeTools(server: McpServer): void {
       runTool('get_active_timer', async () => api.getActiveTimeEntry(), (entry) => {
         if (!entry) return 'No timer is currently running.';
         const elapsed = Math.max(0, Math.floor((Date.now() - new Date(entry.startedAt).getTime()) / 1000));
-        return `Tracking: "${entry.taskTitle}" (task #${entry.taskId})\nStarted: ${clockLabel(entry.startedAt)} (${formatDuration(elapsed)} ago)`;
+        return `Tracking: "${entryLabel(entry)}"${entry.taskId ? ` (task #${entry.taskId})` : ''}\nStarted: ${clockLabel(entry.startedAt)} (${formatDuration(elapsed)} ago)`;
       }),
   );
 
   server.tool(
     'log_time',
-    'Manually log a completed time entry on a task. Both start and end are required. ' +
+    'Manually log a completed time entry. Start and end are required; task/description/project ' +
+      'are optional (log a task-free activity by passing just a description). ' +
       'Pass local ISO datetimes (e.g. "2026-06-11T14:00:00", no timezone offset). ' +
       'End must be after start and not in the future.',
     {
-      taskId: z.number().int().positive().describe('ID of the task to log time on.'),
       startedAt: z
         .string()
         .describe('Start time as a local ISO datetime, e.g. "2026-06-11T14:00:00".'),
       endedAt: z
         .string()
         .describe('End time as a local ISO datetime, e.g. "2026-06-11T16:30:00". Must be after startedAt.'),
+      taskId: z.number().int().positive().optional().describe('Optional task id to log time on.'),
+      description: z.string().optional().describe('Free-text label for a task-free entry, e.g. "Sleep".'),
+      projectId: z.number().int().positive().optional().describe('Optional project to group the entry under.'),
     },
-    ({ taskId, startedAt, endedAt }) =>
-      runTool('log_time', () => api.addTimeEntry(taskId, startedAt, endedAt), (entry) => {
+    ({ startedAt, endedAt, taskId, description, projectId }) =>
+      runTool('log_time', () =>
+        api.addTimeEntry({
+          startedAt,
+          endedAt,
+          ...(taskId !== undefined ? { taskId } : {}),
+          ...(description !== undefined ? { description } : {}),
+          ...(projectId !== undefined ? { projectId } : {}),
+        }),
+      (entry) => {
         const duration = formatDuration(entry.durationSeconds);
-        return `Logged: ${duration} on "${entry.taskTitle}"\n${clockLabel(entry.startedAt)} - ${clockLabel(entry.endedAt!)}`;
+        return `Logged: ${duration} on "${entryLabel(entry)}"\n${clockLabel(entry.startedAt)} - ${clockLabel(entry.endedAt!)}`;
       }),
   );
 
   server.tool(
     'edit_time_entry',
-    'Correct the start or end time of a logged (closed) time entry. ' +
-      'Pass only the fields you want to change; omit the rest to keep them. ' +
-      'End must remain after start. Pass local ISO datetimes (e.g. "2026-06-11T14:00:00", no timezone offset).',
+    'Edit a logged (closed) time entry: its start/end time, description, project, or the ' +
+      'linked task. Pass only the fields you want to change; omit the rest to keep them. ' +
+      'Pass null for description/projectId/taskId to clear/unlink. End must remain after ' +
+      'start. Pass local ISO datetimes (e.g. "2026-06-11T14:00:00", no timezone offset).',
     {
       id: z.number().int().positive().describe('ID of the time entry to edit.'),
       startedAt: z
@@ -123,16 +161,38 @@ export function registerTimeTools(server: McpServer): void {
         .string()
         .optional()
         .describe('New end time as a local ISO datetime, e.g. "2026-06-11T16:30:00". Must be after startedAt.'),
+      description: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('New free-text label; null clears it.'),
+      projectId: z
+        .number()
+        .int()
+        .positive()
+        .nullable()
+        .optional()
+        .describe('New project id; null un-groups (Inbox).'),
+      taskId: z
+        .number()
+        .int()
+        .positive()
+        .nullable()
+        .optional()
+        .describe('Link to a task id; null unlinks (makes it task-free).'),
     },
-    ({ id, startedAt, endedAt }) =>
+    ({ id, startedAt, endedAt, description, projectId, taskId }) =>
       runTool('edit_time_entry', async () => {
-        const body: { startedAt?: string; endedAt?: string } = {};
+        const body: { startedAt?: string; endedAt?: string; description?: string | null; projectId?: number | null; taskId?: number | null } = {};
         if (startedAt !== undefined) body.startedAt = startedAt;
         if (endedAt !== undefined) body.endedAt = endedAt;
+        if (description !== undefined) body.description = description;
+        if (projectId !== undefined) body.projectId = projectId;
+        if (taskId !== undefined) body.taskId = taskId;
         return api.updateTimeEntry(id, body);
       }, (entry) => {
         const duration = entry.endedAt ? formatDuration(Math.max(0, Math.round((new Date(entry.endedAt).getTime() - new Date(entry.startedAt).getTime()) / 1000))) : 'running';
-        return `Updated entry #${entry.id} on "${entry.taskTitle}"\n${clockLabel(entry.startedAt)}${entry.endedAt ? ` - ${clockLabel(entry.endedAt)} (${duration})` : ' (running)'}`;
+        return `Updated entry #${entry.id}: "${entryLabel(entry)}"\n${clockLabel(entry.startedAt)}${entry.endedAt ? ` - ${clockLabel(entry.endedAt)} (${duration})` : ' (running)'}`;
       }),
   );
 
@@ -152,8 +212,10 @@ export function registerTimeTools(server: McpServer): void {
 
   server.tool(
     'get_time_summary',
-    'Get time tracked for a date range, grouped by task with totals. ' +
-      'Use from === to for a single day. Returns per-task totals sorted by most time first, plus a grand total.',
+    'Get time tracked for a date range, grouped by client/project with totals (#86). ' +
+      'Use from === to for a single day. Returns per-project totals (prefixed with their ' +
+      'client / life area) sorted by most time first, plus a grand total. Task-free entries ' +
+      'with no project fall under "(no project)".',
     {
       from: z.string().describe('Start date in YYYY-MM-DD format (inclusive).'),
       to: z.string().describe('End date in YYYY-MM-DD format (inclusive).'),
@@ -165,36 +227,53 @@ export function registerTimeTools(server: McpServer): void {
         const toDate = new Date(to);
         toDate.setDate(toDate.getDate() + 1);
         const toExclusive = `${toDate.toISOString().slice(0, 10)}T00:00:00`;
-        const entries = await api.listTimeEntries(`${from}T00:00:00`, toExclusive);
-        return { from, to, toExclusive, entries };
-      }, ({ from, to, toExclusive, entries }) => {
+        // Fetch entries + projects together so we can label each group by project name
+        // (the entry only carries projectId + the client name, not the project name).
+        const [entries, projects] = await Promise.all([
+          api.listTimeEntries(`${from}T00:00:00`, toExclusive),
+          api.listProjects(),
+        ]);
+        return { from, to, toExclusive, entries, projects };
+      }, ({ from, to, toExclusive, entries, projects }) => {
         const closed = entries.filter((e) => e.endedAt !== null);
         if (closed.length === 0) {
           return `No completed time entries from ${from} to ${to}.`;
         }
+
+        const projectById = new Map(projects.map((p) => [p.id, p]));
 
         // Clamp each entry to the query window before summing so entries that straddle
         // the boundary don't inflate the total. windowStart/End are epoch ms.
         const windowStart = new Date(`${from}T00:00:00`).getTime();
         const windowEnd = new Date(toExclusive).getTime();
 
-        const byTask = new Map<number, { title: string; seconds: number }>();
+        // Group by project (id), labelled "Client / Project"; ungrouped entries share "(no project)".
+        const byGroup = new Map<string, { label: string; seconds: number }>();
         let totalSeconds = 0;
         for (const e of closed) {
           const entryStart = Math.max(new Date(e.startedAt).getTime(), windowStart);
           const entryEnd = Math.min(new Date(e.endedAt!).getTime(), windowEnd);
           const secs = Math.max(0, Math.round((entryEnd - entryStart) / 1000));
-          const prev = byTask.get(e.taskId);
+
+          const key = e.projectId != null ? `p${e.projectId}` : 'none';
+          const project = e.projectId != null ? projectById.get(e.projectId) : undefined;
+          const clientName = e.clientName ?? project?.client?.name ?? null;
+          const projectName = project?.name ?? null;
+          const label = projectName
+            ? clientName ? `${clientName} / ${projectName}` : projectName
+            : '(no project)';
+
+          const prev = byGroup.get(key);
           if (prev) prev.seconds += secs;
-          else byTask.set(e.taskId, { title: e.taskTitle, seconds: secs });
+          else byGroup.set(key, { label, seconds: secs });
           totalSeconds += secs;
         }
 
         const label = from === to ? from : `${from} to ${to}`;
         const lines = [`Time tracked ${label}:`];
-        const sorted = [...byTask.values()].sort((a, b) => b.seconds - a.seconds);
-        for (const { title, seconds } of sorted) {
-          lines.push(`  ${title}: ${formatDuration(seconds)}`);
+        const sorted = [...byGroup.values()].sort((a, b) => b.seconds - a.seconds);
+        for (const g of sorted) {
+          lines.push(`  ${g.label}: ${formatDuration(g.seconds)}`);
         }
         lines.push(`Total: ${formatDuration(totalSeconds)}`);
         return lines.join('\n');
