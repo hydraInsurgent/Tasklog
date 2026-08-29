@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| - | - | - | - |
+| P86-time-tracking.md | #86 | feature/routines-#86 | In Progress |
 
 ---
 
@@ -111,3 +111,14 @@ Untracked ideas - not estimated, not prioritized, not committed to. Just things 
 - Watch list / content tracker - a standing list of shows, movies, and other content to watch, doubling as a tracker of what has been watched (status per item). Same standing-list family as the dream journal / wishlist; post-#79.
 - Recurring task progress log (auto-comments) - when a recurring occurrence is completed, automatically write a log entry capturing the outcome (e.g. "Completed 4/5 subtasks", completion date) so each series builds its own history/streak record without manual notes. Depends on subtasks (#78) for the progress count. Open design question: log onto the series (SeriesId) vs the individual occurrence.
 - Domain event log + notification foundation - persist system events (deadline crossed / task went overdue, task completed, recurring occurrence spawned or completed, subtask went overdue) as structured, durable log entries. Purpose: give a future notification service a reliable event stream to consume so reminders/notifications can be built on top and keep working. Key design decision to resolve first: reuse the TaskComment table (simple, but mixes system events into the user's comment stream) vs a dedicated Activity/Event table (cleaner separation, own schema). Leaning toward a dedicated table so user comments stay human-authored. This is the substrate a notification service would poll or subscribe to.
+
+### Time-tracking + "record of life" cluster (from #86 exploration, 2026-08-29)
+
+These emerged while exploring #86 (Toggl-style time tracking). #86 v1 deliberately builds only the actuals/tracking half plus the shared Area -> Project spine; the items below are the follow-on features that stand on that foundation. Rough dumps, need refining before any become an issue.
+
+- Day-planning calendar (plan vs actual overlay) - the Toggl-mobile-style 24h day view with the planned side (internal calendar blocks; optional Google Calendar sync later) shown against tracked actuals, overlaid so you see planned-vs-executed per block. The "planning half" that pairs with #86's actuals half. Plan holds tasks AND intentional activities (walk, exercise, morning routine, modeled as habits/recurring tasks). This is the immediate intended follow-up to #86.
+- Life-graph / referable entities (people, movies, media) - make `@person`, `@movie`, etc. first-class things you can reference from journal entries, tasks, and time entries, then query by entity ("what memories/entries mention this person", "all time around X"). Extends the journal into a "record of life around you", not just daily entries. Hangs off the Area/Project/entry structure #86 establishes.
+- Goals feature - Toggl recently added goals; likely lives in/near the Journal. Tie tracked time and habit streaks to explicit goals. Part of the same journal-expansion family (people / goals / interests / hobbies sections).
+- Desktop/PC auto-trackers - a background script on the PC that logs the active app/window into time entries automatically, to cut manual tracking friction and recover the data lost on low-motivation days (the "22h tracked then life happened and I forgot" problem).
+- Unified add-or-track composer - one minimal input that can either create a task (plan) or start a timer (track), expanding for more detail on demand. The "same slider, add-or-start-working" idea. A UI unification over the (deliberately distinct) Task and TimeEntry entities.
+- Routine-runner reconsidered (original #96 Routinery idea) - a routine is an ordered set of steps you "run", producing a chain of time entries (one per step) on the decoupled-entry engine built in #86 (start auto-stops the previous = the step hand-off, no rework). Definition layer rides on tasks-with-subtasks (routine = task, steps = subtasks); the one new field is a per-step **estimate** - soft, NOT an enforced countdown. While running, an **overrun reminder/notification** nudges you ("30 min on this step") and you **manually** switch to the next step - a reminder, not auto-advance. Planned-vs-actual falls out for free (estimate vs the entry the step produced). DEPENDS ON a notification capability the app does not have yet (product-design: "No notifications, deadlines are informational") - would ride on the "Domain event log + notification foundation" item above. Cut from #86 v1 because real historical usage was free-form entries, not step-runners; revisit once notifications exist and/or free-text tracking proves insufficient.
