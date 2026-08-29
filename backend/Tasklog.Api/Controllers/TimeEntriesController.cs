@@ -6,15 +6,19 @@ using Tasklog.Api.Models;
 
 namespace Tasklog.Api.Controllers
 {
-    // Time tracking (#77). A TimeEntry is one start->stop interval on a task; EndedAt null =
-    // running. At most one entry is running app-wide (single timer) - starting a new one
-    // auto-stops the current. Responses are projected to include the task title + project
-    // color so the timeline is self-contained. Per-day totals / block geometry are computed
+    // Time tracking (#77; decoupled from tasks in #86). A TimeEntry is one start->stop
+    // interval; EndedAt null = running. At most one entry is running app-wide (single timer) -
+    // starting a new one auto-stops the current. As of #86 an entry is a first-class actual:
+    // it may be task-free, carries its own free-text description, and its own project (Client
+    // via the project). Responses are projected to include the effective project color +
+    // client so the timeline is self-contained. Per-day totals / block geometry are computed
     // client-side (the timeline is the only consumer), so there is no aggregation here.
     [ApiController]
     [Route("api/time-entries")]
     public class TimeEntriesController : ControllerBase
     {
+        private const int MaxDescriptionLength = 500;
+
         private readonly TasklogDbContext _context;
 
         public TimeEntriesController(TasklogDbContext context)
@@ -35,8 +39,7 @@ namespace Tasklog.Api.Controllers
         {
             if (taskId.HasValue)
             {
-                var taskEntries = await _context.TimeEntries
-                    .Include(e => e.Task!).ThenInclude(t => t.Project)
+                var taskEntries = await WithGrouping(_context.TimeEntries)
                     .Where(e => e.TaskId == taskId.Value)
                     .OrderByDescending(e => e.StartedAt)
                     .ToListAsync();
@@ -49,8 +52,7 @@ namespace Tasklog.Api.Controllers
                 return BadRequest(new { message = "Date range must not exceed 366 days." });
             var now = DateTime.Now;
 
-            var entries = await _context.TimeEntries
-                .Include(e => e.Task!).ThenInclude(t => t.Project)
+            var entries = await WithGrouping(_context.TimeEntries)
                 .Where(e => e.StartedAt < end && (e.EndedAt ?? now) >= start)
                 .OrderBy(e => e.StartedAt)
                 .ToListAsync();
@@ -62,32 +64,81 @@ namespace Tasklog.Api.Controllers
         [HttpGet("active")]
         public async Task<IActionResult> Active()
         {
-            var running = await _context.TimeEntries
-                .Include(e => e.Task!).ThenInclude(t => t.Project)
+            var running = await WithGrouping(_context.TimeEntries)
                 .FirstOrDefaultAsync(e => e.EndedAt == null);
             return Ok(running is null ? null : Project(running));
         }
 
-        // POST /api/time-entries/start  { taskId }
-        // Auto-stops any running entry, then opens a new one on the task. 404 if task missing.
+        // GET /api/time-entries/suggestions?text=&limit=
+        // Autocomplete backing (#86): distinct recent entry descriptions matching `text`,
+        // each carrying the project it was most recently used with (so the composer can
+        // pre-fill project/client). A lookup over recent history - no managed "activity"
+        // entity. Bounded to the last 500 entries before grouping.
+        [HttpGet("suggestions")]
+        public async Task<IActionResult> Suggestions([FromQuery] string? text, [FromQuery] int? limit)
+        {
+            var query = _context.TimeEntries.Where(e => e.Description != null && e.Description != "");
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                // Case-insensitive substring match. ToLower().Contains translates to SQLite
+                // (case-insensitive instr) and also evaluates on the in-memory test provider,
+                // unlike EF.Functions.Like which is relational-only.
+                var t = text.Trim().ToLower();
+                query = query.Where(e => e.Description!.ToLower().Contains(t));
+            }
+
+            var recent = await query
+                .OrderByDescending(e => e.StartedAt)
+                .Select(e => new { e.Description, e.ProjectId, e.StartedAt })
+                .Take(500)
+                .ToListAsync();
+
+            var suggestions = recent
+                .GroupBy(r => r.Description!, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.OrderByDescending(r => r.StartedAt).First())
+                .OrderByDescending(r => r.StartedAt)
+                .Take(limit is > 0 ? limit.Value : 8)
+                .Select(r => new EntrySuggestion(r.Description!, r.ProjectId))
+                .ToList();
+
+            return Ok(suggestions);
+        }
+
+        // POST /api/time-entries/start  { taskId?, description?, projectId? }
+        // Auto-stops any running entry, then opens a new one. Everything is optional (#86):
+        // a task-free entry with just a description, or a bare timer to categorize later.
+        // When started on a task with no explicit project, the entry's project defaults from
+        // the task's project. 404 if a supplied task/project id does not exist.
         [HttpPost("start")]
         public async Task<IActionResult> Start([FromBody] StartRequest request)
         {
-            var task = await _context.Tasks.FindAsync(request.TaskId);
-            if (task is null)
+            var task = await ResolveTaskAsync(request.TaskId);
+            if (request.TaskId.HasValue && task is null)
                 return NotFound(new { message = $"Task {request.TaskId} not found." });
+            if (request.ProjectId is int pid && !await _context.Projects.AnyAsync(p => p.Id == pid))
+                return NotFound(new { message = $"Project {pid} not found." });
+
+            if (!TryNormalizeDescription(request.Description, out var description))
+                return BadRequest(new { message = $"Description must be {MaxDescriptionLength} characters or fewer." });
 
             var now = DateTime.Now;
             await StopAllRunning(now);
 
-            var entry = new TimeEntry { TaskId = task.Id, StartedAt = now, CreatedAt = now };
+            var entry = new TimeEntry
+            {
+                TaskId = task?.Id,
+                Description = description,
+                ProjectId = request.ProjectId ?? task?.ProjectId,
+                StartedAt = now,
+                CreatedAt = now,
+            };
             _context.TimeEntries.Add(entry);
             await _context.SaveChangesAsync();
 
             return CreatedAtAction(nameof(Active), await ProjectByIdAsync(entry.Id));
         }
 
-        // POST /api/time-entries/{id}/stop - close a running entry (idempotent: a
+        // POST /api/time-entries/{id}/stop - close a running entry (idempotent: an
         // already-stopped entry is returned unchanged).
         [HttpPost("{id:int}/stop")]
         public async Task<IActionResult> Stop(int id)
@@ -104,14 +155,20 @@ namespace Tasklog.Api.Controllers
             return Ok(await ProjectByIdAsync(id));
         }
 
-        // POST /api/time-entries  { taskId, startedAt, endedAt }
-        // Manual (retroactive) entry - a closed interval logged without the timer.
+        // POST /api/time-entries  { taskId?, description?, projectId?, startedAt, endedAt }
+        // Manual (retroactive) entry - a closed interval logged without the timer. Task and
+        // project are optional (#86), same defaulting as Start.
         [HttpPost]
         public async Task<IActionResult> AddManual([FromBody] ManualRequest request)
         {
-            var task = await _context.Tasks.FindAsync(request.TaskId);
-            if (task is null)
+            var task = await ResolveTaskAsync(request.TaskId);
+            if (request.TaskId.HasValue && task is null)
                 return NotFound(new { message = $"Task {request.TaskId} not found." });
+            if (request.ProjectId is int pid && !await _context.Projects.AnyAsync(p => p.Id == pid))
+                return NotFound(new { message = $"Project {pid} not found." });
+
+            if (!TryNormalizeDescription(request.Description, out var description))
+                return BadRequest(new { message = $"Description must be {MaxDescriptionLength} characters or fewer." });
             if (request.EndedAt <= request.StartedAt)
                 return BadRequest(new { message = "End time must be after the start time." });
             if (request.EndedAt > DateTime.Now.AddMinutes(5))
@@ -119,7 +176,9 @@ namespace Tasklog.Api.Controllers
 
             var entry = new TimeEntry
             {
-                TaskId = task.Id,
+                TaskId = task?.Id,
+                Description = description,
+                ProjectId = request.ProjectId ?? task?.ProjectId,
                 StartedAt = request.StartedAt,
                 EndedAt = request.EndedAt,
                 CreatedAt = DateTime.Now,
@@ -130,10 +189,10 @@ namespace Tasklog.Api.Controllers
             return CreatedAtAction(nameof(Active), await ProjectByIdAsync(entry.Id));
         }
 
-        // PATCH /api/time-entries/{id}  { startedAt?, endedAt? }
-        // Edit an entry's bounds. Present-key: omit = keep. Both timestamps must stay ordered
-        // (end > start) when the entry is closed. We don't reopen a closed entry here (use the
-        // timer for live tracking), so endedAt must be a datetime, not null.
+        // PATCH /api/time-entries/{id}  { startedAt?, endedAt?, description?, projectId?, taskId? }
+        // Edit an entry. Present-key (omit = keep): timestamps stay ordered when closed;
+        // description/projectId/taskId accept null to clear/unlink (#86). We don't reopen a
+        // closed entry here (use the timer for live tracking), so endedAt must be a datetime.
         [HttpPatch("{id:int}")]
         public async Task<IActionResult> Update(int id, [FromBody] JsonElement body)
         {
@@ -157,6 +216,48 @@ namespace Tasklog.Api.Controllers
             }
             if (entry.EndedAt is DateTime ended && ended <= entry.StartedAt)
                 return BadRequest(new { message = "End time must be after the start time." });
+
+            if (body.TryGetProperty("description", out var descEl))
+            {
+                if (descEl.ValueKind == JsonValueKind.Null)
+                    entry.Description = null;
+                else if (descEl.ValueKind == JsonValueKind.String)
+                {
+                    if (!TryNormalizeDescription(descEl.GetString(), out var d))
+                        return BadRequest(new { message = $"Description must be {MaxDescriptionLength} characters or fewer." });
+                    entry.Description = d;
+                }
+                else
+                    return BadRequest(new { message = "description must be a string or null." });
+            }
+
+            if (body.TryGetProperty("projectId", out var projEl))
+            {
+                if (projEl.ValueKind == JsonValueKind.Null)
+                    entry.ProjectId = null;
+                else if (projEl.ValueKind == JsonValueKind.Number && projEl.TryGetInt32(out var pid))
+                {
+                    if (!await _context.Projects.AnyAsync(p => p.Id == pid))
+                        return NotFound(new { message = $"Project {pid} not found." });
+                    entry.ProjectId = pid;
+                }
+                else
+                    return BadRequest(new { message = "projectId must be an integer or null." });
+            }
+
+            if (body.TryGetProperty("taskId", out var taskEl))
+            {
+                if (taskEl.ValueKind == JsonValueKind.Null)
+                    entry.TaskId = null;
+                else if (taskEl.ValueKind == JsonValueKind.Number && taskEl.TryGetInt32(out var tid))
+                {
+                    if (!await _context.Tasks.AnyAsync(t => t.Id == tid))
+                        return NotFound(new { message = $"Task {tid} not found." });
+                    entry.TaskId = tid;
+                }
+                else
+                    return BadRequest(new { message = "taskId must be an integer or null." });
+            }
 
             await _context.SaveChangesAsync();
             return Ok(await ProjectByIdAsync(id));
@@ -182,36 +283,76 @@ namespace Tasklog.Api.Controllers
             foreach (var r in running) r.EndedAt = now;
         }
 
+        private async Task<TaskModel?> ResolveTaskAsync(int? taskId) =>
+            taskId.HasValue ? await _context.Tasks.FindAsync(taskId.Value) : null;
+
+        // Eager-load both the linked task's project and the entry's own project, each with
+        // its client, so Project(...) can resolve the effective grouping without extra queries.
+        private static IQueryable<TimeEntry> WithGrouping(IQueryable<TimeEntry> query) =>
+            query
+                .Include(e => e.Task!).ThenInclude(t => t.Project!).ThenInclude(p => p.Client)
+                .Include(e => e.Project!).ThenInclude(p => p.Client);
+
         private async Task<TimeEntryResponse> ProjectByIdAsync(int id)
         {
-            var entry = await _context.TimeEntries
-                .Include(e => e.Task!).ThenInclude(t => t.Project)
-                .FirstAsync(e => e.Id == id);
+            var entry = await WithGrouping(_context.TimeEntries).FirstAsync(e => e.Id == id);
             return Project(entry);
         }
 
-        private static TimeEntryResponse Project(TimeEntry e) => new(
-            e.Id,
-            e.TaskId,
-            e.Task?.Title ?? "",
-            e.Task?.ProjectId,
-            e.Task?.Project?.Color,
-            e.StartedAt,
-            e.EndedAt,
-            e.DurationSeconds);
+        private static TimeEntryResponse Project(TimeEntry e)
+        {
+            // Effective project: the entry's own (#86) if set, else the linked task's project.
+            // The fallback keeps legacy (pre-#86) entries and task-defaulted display working.
+            var proj = e.Project ?? e.Task?.Project;
+            return new(
+                e.Id,
+                e.TaskId,
+                e.Task?.Title ?? "",
+                e.Description,
+                proj?.Id,
+                proj?.Color,
+                proj?.ClientId,
+                proj?.Client?.Name,
+                proj?.Client?.Color,
+                e.StartedAt,
+                e.EndedAt,
+                e.DurationSeconds);
+        }
+
+        // Trim + cap a description. Returns false if over the limit. Blank -> null.
+        private static bool TryNormalizeDescription(string? raw, out string? normalized)
+        {
+            var trimmed = raw?.Trim();
+            if (string.IsNullOrEmpty(trimmed)) { normalized = null; return true; }
+            if (trimmed.Length > MaxDescriptionLength) { normalized = null; return false; }
+            normalized = trimmed;
+            return true;
+        }
     }
 
-    public record StartRequest(int TaskId);
-    public record ManualRequest(int TaskId, DateTime StartedAt, DateTime EndedAt);
+    // All fields optional (#86): a task-free bare timer is valid. JSON binds by name, so the
+    // positional order here is only for C# call sites.
+    public record StartRequest(int? TaskId = null, string? Description = null, int? ProjectId = null);
 
-    // The timeline-facing shape: the interval plus the denormalized task title + project
-    // color it needs to render a block without a second lookup.
+    // StartedAt/EndedAt are required; task/description/project are optional. Required params
+    // lead so the optionals can default. JSON binds by name regardless of this order.
+    public record ManualRequest(DateTime StartedAt, DateTime EndedAt, int? TaskId = null, string? Description = null, int? ProjectId = null);
+
+    // Autocomplete row: a past description + the project it was most recently used with.
+    public record EntrySuggestion(string Description, int? ProjectId);
+
+    // The timeline-facing shape: the interval plus the denormalized task title, description,
+    // and the effective project color + client it needs to render a block without a second lookup.
     public record TimeEntryResponse(
         int Id,
-        int TaskId,
+        int? TaskId,
         string TaskTitle,
+        string? Description,
         int? ProjectId,
         string? ProjectColor,
+        int? ClientId,
+        string? ClientName,
+        string? ClientColor,
         DateTime StartedAt,
         DateTime? EndedAt,
         int DurationSeconds);
