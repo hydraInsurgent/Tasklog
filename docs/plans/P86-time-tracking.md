@@ -1,6 +1,6 @@
 # Flexible Time Tracking - Implementation Plan (#86)
 
-**Overall Progress:** `55%`
+**Overall Progress:** `67%`
 
 ## TLDR
 Make time tracking Toggl-grade flexible so Tasklog becomes a daily-use tool. Two structural changes: (1) add a **Client** grouping level above Project (`Client -> Project`), app-wide; (2) **decouple time entries from tasks** - `TimeEntry.TaskId` becomes optional and each entry carries its own free-text description and its own project. Plus composer autocomplete (from past entries + open tasks), a journal/actuals breakdown by Client/Project, and a mobile-first redesign of the tracking surface. This is the *actuals* half of the Toggl model; the plan-vs-actual calendar is the deliberate next build.
@@ -99,11 +99,11 @@ Make time tracking Toggl-grade flexible so Tasklog becomes a daily-use tool. Two
   - [x] 🟩 `time.ts`: `start_timer`/`log_time` take optional `taskId` + `description` + `projectId` (task-free entries); `edit_time_entry` edits description/project/task (null clears); summaries use an `entryLabel` helper; `get_time_summary` groups by client/project (fetches project names); added `getEntrySuggestions` to api-client.
   - [x] 🟩 Tool descriptions updated so the LLM knows a timer no longer requires a task. MCP `tsc` clean, **106 tests pass** (after a local `better-sqlite3` native rebuild - env only, unrelated to code).
 
-- [ ] 🟨 **Step 4: Frontend data layer + Client CRUD + sidebar grouping** `[UI]` `[parallel]` -> delivers: shared client state + grouped nav; depends on: Step 2 contract
+- [x] 🟩 **Step 4: Frontend data layer + Client CRUD + sidebar grouping** `[UI]` `[parallel]` -> delivers: shared client state + grouped nav; depends on: Step 2 contract
   - [x] 🟩 `lib/api.ts`: `Client` type + `Project.clientId/client/position`; decoupled `TimeEntry` (nullable `taskId`, `description`, `clientId/clientName/clientColor`) + `EntrySuggestion`; client CRUD (`getClients`/`createClient`/`renameClient`/`deleteClient`); `updateProject` (present-key) + `reorderProjects`; `startTimer` (union: id or body), `addTimeEntry`(body), `updateTimeEntry` (+description/project/task), `getEntrySuggestions`. (`renameProject` kept as a wrapper so existing callers compile.)
-  - [ ] 🟥 Client CRUD UI (mirror the project management pattern): create/rename/recolor via `ColorPickerButton`/delete (delete warns projects become Ungrouped, not deleted).
-  - [ ] 🟥 `ProjectSidebar` / `ProjectLayout`: flat project list **clustered by client** (light client label/divider + swatch), client-less under "Ungrouped"; "All Tasks"/"Inbox" pinned on top.
-  - [ ] 🟥 Drag-reorder projects (persist via `reorderProjects`), reusing the `@dnd-kit` pattern from `SubtaskSection`; Inbox + All Tasks are not draggable. Optimistic with revert-on-failure.
+  - [x] 🟩 Client CRUD UI: collapsible "Clients" manager in the sidebar (create/rename/recolor via `ColorPickerButton`/delete); delete dialog states projects become Ungrouped, not deleted.
+  - [x] 🟩 `ProjectSidebar` / `ProjectLayout`: per the user's answer, a **flat** project list (Position order) with a **per-row client chip** (name + swatch) rather than nested groups; "All Tasks"/"Inbox" pinned on top; project edit modal gains a Client dropdown (assign / Ungrouped). `ProjectLayout` loads + polls clients, holds client CRUD + reorder handlers.
+  - [x] 🟩 Drag-reorder projects via `@dnd-kit` (drag handle so a tap still selects); Inbox/All Tasks not draggable; optimistic with revert-on-failure. Sidebar files typecheck clean.
 
 - [ ] 🟥 **Step 5: Tracking surface redesign (mobile-first)** `[UI]` `[sequential]` -> depends on: Step 4
   - [ ] 🟥 `TimeTrackingContext`: `quickStart(description)` starts a **task-free** entry (no phantom task); add project assignment; keep `startForTask` (defaults project from task).
