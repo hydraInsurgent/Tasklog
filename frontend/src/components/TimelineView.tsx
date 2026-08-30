@@ -50,7 +50,7 @@ interface PopoverState {
 
 export default function TimelineView() {
   const { active } = useTimeTracking(); // subscribing makes the view re-render on the 1s tick
-  const [mode, setMode] = useState<"day" | "week">("week");
+  const [mode, setMode] = useState<"day" | "week">("day");
   const [isDesktop, setIsDesktop] = useState(true);
   const [anchor, setAnchor] = useState<Date>(() => startOfDay(new Date()));
   const [entries, setEntries] = useState<TimeEntry[]>([]);
