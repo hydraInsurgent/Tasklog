@@ -155,6 +155,15 @@ export default function ProjectLayout() {
     pendingCheckIns.size === 0,
   );
 
+  // Lock background scroll while the mobile nav drawer is open, so touch-scrolling the drawer
+  // scrolls the drawer (not the task list behind it). Paired with overscroll-contain below.
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [drawerOpen]);
+
   // Persist filter state to sessionStorage so it survives navigation.
   useEffect(() => {
     try {
@@ -403,7 +412,7 @@ export default function ProjectLayout() {
           drawerOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex items-center justify-end px-3 py-3 border-b border-border">
+        <div className="flex items-center justify-end px-3 py-3 border-b border-border shrink-0">
           <button
             onClick={() => setDrawerOpen(false)}
             aria-label="Close navigation"
@@ -413,11 +422,15 @@ export default function ProjectLayout() {
           </button>
         </div>
 
-        {loadingProjects ? (
-          <div className="px-4 py-6 text-sm text-text-muted">Loading...</div>
-        ) : (
-          <ProjectSidebar {...sidebarProps} />
-        )}
+        {/* Scrollable region: the nav can be tall (projects + clients + habits); it scrolls
+            within the drawer, and overscroll-contain stops the scroll chaining to the body. */}
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+          {loadingProjects ? (
+            <div className="px-4 py-6 text-sm text-text-muted">Loading...</div>
+          ) : (
+            <ProjectSidebar {...sidebarProps} />
+          )}
+        </div>
       </div>
     </div>
   );

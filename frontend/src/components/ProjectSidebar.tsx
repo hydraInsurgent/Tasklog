@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -42,6 +43,16 @@ interface Props {
 // Pill-style nav item classes.
 const activeNavClass = "bg-accent/10 text-accent font-semibold";
 const inactiveNavClass = "text-text-muted hover:text-text-primary hover:bg-surface-raised";
+
+// Renders children into <body>. Modals/dialogs live inside the mobile nav drawer, which uses
+// a CSS transform to slide in - and a transformed ancestor makes position:fixed relative to
+// IT, not the viewport, which would cram a "centered" modal into the 224px drawer. Portaling
+// to body escapes the transform so overlays center on the real screen.
+function Portal({ children }: { children: React.ReactNode }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  return mounted ? createPortal(children, document.body) : null;
+}
 
 export default function ProjectSidebar({
   projects,
@@ -122,8 +133,9 @@ export default function ProjectSidebar({
 
   return (
     <>
-      {/* Sidebar nav */}
-      <nav className="flex flex-col h-full py-4">
+      {/* Sidebar nav. min-h-full (not h-full) so it can grow taller than the drawer and let
+          the drawer's scroll container scroll it, instead of clipping the overflow. */}
+      <nav className="flex flex-col min-h-full py-4">
         {/* Fixed items */}
         <div className="px-2 space-y-0.5">
           <button
@@ -272,24 +284,28 @@ export default function ProjectSidebar({
         )}
       </nav>
 
-      {/* Edit modal */}
+      {/* Edit modal (portaled out of the transformed drawer so it centers on screen) */}
       {editingProject && (
-        <EditProjectModal
-          project={editingProject}
-          clients={clients}
-          onSave={(fields) => handleEdit(editingProject.id, fields)}
-          onCancel={() => setEditingProject(null)}
-        />
+        <Portal>
+          <EditProjectModal
+            project={editingProject}
+            clients={clients}
+            onSave={(fields) => handleEdit(editingProject.id, fields)}
+            onCancel={() => setEditingProject(null)}
+          />
+        </Portal>
       )}
 
       {/* Delete confirmation dialog */}
       {deletingProject && (
-        <DeleteProjectDialog
-          project={deletingProject}
-          isPending={pendingId === deletingProject.id}
-          onConfirm={() => handleDelete(deletingProject.id)}
-          onCancel={() => setDeletingProject(null)}
-        />
+        <Portal>
+          <DeleteProjectDialog
+            project={deletingProject}
+            isPending={pendingId === deletingProject.id}
+            onConfirm={() => handleDelete(deletingProject.id)}
+            onCancel={() => setDeletingProject(null)}
+          />
+        </Portal>
       )}
     </>
   );
@@ -492,18 +508,22 @@ function ClientsManager({
       )}
 
       {editing && (
-        <EditClientModal
-          client={editing}
-          onSave={async (name, color) => { await onEdit(editing.id, name, color); setEditing(null); }}
-          onCancel={() => setEditing(null)}
-        />
+        <Portal>
+          <EditClientModal
+            client={editing}
+            onSave={async (name, color) => { await onEdit(editing.id, name, color); setEditing(null); }}
+            onCancel={() => setEditing(null)}
+          />
+        </Portal>
       )}
       {deleting && (
-        <DeleteClientDialog
-          client={deleting}
-          onConfirm={async () => { await onDelete(deleting.id); setDeleting(null); }}
-          onCancel={() => setDeleting(null)}
-        />
+        <Portal>
+          <DeleteClientDialog
+            client={deleting}
+            onConfirm={async () => { await onDelete(deleting.id); setDeleting(null); }}
+            onCancel={() => setDeleting(null)}
+          />
+        </Portal>
       )}
     </div>
   );
