@@ -252,6 +252,26 @@ public class TimeEntriesControllerTests
         (await ctx.TimeEntries.FindAsync(entry.Id)).Should().BeNull();
     }
 
+    // #86: deleting a task snapshots its title into description-less entries so the tracked
+    // interval stays legible (instead of becoming "Untitled") once its TaskId is cleared.
+    [Fact]
+    public async Task DeletingTask_SnapshotsTitleIntoDescriptionlessEntries()
+    {
+        using var ctx = CreateContext();
+        var taskId = await SeedTask(ctx, "Write report");
+        ctx.TimeEntries.AddRange(
+            new TimeEntry { TaskId = taskId, StartedAt = DateTime.Now, EndedAt = DateTime.Now.AddMinutes(30), CreatedAt = DateTime.Now },
+            new TimeEntry { TaskId = taskId, Description = "own label", StartedAt = DateTime.Now, EndedAt = DateTime.Now.AddMinutes(30), CreatedAt = DateTime.Now });
+        await ctx.SaveChangesAsync();
+
+        await TasksController.SnapshotTaskTitlesIntoEntries(ctx, await ctx.Tasks.Where(t => t.Id == taskId).ToListAsync());
+        await ctx.SaveChangesAsync();
+
+        var entries = await ctx.TimeEntries.OrderBy(e => e.Id).ToListAsync();
+        entries[0].Description.Should().Be("Write report"); // was empty -> got the title
+        entries[1].Description.Should().Be("own label");     // kept its own description
+    }
+
     [Fact]
     public async Task List_IncludesAnEntryOverlappingTheWindow()
     {

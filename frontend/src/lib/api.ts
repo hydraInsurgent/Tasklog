@@ -410,11 +410,6 @@ export async function updateProject(
   return res.json();
 }
 
-// Convenience wrapper kept for existing callers: rename and/or set color.
-export function renameProject(id: number, name: string, color?: string | null): Promise<Project> {
-  return updateProject(id, { name, ...(color != null ? { color } : {}) });
-}
-
 // POST /api/projects/reorder - rewrite sidebar order from an ordered id array (must be the
 // full set of project ids). Returns the reordered list.
 export async function reorderProjects(orderedIds: number[]): Promise<Project[]> {

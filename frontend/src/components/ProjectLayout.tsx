@@ -50,6 +50,9 @@ export default function ProjectLayout() {
   // Clients (#86) - the grouping level above projects. Loaded + polled alongside projects.
   const [clients, setClients] = useState<Client[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
+  // True while a drag-reorder is being persisted - pauses the projects poll so a stale
+  // server order can't briefly clobber the optimistic new order (#86).
+  const [reorderPending, setReorderPending] = useState(false);
   const [activeView, setActiveView] = useState<"all" | "inbox" | number>("all");
   // Whether the create-task sheet is open. Held here (not in TasksClient) so the
   // mobile "+ Add Task" button in this header can open the same sheet.
@@ -142,6 +145,7 @@ export default function ProjectLayout() {
       setClients(c);
     }, []),
     30000,
+    !reorderPending,
   );
   usePolling(
     useCallback(async () => {
@@ -241,12 +245,15 @@ export default function ProjectLayout() {
   async function handleReorderProjects(orderedIds: number[]) {
     const snapshot = projects;
     const byId = new Map(projects.map((p) => [p.id, p]));
+    setReorderPending(true); // pause the projects poll so it can't clobber the optimistic order
     setProjects(orderedIds.map((id) => byId.get(id)!).filter(Boolean));
     try {
       setProjects(await reorderProjects(orderedIds));
     } catch {
       setProjects(snapshot);
       showFeedback("error", "Failed to reorder projects.");
+    } finally {
+      setReorderPending(false);
     }
   }
 

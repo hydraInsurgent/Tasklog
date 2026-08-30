@@ -164,6 +164,10 @@ namespace Tasklog.Api.Controllers
                 .Where(t => t.ProjectId == id)
                 .ToListAsync();
 
+            // Keep any time tracked against those tasks legible after their TaskId is SET NULL
+            // (#86): snapshot each task's title into its description-less entries first.
+            await TasksController.SnapshotTaskTitlesIntoEntries(_context, tasks);
+
             _context.Tasks.RemoveRange(tasks);
             _context.Projects.Remove(project);
             await _context.SaveChangesAsync();

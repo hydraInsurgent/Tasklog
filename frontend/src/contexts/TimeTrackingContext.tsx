@@ -9,10 +9,15 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { TimeEntry, getActiveTimeEntry, startTimer, stopTimer, updateTimeEntry } from "@/lib/api";
 
-// Kept for backward compatibility: any listener that refetched tasks after a quick-start.
-// As of #86 quick-start no longer creates a task, so this is dispatched only if a caller
-// still wants it - currently unused, retained so imports elsewhere don't break.
+// Fired on any timer start/stop (#86). Open task/time views (TasksClient, the task-detail
+// time log) listen for it and refresh, so time tracked against a task reflects immediately
+// instead of waiting for the 30s poll. (Pre-#86 it fired only after a quick-start created a
+// task; quick-start no longer creates tasks, so start/stop is now the trigger.)
 export const TASKS_CHANGED_EVENT = "tasklog:tasks-changed";
+
+function announceTasksChanged() {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(TASKS_CHANGED_EVENT));
+}
 
 // What a caller can start a timer with (#86): a task, a free-text description, a project -
 // any combination, all optional (a bare timer is valid, categorize it later).
@@ -106,6 +111,7 @@ export function TimeTrackingProvider({ children }: { children: React.ReactNode }
       const entry = await startTimer(body);
       setActive(entry);
       setNowMs(Date.now());
+      announceTasksChanged(); // refresh open task/time views
     } finally {
       setPending(false);
       inFlight.current = false;
@@ -141,6 +147,7 @@ export function TimeTrackingProvider({ children }: { children: React.ReactNode }
     try {
       await stopTimer(current.id);
       setActive(null);
+      announceTasksChanged(); // refresh open task/time views
     } finally {
       setPending(false);
       inFlight.current = false;
