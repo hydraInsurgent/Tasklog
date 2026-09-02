@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Pencil, Trash2, Plus, Tag, Clock, Inbox, LayoutList, BookOpen, GripVertical, Users, ChevronRight,
+  Pencil, Trash2, Plus, Tag, Clock, Inbox, LayoutList, BookOpen, GripVertical, Users, ChevronRight, MoreVertical,
 } from "lucide-react";
 import {
   DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors,
@@ -52,6 +52,63 @@ function Portal({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   return mounted ? createPortal(children, document.body) : null;
+}
+
+// A compact "..." menu (Edit / Delete) for a row, so the two actions don't reserve ~88px and
+// squeeze the name. The menu is portaled + positioned from the trigger's rect (escaping the
+// mobile drawer transform), with a full-screen backdrop to close on outside click.
+function RowMenu({ label, onEdit, onDelete }: { label: string; onEdit: () => void; onDelete: () => void }) {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+
+  function toggle() {
+    const r = btnRef.current?.getBoundingClientRect();
+    if (r) setPos({ top: r.bottom + 4, left: Math.max(8, r.right - 144) });
+    setOpen((v) => !v);
+  }
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        onClick={toggle}
+        aria-label={`Options for ${label}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="flex items-center justify-center w-9 h-9 shrink-0 mr-1 rounded text-text-muted hover:text-text-primary opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer transition-opacity duration-150"
+      >
+        <MoreVertical size={16} aria-hidden="true" />
+      </button>
+      {open && (
+        <Portal>
+          <div className="fixed inset-0 z-[60]" onClick={() => setOpen(false)}>
+            <div
+              role="menu"
+              onClick={(e) => e.stopPropagation()}
+              style={{ top: pos.top, left: pos.left }}
+              className="absolute w-36 bg-surface border border-border rounded-md shadow-xl py-1"
+            >
+              <button
+                role="menuitem"
+                onClick={() => { setOpen(false); onEdit(); }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm text-text-primary hover:bg-surface-raised focus:outline-none focus:bg-surface-raised cursor-pointer"
+              >
+                <Pencil size={14} aria-hidden="true" /> Edit
+              </button>
+              <button
+                role="menuitem"
+                onClick={() => { setOpen(false); onDelete(); }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm text-danger hover:bg-surface-raised focus:outline-none focus:bg-surface-raised cursor-pointer"
+              >
+                <Trash2 size={14} aria-hidden="true" /> Delete
+              </button>
+            </div>
+          </div>
+        </Portal>
+      )}
+    </>
+  );
 }
 
 export default function ProjectSidebar({
@@ -372,23 +429,8 @@ function SortableProjectRow({
         </span>
       </button>
 
-      {/* Edit button */}
-      <button
-        onClick={onEdit}
-        aria-label={`Edit project: ${project.name}`}
-        className="opacity-0 group-hover:opacity-100 flex items-center justify-center min-w-[44px] min-h-[44px] text-text-muted hover:text-text-primary focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 rounded transition-colors duration-150 cursor-pointer"
-      >
-        <Pencil size={14} aria-hidden="true" />
-      </button>
-
-      {/* Delete button */}
-      <button
-        onClick={onDelete}
-        aria-label={`Delete project: ${project.name}`}
-        className="opacity-0 group-hover:opacity-100 flex items-center justify-center min-w-[44px] min-h-[44px] text-text-muted hover:text-danger focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 rounded transition-colors duration-150 cursor-pointer mr-1"
-      >
-        <Trash2 size={14} aria-hidden="true" />
-      </button>
+      {/* Edit/Delete tucked into a "..." menu so they don't reserve width and squeeze the name */}
+      <RowMenu label={`project ${project.name}`} onEdit={onEdit} onDelete={onDelete} />
     </div>
   );
 }
@@ -455,20 +497,7 @@ function ClientsManager({
                 aria-hidden="true"
               />
               <span className="flex-1 min-w-0 truncate">{client.name}</span>
-              <button
-                onClick={() => setEditing(client)}
-                aria-label={`Edit client: ${client.name}`}
-                className="opacity-0 group-hover:opacity-100 focus:opacity-100 flex items-center justify-center min-w-[36px] min-h-[36px] text-text-muted hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-accent rounded cursor-pointer"
-              >
-                <Pencil size={13} aria-hidden="true" />
-              </button>
-              <button
-                onClick={() => setDeleting(client)}
-                aria-label={`Delete client: ${client.name}`}
-                className="opacity-0 group-hover:opacity-100 focus:opacity-100 flex items-center justify-center min-w-[36px] min-h-[36px] text-text-muted hover:text-danger focus:outline-none focus:ring-2 focus:ring-accent rounded cursor-pointer"
-              >
-                <Trash2 size={13} aria-hidden="true" />
-              </button>
+              <RowMenu label={`client ${client.name}`} onEdit={() => setEditing(client)} onDelete={() => setDeleting(client)} />
             </div>
           ))}
 

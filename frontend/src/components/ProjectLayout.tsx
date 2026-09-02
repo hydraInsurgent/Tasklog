@@ -338,7 +338,7 @@ export default function ProjectLayout() {
   return (
     <div className="flex min-h-screen -my-8">
       {/* Desktop sidebar - hidden on mobile */}
-      <aside className="hidden md:flex md:flex-col md:w-56 bg-surface border-r border-border shrink-0">
+      <aside className="hidden md:flex md:flex-col md:w-64 bg-surface border-r border-border shrink-0">
         {loadingProjects ? (
           <div className="px-4 py-6 text-sm text-text-muted">Loading...</div>
         ) : (
@@ -408,7 +408,7 @@ export default function ProjectLayout() {
 
       {/* Mobile drawer panel */}
       <div
-        className={`fixed inset-y-0 left-0 z-50 w-56 bg-surface border-r border-border flex flex-col md:hidden transition-transform duration-200 ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-surface border-r border-border flex flex-col md:hidden transition-transform duration-200 ${
           drawerOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
