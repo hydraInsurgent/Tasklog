@@ -215,6 +215,18 @@ export default function ProjectSidebar({
           </button>
         </div>
 
+        {/* Habits: quick daily check-ins, kept high (just under Inbox) for easy access (#76). */}
+        {onCheckInToggle && habits && habits.length > 0 && (
+          <>
+            <hr className="my-3 border-border mx-2" />
+            <SidebarHabits
+              habits={habits}
+              pendingCheckIns={pendingCheckIns ?? new Set()}
+              onCheckInToggle={onCheckInToggle}
+            />
+          </>
+        )}
+
         <hr className="my-3 border-border mx-2" />
 
         {/* Projects section */}
@@ -328,17 +340,6 @@ export default function ProjectSidebar({
           </Link>
         </div>
 
-        {/* Habits: compact due-today check-in section (#76). */}
-        {onCheckInToggle && habits && habits.length > 0 && (
-          <>
-            <hr className="my-3 border-border" />
-            <SidebarHabits
-              habits={habits}
-              pendingCheckIns={pendingCheckIns ?? new Set()}
-              onCheckInToggle={onCheckInToggle}
-            />
-          </>
-        )}
       </nav>
 
       {/* Edit modal (portaled out of the transformed drawer so it centers on screen) */}
