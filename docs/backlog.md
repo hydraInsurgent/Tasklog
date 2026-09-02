@@ -32,6 +32,7 @@ Future features - not yet started. Add GitHub issue number when created.
 
 | # | Title | Priority | Notes |
 |---|-------|----------|-------|
+| - | "Today" screen: a focused daily view - today's tasks + due habits + the day's planned/tracked time in one place | medium | raised during #86 (flagged as scope creep, correctly deferred). Distinct from the All Tasks list. The list/board view-mode axis already leaves room for a today/calendar view. Natural home for the plan-vs-actual overlay too. Its own feature after #86 ships. |
 | - | Habit combined schedule mode: a weekly count AND restricted days ("3 times among Mon/Wed/Fri"); also "x times a month" period + per-habit minimum floor | low | parked from #75; #75 ships two distinct modes (specific-days OR x-times-a-week), this combines them |
 | - | Dark mode (tokens already in place from #73 - add a `.dark` block) | low | #73 made it a drop-in |
 | - | Habits calendar heatmap (GitHub-style) | low | check-in data already supports it |
