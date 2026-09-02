@@ -8,6 +8,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { TimeEntry, getActiveTimeEntry, startTimer, stopTimer, updateTimeEntry } from "@/lib/api";
+import { usePolling } from "@/hooks/usePolling";
 
 // Fired on any timer start/stop (#86). Open task/time views (TasksClient, the task-detail
 // time log) listen for it and refresh, so time tracked against a task reflects immediately
@@ -65,6 +66,10 @@ export function TimeTrackingProvider({ children }: { children: React.ReactNode }
   const [active, setActive] = useState<TimeEntry | null>(null);
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
   const [pending, setPending] = useState(false);
+  // Synchronous mirror of `active` for the cross-device reconcile poll (state reads inside a
+  // callback can be one render stale).
+  const activeRef = useRef<TimeEntry | null>(null);
+  useEffect(() => { activeRef.current = active; }, [active]);
 
   // Rehydrate the running timer on mount.
   useEffect(() => {
@@ -153,6 +158,30 @@ export function TimeTrackingProvider({ children }: { children: React.ReactNode }
       inFlight.current = false;
     }
   }, [active]);
+
+  // Poll the server for the running timer so a start/stop/edit on ANOTHER device shows up here
+  // within the interval (the bar + timeline are otherwise only rehydrated on mount, which is
+  // why the desktop showed a stale timer after acting on mobile). Skip while a local start/stop
+  // is mid-flight so we never clobber the optimistic state.
+  usePolling(
+    useCallback(async () => {
+      if (inFlight.current) return;
+      try {
+        const server = await getActiveTimeEntry();
+        const prevId = activeRef.current?.id ?? null;
+        const serverId = server?.id ?? null;
+        if (prevId !== serverId) {
+          setActive(server);          // started/stopped elsewhere - adopt server truth
+          if (server) setNowMs(Date.now());
+        } else if (server) {
+          setActive(server);          // same entry, refresh fields edited elsewhere
+        }
+      } catch {
+        /* transient (offline / API blip) - keep current state */
+      }
+    }, []),
+    15000,
+  );
 
   const isRunning = useCallback((taskId: number) => active?.taskId === taskId, [active]);
 

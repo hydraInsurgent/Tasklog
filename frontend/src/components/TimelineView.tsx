@@ -20,6 +20,7 @@ import {
   daySegment, dayTotalSeconds, perActivityTotals, entryLabel, clockLabel,
 } from "@/lib/time";
 import { useTimeTracking } from "@/contexts/TimeTrackingContext";
+import { usePolling } from "@/hooks/usePolling";
 import ColorPickerButton from "@/components/ColorPickerButton";
 
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
@@ -105,6 +106,10 @@ export default function TimelineView() {
   useEffect(() => {
     load();
   }, [load, active?.id]);
+
+  // Poll the visible range so entries logged/edited on another device appear (pauses when the
+  // tab is hidden). The context also polls the active timer, which refires the effect above.
+  usePolling(load, 30000);
 
   // Tasks and projects for the add-entry picker.
   useEffect(() => {
