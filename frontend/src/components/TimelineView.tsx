@@ -50,7 +50,7 @@ interface PopoverState {
 }
 
 export default function TimelineView() {
-  const { active } = useTimeTracking(); // subscribing makes the view re-render on the 1s tick
+  const { active, refreshActive } = useTimeTracking(); // subscribing re-renders on the 1s tick
   const [mode, setMode] = useState<"day" | "week">("day");
   const [isDesktop, setIsDesktop] = useState(true);
   const [anchor, setAnchor] = useState<Date>(() => startOfDay(new Date()));
@@ -164,7 +164,8 @@ export default function TimelineView() {
   }
 
   function openEdit(entry: TimeEntry) {
-    if (!entry.endedAt) return; // the running entry is controlled from the tracking bar
+    // Running entries are editable too (#86): you can fix the start / description / project
+    // while the timer runs; the end stays "running" (stopping is still done from the bar).
     const s = new Date(entry.startedAt);
     setFormError("");
     setPopover({
@@ -174,7 +175,7 @@ export default function TimelineView() {
       description: entry.description ?? "",
       projectId: entry.projectId ?? "",
       start: hhmm(s),
-      end: hhmm(new Date(entry.endedAt)),
+      end: entry.endedAt ? hhmm(new Date(entry.endedAt)) : hhmm(now),
       entry,
     });
   }
@@ -186,7 +187,32 @@ export default function TimelineView() {
       setFormError("Add a description or pick a task.");
       return;
     }
+    const taskId = popover.taskId === "" ? null : popover.taskId;
+    const projectId = popover.projectId === "" ? null : popover.projectId;
+    const description = popover.description.trim() || null;
     const startISO = isoFromDayTime(popover.day, popover.start);
+
+    // Running entry (#86): edit start / description / project in place; the end stays running
+    // (stopping is done from the tracking bar), so skip the end validation entirely.
+    if (popover.entry && !popover.entry.endedAt) {
+      if (new Date(startISO).getTime() > Date.now()) {
+        setFormError("Start can't be in the future.");
+        return;
+      }
+      setSaving(true);
+      try {
+        await updateTimeEntry(popover.entry.id, { startedAt: startISO, taskId, description, projectId });
+        await refreshActive(); // sync the bar's live elapsed to the new start
+        setPopover(null);
+        await load();
+      } catch (err) {
+        setFormError(err instanceof Error ? err.message : "Save failed.");
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
     const endISO = isoFromDayTime(popover.day, popover.end);
     if (new Date(endISO).getTime() <= new Date(startISO).getTime()) {
       setFormError("End must be after start.");
@@ -206,9 +232,6 @@ export default function TimelineView() {
       return startMs < new Date(e.endedAt).getTime() && endMs > new Date(e.startedAt).getTime();
     });
     if (overlaps) { setFormError("This entry overlaps an existing one."); return; }
-    const taskId = popover.taskId === "" ? null : popover.taskId;
-    const projectId = popover.projectId === "" ? null : popover.projectId;
-    const description = popover.description.trim() || null;
     setSaving(true);
     try {
       if (popover.entry) {
@@ -242,6 +265,15 @@ export default function TimelineView() {
 
   const rangeTotal = columns.reduce((sum, d) => sum + dayTotalSeconds(entries, d, now), 0);
   const activityTotals = useMemo(() => perActivityTotals(entries, columns, now), [entries, columns, now]);
+  // The most recent stopped timer's end, for the running-entry "set start to last stop" button.
+  const lastStopISO = useMemo(() => {
+    let latest: string | null = null;
+    for (const e of entries) {
+      if (!e.endedAt) continue;
+      if (!latest || new Date(e.endedAt) > new Date(latest)) latest = e.endedAt;
+    }
+    return latest;
+  }, [entries]);
 
   return (
     <div className="space-y-4">
@@ -451,6 +483,7 @@ export default function TimelineView() {
                         state={popover}
                         tasks={tasks}
                         projects={projects}
+                        lastStopISO={lastStopISO}
                         error={formError}
                         saving={saving}
                         onChange={setPopover}
@@ -487,11 +520,12 @@ export default function TimelineView() {
 
 // The inline add/edit form, anchored near the clicked slot within a day column.
 function EntryForm({
-  state, tasks, projects, error, saving, onChange, onSave, onDelete, onCancel,
+  state, tasks, projects, lastStopISO, error, saving, onChange, onSave, onDelete, onCancel,
 }: {
   state: PopoverState;
   tasks: Task[];
   projects: Project[];
+  lastStopISO: string | null;
   error: string;
   saving: boolean;
   onChange: (s: PopoverState) => void;
@@ -499,6 +533,8 @@ function EntryForm({
   onDelete: () => void;
   onCancel: () => void;
 }) {
+  // Editing the currently-running entry: end is "running", stopping is done from the bar.
+  const isRunning = !!state.entry && !state.entry.endedAt;
   // Keep the popover on-screen: clamp its top within the day.
   const top = Math.min(state.topPx, DAY_PX - 340);
 
@@ -581,17 +617,35 @@ function EntryForm({
         </div>
         <div className="flex-1">
           <label className="block text-xs font-medium text-text-muted mb-1">End</label>
-          <input
-            type="time"
-            value={state.end}
-            onChange={(e) => onChange({ ...state, end: e.target.value })}
-            className="w-full px-2 py-1.5 text-sm border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent"
-          />
+          {isRunning ? (
+            <div className="w-full px-2 py-1.5 text-sm border border-border rounded-md text-text-muted bg-surface-raised">
+              running…
+            </div>
+          ) : (
+            <input
+              type="time"
+              value={state.end}
+              onChange={(e) => onChange({ ...state, end: e.target.value })}
+              className="w-full px-2 py-1.5 text-sm border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent"
+            />
+          )}
         </div>
       </div>
+      {isRunning && lastStopISO && (
+        <button
+          type="button"
+          onClick={() => {
+            const d = new Date(lastStopISO);
+            onChange({ ...state, day: startOfDay(d), start: hhmm(d) });
+          }}
+          className="text-xs text-accent hover:underline focus:outline-none focus:underline cursor-pointer"
+        >
+          Set start to last stop ({clockLabel(lastStopISO)})
+        </button>
+      )}
       {error && <p className="text-xs text-danger" role="alert">{error}</p>}
       <div className="flex items-center justify-between pt-1">
-        {state.entry ? (
+        {state.entry && !isRunning ? (
           <button
             type="button"
             onClick={onDelete}

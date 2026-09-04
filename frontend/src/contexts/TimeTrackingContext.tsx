@@ -42,6 +42,8 @@ interface TimeTrackingValue {
   quickStart: (description: string, projectId?: number | null) => Promise<void>;
   // Edit the running entry's description and/or project without stopping it (#86).
   updateActive: (fields: { description?: string | null; projectId?: number | null }) => Promise<void>;
+  // Re-pull the running entry from the server (e.g. after the timeline edits its start time).
+  refreshActive: () => Promise<void>;
   stop: () => Promise<void>;
 }
 
@@ -57,6 +59,7 @@ const NOOP: TimeTrackingValue = {
   startEntry: async () => {},
   quickStart: async () => {},
   updateActive: async () => {},
+  refreshActive: async () => {},
   stop: async () => {},
 };
 
@@ -183,11 +186,23 @@ export function TimeTrackingProvider({ children }: { children: React.ReactNode }
     15000,
   );
 
+  // Re-pull the running entry from the server (used after the timeline edits its start, so the
+  // bar's live elapsed reflects the new start immediately instead of waiting for the 15s poll).
+  const refreshActive = useCallback(async () => {
+    try {
+      const server = await getActiveTimeEntry();
+      setActive(server);
+      if (server) setNowMs(Date.now());
+    } catch {
+      /* keep current state */
+    }
+  }, []);
+
   const isRunning = useCallback((taskId: number) => active?.taskId === taskId, [active]);
 
   return (
     <TimeTrackingContext.Provider
-      value={{ active, elapsedSeconds, pending, isRunning, start, startEntry, quickStart, updateActive, stop }}
+      value={{ active, elapsedSeconds, pending, isRunning, start, startEntry, quickStart, updateActive, refreshActive, stop }}
     >
       {children}
     </TimeTrackingContext.Provider>
