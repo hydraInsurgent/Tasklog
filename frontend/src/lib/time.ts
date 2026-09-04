@@ -12,13 +12,16 @@ export function entryLabel(en: Pick<TimeEntry, "taskTitle" | "description">): st
   return en.taskTitle || en.description || "Untitled";
 }
 
-// 1 hour = 72px. Chosen so any entry >= 15 min renders at its true height (15 * 1.2 = 18px =
-// MIN_BLOCK_PX), meaning only sub-15-min blocks ever get inflated - which keeps the push-down
-// layout's drift small and blocks aligned to the real time axis (#86).
-export const PX_PER_MIN = 1.2;
+// 1 hour = 216px. Entries are snapped to the 5-min grid and anything under 2.5 min is
+// discarded (#86), so the smallest possible block is exactly 5 min. Setting the zoom so
+// 5 min == MIN_BLOCK_PX (5 * 3.6 = 18px) means EVERY block renders at its true height:
+// nothing is inflated, push-down never triggers, and there is zero time-axis drift. The
+// trade is a tall day that scrolls (it opens scrolled to ~07:00). These are the timeline's
+// "5-minute boxes".
+export const PX_PER_MIN = 3.6;
 export const DAY_MINUTES = 24 * 60;
-export const DAY_PX = DAY_MINUTES * PX_PER_MIN; // 1728
-export const MIN_BLOCK_PX = 18; // tiny entries still get a readable, clickable height
+export const DAY_PX = DAY_MINUTES * PX_PER_MIN; // 5184
+export const MIN_BLOCK_PX = 18; // one 5-min box; also the readable/clickable minimum
 
 // Local "YYYY-MM-DD" for a date.
 export function dateKey(d: Date): string {
