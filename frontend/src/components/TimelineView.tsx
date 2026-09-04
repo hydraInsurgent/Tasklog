@@ -22,6 +22,7 @@ import {
 import { useTimeTracking } from "@/contexts/TimeTrackingContext";
 import { usePolling } from "@/hooks/usePolling";
 import ColorPickerButton from "@/components/ColorPickerButton";
+import RadialTimePicker from "@/components/RadialTimePicker";
 
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
 const WEEKDAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -263,6 +264,15 @@ export default function TimelineView() {
     }
   }
 
+  // "Exit saves" (#86): clicking the sheet backdrop commits the edit when there's something
+  // to save; an untouched/empty form is just discarded so exiting always closes.
+  async function dismissForm() {
+    if (!popover) return;
+    const hasContent = popover.taskId !== "" || popover.description.trim() !== "";
+    if (hasContent) await saveForm();
+    else setPopover(null);
+  }
+
   const rangeTotal = columns.reduce((sum, d) => sum + dayTotalSeconds(entries, d, now), 0);
   const activityTotals = useMemo(() => perActivityTotals(entries, columns, now), [entries, columns, now]);
   // The most recent stopped timer's end, for the running-entry "set start to last stop" button.
@@ -475,21 +485,6 @@ export default function TimelineView() {
                       );
                     })}
 
-                    {/* Add/edit popover anchored at the slot for this column */}
-                    {popover && dateKey(popover.day) === dateKey(day) && (
-                      <EntryForm
-                        state={popover}
-                        tasks={tasks}
-                        projects={projects}
-                        lastStopISO={lastStopISO}
-                        error={formError}
-                        saving={saving}
-                        onChange={setPopover}
-                        onSave={saveForm}
-                        onDelete={removeEntry}
-                        onCancel={() => setPopover(null)}
-                      />
-                    )}
                   </div>
                 );
               })}
@@ -497,6 +492,23 @@ export default function TimelineView() {
           </div>
         )}
       </div>
+
+      {/* Add/edit sheet: bottom sheet on mobile, centered modal on desktop, always in view */}
+      {popover && (
+        <EntryForm
+          state={popover}
+          tasks={tasks}
+          projects={projects}
+          lastStopISO={lastStopISO}
+          error={formError}
+          saving={saving}
+          onChange={setPopover}
+          onSave={saveForm}
+          onDelete={removeEntry}
+          onDismiss={dismissForm}
+          onCancel={() => setPopover(null)}
+        />
+      )}
 
       {/* Per-activity breakdown for the visible range (tasks + task-free entries) */}
       {activityTotals.length > 0 && (
@@ -516,9 +528,11 @@ export default function TimelineView() {
   );
 }
 
-// The inline add/edit form, anchored near the clicked slot within a day column.
+// The add/edit sheet: a bottom sheet on mobile, a centered modal on desktop. Always sits in
+// the viewport (independent of the tall scrolling grid) with a pinned footer so Save is always
+// visible, and clicking the backdrop saves-if-there's-content (#86).
 function EntryForm({
-  state, tasks, projects, lastStopISO, error, saving, onChange, onSave, onDelete, onCancel,
+  state, tasks, projects, lastStopISO, error, saving, onChange, onSave, onDelete, onDismiss, onCancel,
 }: {
   state: PopoverState;
   tasks: Task[];
@@ -529,12 +543,11 @@ function EntryForm({
   onChange: (s: PopoverState) => void;
   onSave: () => void;
   onDelete: () => void;
+  onDismiss: () => void;
   onCancel: () => void;
 }) {
   // Editing the currently-running entry: end is "running", stopping is done from the bar.
   const isRunning = !!state.entry && !state.entry.endedAt;
-  // Keep the popover on-screen: clamp its top within the day.
-  const top = Math.min(state.topPx, DAY_PX - 340);
 
   // Group tasks by project for the optgroup layout.
   const inboxTasks = tasks.filter((t) => !t.projectId);
@@ -551,129 +564,137 @@ function EntryForm({
   }
 
   return (
-    <div
-      onClick={(e) => e.stopPropagation()}
-      className="absolute z-20 left-1 right-1 sm:left-auto sm:w-64 bg-surface border border-border rounded-lg shadow-xl p-3 space-y-2 tl-pop"
-      style={{ top: Math.max(0, top) }}
-    >
-      <div>
-        <label className="block text-xs font-medium text-text-muted mb-1">Description</label>
-        <input
-          type="text"
-          value={state.description}
-          onChange={(e) => onChange({ ...state, description: e.target.value })}
-          placeholder="e.g. Rise and Shine"
-          className="w-full px-2 py-1.5 text-sm border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent"
-        />
-      </div>
-      <div>
-        <label className="block text-xs font-medium text-text-muted mb-1">Task (optional)</label>
-        <select
-          value={state.taskId}
-          onChange={(e) => pickTask(e.target.value)}
-          className="w-full px-2 py-1.5 text-sm border border-border rounded-md bg-surface text-text-primary focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer"
-        >
-          <option value="">No task</option>
-          {inboxTasks.length > 0 && (
-            <optgroup label="Inbox">
-              {inboxTasks.map((t) => (
-                <option key={t.id} value={t.id}>{t.title}</option>
-              ))}
-            </optgroup>
-          )}
-          {projectGroups.map(({ project, tasks: pts }) => (
-            <optgroup key={project.id} label={project.name}>
-              {pts.map((t) => (
-                <option key={t.id} value={t.id}>{t.title}</option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
-      </div>
-      <div>
-        <label className="block text-xs font-medium text-text-muted mb-1">Project</label>
-        <select
-          value={state.projectId}
-          onChange={(e) => onChange({ ...state, projectId: e.target.value ? Number(e.target.value) : "" })}
-          className="w-full px-2 py-1.5 text-sm border border-border rounded-md bg-surface text-text-primary focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer"
-        >
-          <option value="">No project</option>
-          {projects.map((p) => (
-            <option key={p.id} value={p.id}>{p.client ? `${p.client.name} / ${p.name}` : p.name}</option>
-          ))}
-        </select>
-      </div>
-      <div className="flex gap-2">
-        <div className="flex-1">
-          <label className="block text-xs font-medium text-text-muted mb-1">Start</label>
-          <input
-            type="time"
-            value={state.start}
-            onChange={(e) => onChange({ ...state, start: e.target.value })}
-            className="w-full px-2 py-1.5 text-sm border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent"
-          />
-        </div>
-        <div className="flex-1">
-          <label className="block text-xs font-medium text-text-muted mb-1">End</label>
-          {isRunning ? (
-            <div className="w-full px-2 py-1.5 text-sm border border-border rounded-md text-text-muted bg-surface-raised">
-              running…
-            </div>
-          ) : (
+    <>
+      {/* Backdrop: clicking away saves (if there's content), matching "exit out also saves". */}
+      <div className="fixed inset-0 bg-black/40 z-40" onClick={onDismiss} aria-hidden="true" />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={state.entry ? "Edit time entry" : "Add time entry"}
+        className="fixed z-50 inset-x-0 bottom-0 sm:inset-x-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-80 bg-surface border border-border rounded-t-2xl sm:rounded-lg shadow-2xl flex flex-col max-h-[88vh] tl-fade"
+      >
+        {/* Scrollable field area */}
+        <div className="overflow-y-auto p-4 space-y-3 pb-[max(0.25rem,env(safe-area-inset-bottom))]">
+          <div>
+            <label className="block text-xs font-medium text-text-muted mb-1">Description</label>
             <input
-              type="time"
-              value={state.end}
-              onChange={(e) => onChange({ ...state, end: e.target.value })}
-              className="w-full px-2 py-1.5 text-sm border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent"
+              type="text"
+              value={state.description}
+              onChange={(e) => onChange({ ...state, description: e.target.value })}
+              placeholder="e.g. Rise and Shine"
+              className="w-full px-2 py-2 text-sm border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent"
             />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-text-muted mb-1">Task (optional)</label>
+            <select
+              value={state.taskId}
+              onChange={(e) => pickTask(e.target.value)}
+              className="w-full px-2 py-2 text-sm border border-border rounded-md bg-surface text-text-primary focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer"
+            >
+              <option value="">No task</option>
+              {inboxTasks.length > 0 && (
+                <optgroup label="Inbox">
+                  {inboxTasks.map((t) => (
+                    <option key={t.id} value={t.id}>{t.title}</option>
+                  ))}
+                </optgroup>
+              )}
+              {projectGroups.map(({ project, tasks: pts }) => (
+                <optgroup key={project.id} label={project.name}>
+                  {pts.map((t) => (
+                    <option key={t.id} value={t.id}>{t.title}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-text-muted mb-1">Project</label>
+            <select
+              value={state.projectId}
+              onChange={(e) => onChange({ ...state, projectId: e.target.value ? Number(e.target.value) : "" })}
+              className="w-full px-2 py-2 text-sm border border-border rounded-md bg-surface text-text-primary focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer"
+            >
+              <option value="">No project</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>{p.client ? `${p.client.name} / ${p.name}` : p.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <label className="block text-xs font-medium text-text-muted mb-1">Start</label>
+              <RadialTimePicker
+                value={state.start}
+                onChange={(v) => onChange({ ...state, start: v })}
+                ariaLabel="Start time"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="block text-xs font-medium text-text-muted mb-1">End</label>
+              {isRunning ? (
+                <div className="w-full px-2 py-1.5 text-sm border border-border rounded-md text-text-muted bg-surface-raised">
+                  running…
+                </div>
+              ) : (
+                <RadialTimePicker
+                  value={state.end}
+                  onChange={(v) => onChange({ ...state, end: v })}
+                  ariaLabel="End time"
+                />
+              )}
+            </div>
+          </div>
+          {isRunning && lastStopISO && (
+            <button
+              type="button"
+              onClick={() => {
+                const d = new Date(lastStopISO);
+                onChange({ ...state, day: startOfDay(d), start: hhmm(d) });
+              }}
+              className="text-xs text-accent hover:underline focus:outline-none focus:underline cursor-pointer"
+            >
+              Set start to last stop ({clockLabel(lastStopISO)})
+            </button>
           )}
+          {error && <p className="text-xs text-danger" role="alert">{error}</p>}
+        </div>
+
+        {/* Pinned footer - Save always visible without scrolling */}
+        <div className="flex items-center gap-2 p-3 border-t border-border">
+          {state.entry && !isRunning ? (
+            <button
+              type="button"
+              onClick={onDelete}
+              disabled={saving}
+              aria-label="Delete entry"
+              className="flex items-center justify-center w-11 h-11 text-text-muted hover:text-danger focus:outline-none focus:ring-2 focus:ring-danger rounded cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {saving ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <Trash2 size={16} aria-hidden="true" />}
+            </button>
+          ) : <span />}
+          <div className="flex gap-2 ml-auto">
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={saving}
+              className="px-4 py-2 text-sm text-text-muted hover:text-text-primary border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer disabled:opacity-40"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={saving}
+              className="flex items-center gap-1.5 px-4 py-2 text-sm bg-primary text-white rounded-md hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {saving && <Loader2 size={14} className="animate-spin" aria-hidden="true" />}
+              Save
+            </button>
+          </div>
         </div>
       </div>
-      {isRunning && lastStopISO && (
-        <button
-          type="button"
-          onClick={() => {
-            const d = new Date(lastStopISO);
-            onChange({ ...state, day: startOfDay(d), start: hhmm(d) });
-          }}
-          className="text-xs text-accent hover:underline focus:outline-none focus:underline cursor-pointer"
-        >
-          Set start to last stop ({clockLabel(lastStopISO)})
-        </button>
-      )}
-      {error && <p className="text-xs text-danger" role="alert">{error}</p>}
-      <div className="flex items-center justify-between pt-1">
-        {state.entry && !isRunning ? (
-          <button
-            type="button"
-            onClick={onDelete}
-            disabled={saving}
-            aria-label="Delete entry"
-            className="flex items-center justify-center w-8 h-8 text-text-muted hover:text-danger focus:outline-none focus:ring-2 focus:ring-danger rounded cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {saving ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <Trash2 size={15} aria-hidden="true" />}
-          </button>
-        ) : <span />}
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={saving}
-            className="px-3 py-1.5 text-sm text-text-muted hover:text-text-primary focus:outline-none focus:underline cursor-pointer disabled:opacity-40"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={onSave}
-            disabled={saving}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary text-white rounded-md hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {saving && <Loader2 size={13} className="animate-spin" aria-hidden="true" />}
-            Save
-          </button>
-        </div>
-      </div>
-    </div>
+    </>
   );
 }
