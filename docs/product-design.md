@@ -104,14 +104,15 @@ A reminder or alert system would be a meaningful scope addition.
 - Bulk actions (v2.10.4): a "Select" mode on the task list lets you pick several tasks and, from a bulk-actions bar, complete/reopen them, move them to a project (or Inbox), or set/clear their deadline in one step. The same operations are available to Claude via bulk MCP tools, with bulk priority added in v2.10.7. There is no bulk delete - deletion stays one task at a time.
 - Priority (v2.10.5): each task has a priority on the Todoist P1-P4 scale (P1 = Urgent, P2 = High, P3 = Medium, P4 = None, the default). It is set on the add/edit forms, shown as a small colored dot (P1-P3), filterable, and editable/queryable via Claude. P4 tasks show no dot, keeping the default view clean.
 
-**Time tracking** (v2.19.0)
-- Any task can have time tracked against it. At most one timer runs at a time (server-enforced); starting a new one auto-stops the previous.
-- A **persistent tracking bar** sits at the bottom-left on desktop (bottom full-width on mobile): idle shows a "What are you working on?" input that quick-creates an Inbox task and starts tracking in one step; running shows the task title, live elapsed clock, and a Stop button.
-- A per-task **timer control** (play/stop button) appears on each task row.
-- A **timeline view** (`/time`) renders a Toggl-style vertical hour grid with day or week columns. Each tracked interval is a project-colored block. Click an empty slot to log a past entry; click a block to edit its times or delete it. The running entry grows live.
-- Snap-to-5-min / exact granularity setting; an Inbox color picker (localStorage) so Inbox tasks have a distinguishable color on the timeline.
-- A per-task totals breakdown shows below the grid for the visible range.
-- Time entries are never merged or edited automatically - the user has full control over the log.
+**Time tracking** (v2.19.0; decoupled from tasks in v3.2.0/#86)
+- Time entries are **first-class actuals, not bound to a task** (#86). An entry carries its own free-text description and its own project; the task link is optional. So you can track **task work AND non-task life** (sleep, chores, gaming) on one timeline. A Task (planned intent) and a TimeEntry (executed interval) are distinct - one task can have many entries, and most life entries have no task - but they share the same Client -> Project tree.
+- At most one timer runs at a time (server-enforced); starting a new one auto-stops the previous.
+- A **persistent tracking bar**: idle opens a composer (bottom sheet on mobile, card on desktop) with a description field, **autocomplete** (past entry descriptions - which pre-fill their last project - plus matching open tasks), and a project picker. Start tracks it with **no phantom Inbox task**. Running shows the entry label, project dot, live clock, and Stop; tapping the label edits the running entry in place.
+- A per-task **timer control** (play/stop) still appears on each task row.
+- A **timeline view** (`/time`) renders a Toggl-style hour grid (defaults to Day). Blocks are project-colored, labelled by task title or description. Click an empty slot to log a past entry; click a block to edit it - the add/edit form is a bottom sheet on mobile / centered modal on desktop, with description + optional task + project + start/end (a **radial clock-dial** time picker), and clicking away saves. Click the **running block** to fix its start/description/project ("Set start to last stop" chains it to the previous entry).
+- **Tidy-on-stop:** an entry under 2.5 min is discarded (accidental tap); a kept entry has both edges snapped to the nearest 5 min, so the calendar stays clean and contiguous. The grid renders on **5-minute boxes** so short entries always fit, and colliding blocks push down rather than overlap.
+- A per-activity totals breakdown shows below the grid; the running timer + timeline poll so devices stay in sync (~15 s).
+- Time entries are never merged automatically - the user has full control over the log.
 
 **Journaling** (v3.0, #79)
 - A **Journal** section (`/journal`) holds one structured note per day, built from three fixed templates: **Daily** (check-ins, What's going on, Mind dump, Projects today, Today's plan, Front/Back of mind, Daily review, Evening review, Journal), **Gratitude**, and **Affirmations** (a daily list, meant to be revisited at the evening close to celebrate wins). Templates are code-defined; there is no template editor.
@@ -121,11 +122,14 @@ A reminder or alert system would be a meaningful scope addition.
 - **Today's plan references real tasks** - a combobox searches open tasks; creating is always an explicit "+ Create task" row (born due-today, Inbox). Rolled-over state comes from live task data. An **"Unplanned, got done"** bucket is derived automatically: tasks completed that day that were never planned.
 - **Front of mind / Back of mind** are transient rail lists meant to be **cleared by the end of day**; anything uncleared resurfaces tomorrow as a "rolled over - keep?" candidate that must be consciously re-adopted.
 - Empty sections stay quietly collapsed ("earned depth only" - the Journal section is not prompted for daily). After 6pm, opening today's journal lands on the evening cluster - the evening close is designed to be the cheapest ritual of the day.
+- The **"Today so far"** widget shows a **Client/Project time breakdown** of the day's tracked time (v3.2.0/#86) - proportion bars beside the single total - so task and non-task time unite in the day's actuals. The plan stays intent-only (tasks/habits); actuals live here.
 - The journal page carries its **own scoped visual identity** (fog paper / plum accent / serif prose voice, with a soft dark mode) via `--color-j-*` tokens; the rest of the app is unchanged. Journal prose is bilingual-friendly (Hinglish + Devanagari fall through to system fonts).
 - **Sensitivity note:** journal prose and mood history are the most sensitive data the app holds. They stay LAN-only; the MCP surface does NOT expose journal endpoints yet, and minimal auth (v3.1) is planned before it ever does.
 
-**Projects**
-- Projects let the user categorize tasks.
+**Projects & Clients**
+- Projects let the user categorize tasks (and time entries).
+- **Clients** (v3.2.0/#86) are a grouping level *above* projects - a "life area" like Work, Family, Self (the user's Toggl "client" concept). A project optionally belongs to a client; both share the same Client -> Project tree used by tasks and time. Manage clients in a collapsible sidebar section (create/rename/recolor/delete). **Deleting a client keeps its projects** - they become Ungrouped - unlike deleting a project, which cascade-deletes its tasks.
+- Assign a project to a client from the project's edit dialog. In the sidebar each project row shows its client, and projects can be **drag-reordered** (a manual order; Inbox and All Tasks stay pinned). Row edit/delete live in a "..." menu.
 - Each project can have an optional **hex color** (set on create or rename). The color appears as a left border on timeline blocks and as a swatch in the sidebar and project edit modal.
 - The sidebar shows All Tasks, Inbox, and each project as separate views.
 - Tasks can be assigned to a project at creation, reassigned from the task detail page, or changed in the edit modal.
@@ -158,12 +162,13 @@ A reminder or alert system would be a meaningful scope addition.
 
 **AI integration (v2.10+)**
 - Tasklog is reachable from claude.ai via a Model Context Protocol custom connector.
-- The Tasklog API is exposed as **29 MCP tools** across four families:
-  - *Tasks (18)*: list (with rich filters), get, create, update, delete, set-completion, assign-project, set-labels, add/list/delete comments, bulk complete/assign/deadline/priority, log/undo/list habit check-ins, get habits dashboard.
-  - *Projects (4)*: list, create (with optional hex color), rename (with optional color), delete.
-  - *Labels (4)*: list, create, update, delete.
-  - *Time tracking (7, v2.19.0)*: start/stop/get-active timer, manually log a closed interval, edit a logged entry, delete an entry, get time summary by task for a date range.
-- `list_tasks` accepts optional filters (project, inbox, labels, deadline range, creation-date range, completion, title substring, priority) plus sort + order + limit. `update_task` renames / reschedules / reprioritizes / sets recurrence without delete-and-recreate. `get_habits` returns per-habit streak, done-today, and weekly progress (computed server-side). `get_time_summary(from, to)` returns totals by task.
+- The Tasklog API is exposed as **45 MCP tools** across six families:
+  - *Tasks (20)*: list (rich filters), get, find, create, update, delete, set-completion, assign-project, set-labels, add/list/delete comments, bulk complete/assign/deadline/priority, log/undo/list habit check-ins, get habits dashboard.
+  - *Subtasks (6)*, *Labels (4)*.
+  - *Projects (4)*: list, create/rename (optional hex color + `clientId`), delete.
+  - *Clients (4, v3.2.0/#86)*: list, create, rename, delete (the grouping level above projects).
+  - *Time tracking (7, v2.19.0; task-optional in v3.2.0/#86)*: start/stop/get-active timer and log/edit a closed interval - all accept an optional task + free-text description + project (so Claude can track task-free life too); delete; get time summary grouped by client/project for a date range.
+- `list_tasks` accepts optional filters (project, inbox, labels, deadline range, creation-date range, completion, title substring, priority) plus sort + order + limit. `update_task` renames / reschedules / reprioritizes / sets recurrence without delete-and-recreate. `get_habits` returns per-habit streak, done-today, and weekly progress. `get_time_summary(from, to)` returns totals by client/project.
 - The connector works on claude.ai web and mobile (Pro / Max plan).
 - Connecting requires logging in with GitHub once; only the allow-listed username is permitted.
 - All tool calls execute against the same SQLite database the web UI reads from. Tasks created via Claude appear instantly in the web UI on next refresh.

@@ -56,11 +56,12 @@ I wanted a task system I understood completely - one where the data, the workflo
 - Break a task into **subtasks** - a checklist of tickable steps shown right on the card with a "2/5" progress badge, drag-reorderable in the detail; give a subtask its own deadline and it also shows up in your due list, linked back to its parent
 - Task detail page with full status, comments, subtasks, and completion history
 
-**Track your time**
-- A persistent tracking bar (bottom-left on desktop, full-width on mobile) - type a task name and hit Start to quick-create it and begin tracking immediately; one tap stops the timer
+**Track your time (Toggl-style)**
+- A persistent tracking bar - type what you're doing, pick a project, hit Start. Entries are **not tied to a task**, so you can track task work *and* non-task life (sleep, chores, gaming). Autocomplete suggests your past entries and open tasks
 - Per-task start/stop button on each task row; at most one timer runs at a time
-- Toggl-style timeline at `/time` - a vertical hour grid with day or week view; project-colored blocks for each interval; click to log, edit, or delete entries
-- Projects carry an optional hex color that appears as a left border on timeline blocks
+- Timeline at `/time` - a 5-minute-box hour grid; project-colored blocks; click to log/edit (a radial clock-dial time picker), or click the running block to fix it live
+- **Clients** group your projects into life areas (Work, Family, Self); drag to reorder projects; a per-day Client/Project time breakdown in the journal
+- Tidy by design: sub-2.5-min blips are dropped and entries snap to the 5-min grid on stop
 
 **Repeat and build habits**
 - Recurring tasks with Todoist-level rules - daily, every N days, weekly on chosen weekdays, monthly on a day-of-month or the "3rd Thursday" / "last day", every-other-week intervals, and end conditions (until a date or for N times). Completing one spawns the next occurrence automatically
@@ -82,7 +83,7 @@ I wanted a task system I understood completely - one where the data, the workflo
 
 **Talk to your tasks via Claude (v2.10)**
 - Tasklog can be plugged into claude.ai as a custom connector (Model Context Protocol server)
-- 36 MCP tools: create/manage tasks and subtasks, find any task or subtask by name, check in habits, start/stop timers, query time summaries, manage projects and labels - all from claude.ai web or mobile
+- 45 MCP tools: create/manage tasks and subtasks, find any task or subtask by name, check in habits, start/stop timers (task or task-free), query time summaries by client/project, manage projects, clients, and labels - all from claude.ai web or mobile
 - Tasks created via Claude appear instantly in your Tasklog UI
 - OAuth 2.1 with GitHub upstream gates access; only your username is allowed
 - The Tasklog API itself stays LAN-only; only one tightly-scoped MCP endpoint is exposed
