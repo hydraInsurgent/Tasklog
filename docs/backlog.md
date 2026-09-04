@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| P86-time-tracking.md | #86 | feature/routines-#86 | In Progress |
+| - | - | - | - |
 
 ---
 
@@ -81,6 +81,7 @@ Recently completed work (keep last 10):
 
 | # | Title | Type | Closed |
 |---|-------|------|--------|
+| #86 | Flexible time tracking: Client level + task-free entries (v3.2.0) | feature | 2026-09-02 |
 | #85 | Journal QoL (wheel drill-down + task sheet) | improvement | 2026-07-08 |
 | #79 | Journaling | feature | 2026-07-04 |
 | #78 | Subtasks: lightweight checklist items under a task (v2.20.0) | feature | 2026-07-02 |
@@ -90,9 +91,6 @@ Recently completed work (keep last 10):
 | #73 | UI uplift: design tokens + chip-driven sheet + board view + Habits v2 Step 1 (v2.17.0) | feature | 2026-05-30 |
 | #74 | Habit tracking (IsHabit + daily check-ins + streaks) (v2.16.0) - completes the recurring+habits program | feature | 2026-05-28 |
 | #72 | Natural-language quick-add (Todoist-style title parsing) (v2.15.0) | feature | 2026-05-27 |
-| #71 | Advanced recurrence grammar (nth-weekday, end conditions, intervals) (v2.14.1) | feature | 2026-05-27 |
-| #70 | Recurrence core (recurring tasks) (v2.14.0) | feature | 2026-05-27 |
-| #69 | Task comments + completion-log foundation (v2.13.0) | feature | 2026-05-27 |
 
 ---
 
