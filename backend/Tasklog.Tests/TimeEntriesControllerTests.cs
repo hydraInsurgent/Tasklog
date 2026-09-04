@@ -66,14 +66,18 @@ public class TimeEntriesControllerTests
         var b = await SeedTask(ctx, "B");
         var controller = new TimeEntriesController(ctx);
 
-        await controller.Start(new StartRequest(a));
+        // A has been running long enough to survive the tiny-entry discard on auto-stop.
+        var aEntry = new TimeEntry { TaskId = a, StartedAt = DateTime.Now.AddMinutes(-10), CreatedAt = DateTime.Now };
+        ctx.TimeEntries.Add(aEntry);
+        await ctx.SaveChangesAsync();
+
         await controller.Start(new StartRequest(b));
 
-        // Exactly one running, and it's on B; A's interval was closed.
+        // Exactly one running, and it's on B; A's interval was closed (kept - it was long).
         (await ctx.TimeEntries.CountAsync(e => e.EndedAt == null)).Should().Be(1);
         var running = await ctx.TimeEntries.SingleAsync(e => e.EndedAt == null);
         running.TaskId.Should().Be(b);
-        (await ctx.TimeEntries.SingleAsync(e => e.TaskId == a)).EndedAt.Should().NotBeNull();
+        (await ctx.TimeEntries.FindAsync(aEntry.Id))!.EndedAt.Should().NotBeNull();
     }
 
     [Fact]
@@ -167,22 +171,78 @@ public class TimeEntriesControllerTests
         suggestions[0].ProjectId.Should().Be(newProject); // most-recent wins
     }
 
+    // #86: stopping a timer that ran under 2.5 min discards it (accidental start/stop).
+    [Fact]
+    public async Task Stop_DiscardsSubTwoAndHalfMinuteEntry()
+    {
+        using var ctx = CreateContext();
+        var taskId = await SeedTask(ctx);
+        var entry = new TimeEntry { TaskId = taskId, StartedAt = DateTime.Now.AddSeconds(-90), CreatedAt = DateTime.Now };
+        ctx.TimeEntries.Add(entry);
+        await ctx.SaveChangesAsync();
+        var controller = new TimeEntriesController(ctx);
+
+        await controller.Stop(entry.Id);
+
+        (await ctx.TimeEntries.FindAsync(entry.Id)).Should().BeNull(); // discarded
+    }
+
+    // #86: a kept entry has both edges snapped to the nearest 5-minute grid on stop.
+    [Fact]
+    public async Task Stop_SnapsBothEdgesToFiveMinuteGrid()
+    {
+        using var ctx = CreateContext();
+        var taskId = await SeedTask(ctx);
+        // Off-grid start well in the past so the entry is long -> kept, and its START snap is
+        // deterministic (09:13:20 -> nearest 5 min = 09:15:00). The end snaps to "now"-on-grid.
+        var entry = new TimeEntry { TaskId = taskId, StartedAt = new DateTime(2026, 6, 8, 9, 13, 20), CreatedAt = DateTime.Now };
+        ctx.TimeEntries.Add(entry);
+        await ctx.SaveChangesAsync();
+        var controller = new TimeEntriesController(ctx);
+
+        await controller.Stop(entry.Id);
+
+        var saved = await ctx.TimeEntries.FindAsync(entry.Id);
+        saved!.StartedAt.Should().Be(new DateTime(2026, 6, 8, 9, 15, 0)); // start snapped to nearest 5
+        (saved.EndedAt!.Value.Minute % 5).Should().Be(0);                 // end snapped to the grid
+        saved.EndedAt.Value.Second.Should().Be(0);
+    }
+
+    // #86: starting a new timer auto-stops the previous one, discarding it if it was tiny.
+    [Fact]
+    public async Task Start_AutoStop_DiscardsTinyPreviousEntry()
+    {
+        using var ctx = CreateContext();
+        var a = await SeedTask(ctx, "A");
+        var b = await SeedTask(ctx, "B");
+        var controller = new TimeEntriesController(ctx);
+
+        // Start A, then immediately start B -> A ran ~0s -> discarded.
+        var started = (await controller.Start(new StartRequest(a)) as CreatedAtActionResult)!.Value as TimeEntryResponse;
+        await controller.Start(new StartRequest(b));
+
+        (await ctx.TimeEntries.FindAsync(started!.Id)).Should().BeNull(); // tiny A discarded
+        (await ctx.TimeEntries.CountAsync(e => e.EndedAt == null)).Should().Be(1); // only B running
+    }
+
     [Fact]
     public async Task Stop_ClosesEntry_AndIsIdempotent()
     {
         using var ctx = CreateContext();
         var taskId = await SeedTask(ctx);
+        // Started 10 min ago so it survives the sub-2.5-min discard on stop.
+        var entry = new TimeEntry { TaskId = taskId, StartedAt = DateTime.Now.AddMinutes(-10), CreatedAt = DateTime.Now };
+        ctx.TimeEntries.Add(entry);
+        await ctx.SaveChangesAsync();
         var controller = new TimeEntriesController(ctx);
-        var started = (await controller.Start(new StartRequest(taskId))
-            as CreatedAtActionResult)!.Value as TimeEntryResponse;
 
-        await controller.Stop(started!.Id);
-        var firstEnd = (await ctx.TimeEntries.FindAsync(started.Id))!.EndedAt;
+        await controller.Stop(entry.Id);
+        var firstEnd = (await ctx.TimeEntries.FindAsync(entry.Id))!.EndedAt;
         firstEnd.Should().NotBeNull();
 
         // Stopping again leaves the end time unchanged.
-        await controller.Stop(started.Id);
-        (await ctx.TimeEntries.FindAsync(started.Id))!.EndedAt.Should().Be(firstEnd);
+        await controller.Stop(entry.Id);
+        (await ctx.TimeEntries.FindAsync(entry.Id))!.EndedAt.Should().Be(firstEnd);
     }
 
     [Fact]

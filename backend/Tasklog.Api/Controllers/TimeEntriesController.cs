@@ -18,6 +18,9 @@ namespace Tasklog.Api.Controllers
     public class TimeEntriesController : ControllerBase
     {
         private const int MaxDescriptionLength = 500;
+        // Tidy rules applied to the STORED data when a timer entry CLOSES (stop/auto-stop), #86:
+        private const int MinDurationSeconds = 150; // under 2.5 min = accidental tap -> discarded
+        private const int SnapMinutes = 5;          // both edges snapped to the nearest 5-min grid
 
         private readonly TasklogDbContext _context;
 
@@ -143,16 +146,18 @@ namespace Tasklog.Api.Controllers
         [HttpPost("{id:int}/stop")]
         public async Task<IActionResult> Stop(int id)
         {
-            var entry = await _context.TimeEntries.FindAsync(id);
+            // Load with grouping so the projection works even if CloseEntry discards the row
+            // (we read the in-memory object after it is removed from the context).
+            var entry = await WithGrouping(_context.TimeEntries).FirstOrDefaultAsync(e => e.Id == id);
             if (entry is null)
                 return NotFound(new { message = $"Time entry {id} not found." });
 
             if (entry.EndedAt is null)
             {
-                entry.EndedAt = DateTime.Now;
+                CloseEntry(entry, DateTime.Now); // discard-if-tiny + snap edges to the grid (#86)
                 await _context.SaveChangesAsync();
             }
-            return Ok(await ProjectByIdAsync(id));
+            return Ok(Project(entry));
         }
 
         // POST /api/time-entries  { taskId?, description?, projectId?, startedAt, endedAt }
@@ -280,7 +285,38 @@ namespace Tasklog.Api.Controllers
         private async Task StopAllRunning(DateTime now)
         {
             var running = await _context.TimeEntries.Where(e => e.EndedAt == null).ToListAsync();
-            foreach (var r in running) r.EndedAt = now;
+            foreach (var r in running) CloseEntry(r, now);
+        }
+
+        // Close a running entry at `endedAt`, applying the #86 tidy rules to the STORED data:
+        //  - discard it if the real duration is under 2.5 min (an accidental start/stop);
+        //  - otherwise snap BOTH edges to the nearest 5-min grid, so the calendar is smooth and
+        //    consecutive entries stay contiguous (a shared transition instant rounds to the same
+        //    value on both sides). Applied only on close, so the timestamps are already in the
+        //    past - no future-dated starts, and a running timer is never touched.
+        // Returns false if the entry was discarded (removed from the context).
+        private bool CloseEntry(TimeEntry entry, DateTime endedAt)
+        {
+            if ((endedAt - entry.StartedAt).TotalSeconds < MinDurationSeconds)
+            {
+                _context.TimeEntries.Remove(entry);
+                return false;
+            }
+            entry.StartedAt = SnapToGrid(entry.StartedAt);
+            entry.EndedAt = SnapToGrid(endedAt);
+            if (entry.EndedAt <= entry.StartedAt) // a ~2.5 min edge case that snapped to zero length
+            {
+                _context.TimeEntries.Remove(entry);
+                return false;
+            }
+            return true;
+        }
+
+        // Round a timestamp to the nearest 5-minute mark (ties round up).
+        private static DateTime SnapToGrid(DateTime t)
+        {
+            var mins = Math.Round(t.TimeOfDay.TotalMinutes / SnapMinutes, MidpointRounding.AwayFromZero) * SnapMinutes;
+            return t.Date.AddMinutes(mins);
         }
 
         private async Task<TaskModel?> ResolveTaskAsync(int? taskId) =>
