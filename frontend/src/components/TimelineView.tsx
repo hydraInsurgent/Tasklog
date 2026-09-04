@@ -17,7 +17,7 @@ import {
 import { formatDuration } from "@/lib/format";
 import {
   PX_PER_MIN, DAY_PX, dateKey, startOfDay, addDays, dayColumns,
-  daySegment, dayTotalSeconds, perActivityTotals, entryLabel, clockLabel,
+  daySegment, layoutDay, dayTotalSeconds, perActivityTotals, entryLabel, clockLabel,
 } from "@/lib/time";
 import { useTimeTracking } from "@/contexts/TimeTrackingContext";
 import { usePolling } from "@/hooks/usePolling";
@@ -442,10 +442,8 @@ export default function TimelineView() {
                       </div>
                     )}
 
-                    {/* Entry blocks for this day */}
-                    {entries.map((en) => {
-                      const seg = daySegment(en.startedAt, en.endedAt, day, now);
-                      if (!seg) return null;
+                    {/* Entry blocks for this day, laid out so short ones don't overlap (#86) */}
+                    {layoutDay(entries, day, now).map(({ entry: en, topPx, heightPx }) => {
                       const color = en.projectColor ?? inboxColor;
                       const running = !en.endedAt;
                       const isSelected = popover?.entry?.id === en.id;
@@ -459,8 +457,8 @@ export default function TimelineView() {
                             isSelected ? "ring-2 ring-accent" : ""
                           }`}
                           style={{
-                            top: seg.topPx,
-                            height: seg.heightPx,
+                            top: topPx,
+                            height: heightPx,
                             backgroundColor: color ? `${color}22` : "var(--color-surface-raised)",
                             borderLeft: `3px solid ${color ?? "var(--color-border)"}`,
                           }}
@@ -468,7 +466,7 @@ export default function TimelineView() {
                           <span className="block truncate text-[11px] font-medium text-text-primary">
                             {entryLabel(en)}{running ? " ·" : ""}
                           </span>
-                          {seg.heightPx >= 32 && (
+                          {heightPx >= 32 && (
                             <span className="block truncate text-[10px] text-text-muted">
                               {clockLabel(en.startedAt)}{en.endedAt ? ` - ${clockLabel(en.endedAt)}` : ""}
                             </span>

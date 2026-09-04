@@ -78,6 +78,35 @@ export function daySegment(
   };
 }
 
+export interface LaidOutBlock {
+  entry: TimeEntry;
+  topPx: number;
+  heightPx: number;
+}
+
+// Lay out a day's entries so short blocks that would visually collide - because each is forced
+// to a minimum readable height (MIN_BLOCK_PX) even when its real time-slot is tiny - are pushed
+// down to sit one under the other instead of overlapping. Timer entries never overlap in TIME
+// (single-timer invariant), so this is purely a render fix: walking in start order, each block
+// starts no higher than the previous one's bottom. Real gaps between entries are preserved.
+// Trade-off: a dense cluster of short entries drifts slightly later on screen, in exchange for
+// every block staying readable and separate.
+export function layoutDay(entries: TimeEntry[], day: Date, now: Date): LaidOutBlock[] {
+  const segs = entries
+    .map((e) => ({ e, seg: daySegment(e.startedAt, e.endedAt, day, now) }))
+    .filter((x): x is { e: TimeEntry; seg: DaySegment } => x.seg !== null)
+    .sort((a, b) => a.seg.startMin - b.seg.startMin);
+
+  const out: LaidOutBlock[] = [];
+  let prevBottom = -Infinity;
+  for (const { e, seg } of segs) {
+    const topPx = Math.max(seg.topPx, prevBottom);
+    out.push({ entry: e, topPx, heightPx: seg.heightPx });
+    prevBottom = topPx + seg.heightPx;
+  }
+  return out;
+}
+
 // Seconds of [start, end] that fall on `day` (for per-day totals; respects midnight split).
 export function secondsOnDay(startISO: string, endISO: string | null, day: Date, now: Date): number {
   const dayStart = startOfDay(day).getTime();

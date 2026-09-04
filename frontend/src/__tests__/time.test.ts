@@ -1,5 +1,5 @@
 import {
-  daySegment, secondsOnDay, dayTotalSeconds, perActivityTotals,
+  daySegment, layoutDay, secondsOnDay, dayTotalSeconds, perActivityTotals,
   mondayOf, dayColumns, PX_PER_MIN, MIN_BLOCK_PX,
 } from '@/lib/time'
 import { TimeEntry } from '@/lib/api'
@@ -86,6 +86,32 @@ describe('perActivityTotals', () => {
     ]
     const totals = perActivityTotals(entries, [day(2026, 6, 8)], NOW)
     expect(totals).toEqual([{ key: 'dsleep', title: 'Sleep', seconds: 7 * 3600 }])
+  })
+})
+
+describe('layoutDay (push-down so short blocks do not overlap)', () => {
+  const D = day(2026, 6, 8)
+
+  it('pushes a colliding short block below the previous one', () => {
+    // Two 1-min entries back-to-back: each forced to MIN_BLOCK_PX, so they would overlap.
+    const entries = [
+      entry({ id: 1, startedAt: '2026-06-08T09:00:00', endedAt: '2026-06-08T09:01:00' }),
+      entry({ id: 2, startedAt: '2026-06-08T09:01:00', endedAt: '2026-06-08T09:02:00' }),
+    ]
+    const laid = layoutDay(entries, D, NOW)
+    expect(laid).toHaveLength(2)
+    // Second block starts no higher than the first block's bottom -> no overlap.
+    expect(laid[1].topPx).toBeGreaterThanOrEqual(laid[0].topPx + laid[0].heightPx)
+  })
+
+  it('leaves well-separated blocks at their real positions', () => {
+    const entries = [
+      entry({ id: 1, startedAt: '2026-06-08T09:00:00', endedAt: '2026-06-08T10:00:00' }),
+      entry({ id: 2, startedAt: '2026-06-08T14:00:00', endedAt: '2026-06-08T15:00:00' }),
+    ]
+    const laid = layoutDay(entries, D, NOW)
+    expect(laid[0].topPx).toBeCloseTo(540 * PX_PER_MIN) // 09:00, unshifted
+    expect(laid[1].topPx).toBeCloseTo(840 * PX_PER_MIN) // 14:00, unshifted (real gap preserved)
   })
 })
 
