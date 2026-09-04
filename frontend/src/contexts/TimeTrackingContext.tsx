@@ -7,11 +7,26 @@
  * server-side; we just replace the local active entry. */
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { TimeEntry, createTask, getActiveTimeEntry, startTimer, stopTimer } from "@/lib/api";
+import { TimeEntry, getActiveTimeEntry, startTimer, stopTimer, updateTimeEntry } from "@/lib/api";
+import { usePolling } from "@/hooks/usePolling";
 
-// Fired after quickStart creates a task so the task list (TasksClient) refetches and the
-// new task shows immediately, instead of waiting for the 30s poll.
+// Fired on any timer start/stop (#86). Open task/time views (TasksClient, the task-detail
+// time log) listen for it and refresh, so time tracked against a task reflects immediately
+// instead of waiting for the 30s poll. (Pre-#86 it fired only after a quick-start created a
+// task; quick-start no longer creates tasks, so start/stop is now the trigger.)
 export const TASKS_CHANGED_EVENT = "tasklog:tasks-changed";
+
+function announceTasksChanged() {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(TASKS_CHANGED_EVENT));
+}
+
+// What a caller can start a timer with (#86): a task, a free-text description, a project -
+// any combination, all optional (a bare timer is valid, categorize it later).
+export interface StartEntryInput {
+  taskId?: number;
+  description?: string;
+  projectId?: number | null;
+}
 
 interface TimeTrackingValue {
   active: TimeEntry | null;
@@ -21,8 +36,14 @@ interface TimeTrackingValue {
   pending: boolean;
   isRunning: (taskId: number) => boolean;
   start: (taskId: number) => Promise<void>;
-  // Quick-create an Inbox task from a typed title and immediately start tracking it (#77).
-  quickStart: (title: string) => Promise<void>;
+  // Start a timer with any combination of task / description / project (#86).
+  startEntry: (input: StartEntryInput) => Promise<void>;
+  // Start a task-free entry from a typed label (+ optional project). No phantom task (#86).
+  quickStart: (description: string, projectId?: number | null) => Promise<void>;
+  // Edit the running entry's description and/or project without stopping it (#86).
+  updateActive: (fields: { description?: string | null; projectId?: number | null }) => Promise<void>;
+  // Re-pull the running entry from the server (e.g. after the timeline edits its start time).
+  refreshActive: () => Promise<void>;
   stop: () => Promise<void>;
 }
 
@@ -35,7 +56,10 @@ const NOOP: TimeTrackingValue = {
   pending: false,
   isRunning: () => false,
   start: async () => {},
+  startEntry: async () => {},
   quickStart: async () => {},
+  updateActive: async () => {},
+  refreshActive: async () => {},
   stop: async () => {},
 };
 
@@ -45,6 +69,10 @@ export function TimeTrackingProvider({ children }: { children: React.ReactNode }
   const [active, setActive] = useState<TimeEntry | null>(null);
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
   const [pending, setPending] = useState(false);
+  // Synchronous mirror of `active` for the cross-device reconcile poll (state reads inside a
+  // callback can be one render stale).
+  const activeRef = useRef<TimeEntry | null>(null);
+  useEffect(() => { activeRef.current = active; }, [active]);
 
   // Rehydrate the running timer on mount.
   useEffect(() => {
@@ -76,46 +104,47 @@ export function TimeTrackingProvider({ children }: { children: React.ReactNode }
   // Guard against overlapping start/stop clicks.
   const inFlight = useRef(false);
 
-  const start = useCallback(async (taskId: number) => {
+  // Start a timer from any combination of task / description / project (#86). The server
+  // auto-stops any previous timer; we just replace the local active entry.
+  const startEntry = useCallback(async (input: StartEntryInput) => {
     if (inFlight.current) return;
     inFlight.current = true;
     setPending(true);
     try {
-      const entry = await startTimer(taskId); // server auto-stops any previous timer
+      const body: StartEntryInput = {};
+      if (input.taskId !== undefined) body.taskId = input.taskId;
+      const desc = input.description?.trim();
+      if (desc) body.description = desc;
+      if (input.projectId != null) body.projectId = input.projectId;
+      const entry = await startTimer(body);
       setActive(entry);
       setNowMs(Date.now());
+      announceTasksChanged(); // refresh open task/time views
     } finally {
       setPending(false);
       inFlight.current = false;
     }
   }, []);
 
-  // Quick-create a task (Inbox) from a title and start its timer in one step. The created
-  // task behaves like any other - it shows in the list and accrues sessions like normal.
-  const quickStart = useCallback(async (title: string) => {
-    if (inFlight.current) return;
-    inFlight.current = true;
-    setPending(true);
-    let taskCreated = false;
-    try {
-      const task = await createTask(title.trim() || "Untitled");
-      taskCreated = true;
-      const entry = await startTimer(task.id); // server auto-stops any previous timer
-      setActive(entry);
-      setNowMs(Date.now());
-      if (typeof window !== "undefined") window.dispatchEvent(new Event(TASKS_CHANGED_EVENT));
-    } catch (err) {
-      // If the task was created but the timer failed, still refresh the list so the
-      // orphaned task shows up rather than disappearing silently.
-      if (taskCreated && typeof window !== "undefined") {
-        window.dispatchEvent(new Event(TASKS_CHANGED_EVENT));
-      }
-      throw err;
-    } finally {
-      setPending(false);
-      inFlight.current = false;
-    }
-  }, []);
+  const start = useCallback((taskId: number) => startEntry({ taskId }), [startEntry]);
+
+  // Start a task-free entry from a typed label (+ optional project). No phantom Inbox task
+  // is created anymore (#86) - the entry stands on its own as tracked actuals.
+  const quickStart = useCallback(
+    (description: string, projectId?: number | null) => startEntry({ description, projectId }),
+    [startEntry],
+  );
+
+  // Edit the running entry's description/project in place (present-key), keeping it running.
+  const updateActive = useCallback(
+    async (fields: { description?: string | null; projectId?: number | null }) => {
+      const current = active;
+      if (!current) return;
+      const updated = await updateTimeEntry(current.id, fields);
+      setActive(updated);
+    },
+    [active],
+  );
 
   const stop = useCallback(async () => {
     if (inFlight.current) return;
@@ -126,17 +155,54 @@ export function TimeTrackingProvider({ children }: { children: React.ReactNode }
     try {
       await stopTimer(current.id);
       setActive(null);
+      announceTasksChanged(); // refresh open task/time views
     } finally {
       setPending(false);
       inFlight.current = false;
     }
   }, [active]);
 
+  // Poll the server for the running timer so a start/stop/edit on ANOTHER device shows up here
+  // within the interval (the bar + timeline are otherwise only rehydrated on mount, which is
+  // why the desktop showed a stale timer after acting on mobile). Skip while a local start/stop
+  // is mid-flight so we never clobber the optimistic state.
+  usePolling(
+    useCallback(async () => {
+      if (inFlight.current) return;
+      try {
+        const server = await getActiveTimeEntry();
+        const prevId = activeRef.current?.id ?? null;
+        const serverId = server?.id ?? null;
+        if (prevId !== serverId) {
+          setActive(server);          // started/stopped elsewhere - adopt server truth
+          if (server) setNowMs(Date.now());
+        } else if (server) {
+          setActive(server);          // same entry, refresh fields edited elsewhere
+        }
+      } catch {
+        /* transient (offline / API blip) - keep current state */
+      }
+    }, []),
+    15000,
+  );
+
+  // Re-pull the running entry from the server (used after the timeline edits its start, so the
+  // bar's live elapsed reflects the new start immediately instead of waiting for the 15s poll).
+  const refreshActive = useCallback(async () => {
+    try {
+      const server = await getActiveTimeEntry();
+      setActive(server);
+      if (server) setNowMs(Date.now());
+    } catch {
+      /* keep current state */
+    }
+  }, []);
+
   const isRunning = useCallback((taskId: number) => active?.taskId === taskId, [active]);
 
   return (
     <TimeTrackingContext.Provider
-      value={{ active, elapsedSeconds, pending, isRunning, start, quickStart, stop }}
+      value={{ active, elapsedSeconds, pending, isRunning, start, startEntry, quickStart, updateActive, refreshActive, stop }}
     >
       {children}
     </TimeTrackingContext.Provider>

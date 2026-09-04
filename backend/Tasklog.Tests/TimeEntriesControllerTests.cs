@@ -20,12 +20,20 @@ public class TimeEntriesControllerTests
         return new TasklogDbContext(options);
     }
 
-    private static async Task<int> SeedTask(TasklogDbContext ctx, string title = "T")
+    private static async Task<int> SeedTask(TasklogDbContext ctx, string title = "T", int? projectId = null)
     {
-        var t = new TaskModel { Title = title, CreatedAt = DateTime.Now };
+        var t = new TaskModel { Title = title, CreatedAt = DateTime.Now, ProjectId = projectId };
         ctx.Tasks.Add(t);
         await ctx.SaveChangesAsync();
         return t.Id;
+    }
+
+    private static async Task<int> SeedProject(TasklogDbContext ctx, string name = "P")
+    {
+        var p = new Project { Name = name, CreatedAt = DateTime.Now };
+        ctx.Projects.Add(p);
+        await ctx.SaveChangesAsync();
+        return p.Id;
     }
 
     private static JsonElement Json(string json)
@@ -58,14 +66,18 @@ public class TimeEntriesControllerTests
         var b = await SeedTask(ctx, "B");
         var controller = new TimeEntriesController(ctx);
 
-        await controller.Start(new StartRequest(a));
+        // A has been running long enough to survive the tiny-entry discard on auto-stop.
+        var aEntry = new TimeEntry { TaskId = a, StartedAt = DateTime.Now.AddMinutes(-10), CreatedAt = DateTime.Now };
+        ctx.TimeEntries.Add(aEntry);
+        await ctx.SaveChangesAsync();
+
         await controller.Start(new StartRequest(b));
 
-        // Exactly one running, and it's on B; A's interval was closed.
+        // Exactly one running, and it's on B; A's interval was closed (kept - it was long).
         (await ctx.TimeEntries.CountAsync(e => e.EndedAt == null)).Should().Be(1);
         var running = await ctx.TimeEntries.SingleAsync(e => e.EndedAt == null);
         running.TaskId.Should().Be(b);
-        (await ctx.TimeEntries.SingleAsync(e => e.TaskId == a)).EndedAt.Should().NotBeNull();
+        (await ctx.TimeEntries.FindAsync(aEntry.Id))!.EndedAt.Should().NotBeNull();
     }
 
     [Fact]
@@ -76,22 +88,161 @@ public class TimeEntriesControllerTests
         (await controller.Start(new StartRequest(999))).Should().BeOfType<NotFoundObjectResult>();
     }
 
+    // #86: a timer can start with no task at all - just a description and a project.
+    [Fact]
+    public async Task Start_TaskFree_WithDescriptionAndProject()
+    {
+        using var ctx = CreateContext();
+        var projectId = await SeedProject(ctx, "Routines");
+        var controller = new TimeEntriesController(ctx);
+
+        var result = await controller.Start(new StartRequest(Description: "  Rise and Shine  ", ProjectId: projectId));
+
+        var entry = (result as CreatedAtActionResult)!.Value as TimeEntryResponse;
+        entry!.TaskId.Should().BeNull();
+        entry.Description.Should().Be("Rise and Shine"); // trimmed
+        entry.ProjectId.Should().Be(projectId);
+    }
+
+    // #86: starting on a task with no explicit project defaults the entry's project from it.
+    [Fact]
+    public async Task Start_OnTask_DefaultsProjectFromTask()
+    {
+        using var ctx = CreateContext();
+        var projectId = await SeedProject(ctx);
+        var taskId = await SeedTask(ctx, "T", projectId);
+        var controller = new TimeEntriesController(ctx);
+
+        var entry = (await controller.Start(new StartRequest(taskId)) as CreatedAtActionResult)!.Value as TimeEntryResponse;
+        entry!.ProjectId.Should().Be(projectId);
+    }
+
+    [Fact]
+    public async Task Start_UnknownProject_Returns404()
+    {
+        using var ctx = CreateContext();
+        var controller = new TimeEntriesController(ctx);
+        (await controller.Start(new StartRequest(ProjectId: 999))).Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    // #86: present-key edit of description, project, and the optional task link (incl. clearing).
+    [Fact]
+    public async Task Update_SetsDescriptionProjectAndTask_ThenClears()
+    {
+        using var ctx = CreateContext();
+        var projectId = await SeedProject(ctx);
+        var taskId = await SeedTask(ctx);
+        var entry = new TimeEntry { StartedAt = new DateTime(2026, 6, 8, 9, 0, 0), EndedAt = new DateTime(2026, 6, 8, 10, 0, 0), CreatedAt = DateTime.Now };
+        ctx.TimeEntries.Add(entry);
+        await ctx.SaveChangesAsync();
+        var controller = new TimeEntriesController(ctx);
+
+        await controller.Update(entry.Id, Json($"{{\"description\":\"Sleep\",\"projectId\":{projectId},\"taskId\":{taskId}}}"));
+        var saved = await ctx.TimeEntries.FindAsync(entry.Id);
+        saved!.Description.Should().Be("Sleep");
+        saved.ProjectId.Should().Be(projectId);
+        saved.TaskId.Should().Be(taskId);
+
+        await controller.Update(entry.Id, Json("{\"projectId\":null,\"taskId\":null}"));
+        saved = await ctx.TimeEntries.FindAsync(entry.Id);
+        saved!.ProjectId.Should().BeNull();
+        saved.TaskId.Should().BeNull();
+        saved.Description.Should().Be("Sleep"); // omitted key = kept
+    }
+
+    // #86: autocomplete returns distinct recent descriptions with their most-recent project.
+    [Fact]
+    public async Task Suggestions_ReturnsDistinctRecentDescriptions_WithProject()
+    {
+        using var ctx = CreateContext();
+        var oldProject = await SeedProject(ctx, "Old");
+        var newProject = await SeedProject(ctx, "New");
+        ctx.TimeEntries.AddRange(
+            new TimeEntry { Description = "Rise and Shine", ProjectId = oldProject, StartedAt = new DateTime(2026, 6, 1, 7, 0, 0), CreatedAt = DateTime.Now },
+            new TimeEntry { Description = "Rise and Shine", ProjectId = newProject, StartedAt = new DateTime(2026, 6, 8, 7, 0, 0), CreatedAt = DateTime.Now },
+            new TimeEntry { Description = "Gaming", ProjectId = null, StartedAt = new DateTime(2026, 6, 7, 20, 0, 0), CreatedAt = DateTime.Now });
+        await ctx.SaveChangesAsync();
+        var controller = new TimeEntriesController(ctx);
+
+        var ok = await controller.Suggestions(text: "rise", limit: null) as OkObjectResult;
+        var suggestions = ok!.Value as List<EntrySuggestion>;
+        suggestions!.Should().ContainSingle();
+        suggestions[0].Description.Should().Be("Rise and Shine");
+        suggestions[0].ProjectId.Should().Be(newProject); // most-recent wins
+    }
+
+    // #86: stopping a timer that ran under 2.5 min discards it (accidental start/stop).
+    [Fact]
+    public async Task Stop_DiscardsSubTwoAndHalfMinuteEntry()
+    {
+        using var ctx = CreateContext();
+        var taskId = await SeedTask(ctx);
+        var entry = new TimeEntry { TaskId = taskId, StartedAt = DateTime.Now.AddSeconds(-90), CreatedAt = DateTime.Now };
+        ctx.TimeEntries.Add(entry);
+        await ctx.SaveChangesAsync();
+        var controller = new TimeEntriesController(ctx);
+
+        await controller.Stop(entry.Id);
+
+        (await ctx.TimeEntries.FindAsync(entry.Id)).Should().BeNull(); // discarded
+    }
+
+    // #86: a kept entry has both edges snapped to the nearest 5-minute grid on stop.
+    [Fact]
+    public async Task Stop_SnapsBothEdgesToFiveMinuteGrid()
+    {
+        using var ctx = CreateContext();
+        var taskId = await SeedTask(ctx);
+        // Off-grid start well in the past so the entry is long -> kept, and its START snap is
+        // deterministic (09:13:20 -> nearest 5 min = 09:15:00). The end snaps to "now"-on-grid.
+        var entry = new TimeEntry { TaskId = taskId, StartedAt = new DateTime(2026, 6, 8, 9, 13, 20), CreatedAt = DateTime.Now };
+        ctx.TimeEntries.Add(entry);
+        await ctx.SaveChangesAsync();
+        var controller = new TimeEntriesController(ctx);
+
+        await controller.Stop(entry.Id);
+
+        var saved = await ctx.TimeEntries.FindAsync(entry.Id);
+        saved!.StartedAt.Should().Be(new DateTime(2026, 6, 8, 9, 15, 0)); // start snapped to nearest 5
+        (saved.EndedAt!.Value.Minute % 5).Should().Be(0);                 // end snapped to the grid
+        saved.EndedAt.Value.Second.Should().Be(0);
+    }
+
+    // #86: starting a new timer auto-stops the previous one, discarding it if it was tiny.
+    [Fact]
+    public async Task Start_AutoStop_DiscardsTinyPreviousEntry()
+    {
+        using var ctx = CreateContext();
+        var a = await SeedTask(ctx, "A");
+        var b = await SeedTask(ctx, "B");
+        var controller = new TimeEntriesController(ctx);
+
+        // Start A, then immediately start B -> A ran ~0s -> discarded.
+        var started = (await controller.Start(new StartRequest(a)) as CreatedAtActionResult)!.Value as TimeEntryResponse;
+        await controller.Start(new StartRequest(b));
+
+        (await ctx.TimeEntries.FindAsync(started!.Id)).Should().BeNull(); // tiny A discarded
+        (await ctx.TimeEntries.CountAsync(e => e.EndedAt == null)).Should().Be(1); // only B running
+    }
+
     [Fact]
     public async Task Stop_ClosesEntry_AndIsIdempotent()
     {
         using var ctx = CreateContext();
         var taskId = await SeedTask(ctx);
+        // Started 10 min ago so it survives the sub-2.5-min discard on stop.
+        var entry = new TimeEntry { TaskId = taskId, StartedAt = DateTime.Now.AddMinutes(-10), CreatedAt = DateTime.Now };
+        ctx.TimeEntries.Add(entry);
+        await ctx.SaveChangesAsync();
         var controller = new TimeEntriesController(ctx);
-        var started = (await controller.Start(new StartRequest(taskId))
-            as CreatedAtActionResult)!.Value as TimeEntryResponse;
 
-        await controller.Stop(started!.Id);
-        var firstEnd = (await ctx.TimeEntries.FindAsync(started.Id))!.EndedAt;
+        await controller.Stop(entry.Id);
+        var firstEnd = (await ctx.TimeEntries.FindAsync(entry.Id))!.EndedAt;
         firstEnd.Should().NotBeNull();
 
         // Stopping again leaves the end time unchanged.
-        await controller.Stop(started.Id);
-        (await ctx.TimeEntries.FindAsync(started.Id))!.EndedAt.Should().Be(firstEnd);
+        await controller.Stop(entry.Id);
+        (await ctx.TimeEntries.FindAsync(entry.Id))!.EndedAt.Should().Be(firstEnd);
     }
 
     [Fact]
@@ -101,7 +252,7 @@ public class TimeEntriesControllerTests
         var taskId = await SeedTask(ctx);
         var controller = new TimeEntriesController(ctx);
 
-        var req = new ManualRequest(taskId, new DateTime(2026, 6, 8, 10, 0, 0), new DateTime(2026, 6, 8, 9, 0, 0));
+        var req = new ManualRequest(new DateTime(2026, 6, 8, 10, 0, 0), new DateTime(2026, 6, 8, 9, 0, 0), taskId);
         (await controller.AddManual(req)).Should().BeOfType<BadRequestObjectResult>();
     }
 
@@ -112,7 +263,7 @@ public class TimeEntriesControllerTests
         var taskId = await SeedTask(ctx);
         var controller = new TimeEntriesController(ctx);
 
-        var req = new ManualRequest(taskId, new DateTime(2026, 6, 8, 9, 0, 0), new DateTime(2026, 6, 8, 10, 30, 0));
+        var req = new ManualRequest(new DateTime(2026, 6, 8, 9, 0, 0), new DateTime(2026, 6, 8, 10, 30, 0), taskId);
         var entry = (await controller.AddManual(req) as CreatedAtActionResult)!.Value as TimeEntryResponse;
 
         entry!.EndedAt.Should().Be(new DateTime(2026, 6, 8, 10, 30, 0));
@@ -159,6 +310,26 @@ public class TimeEntriesControllerTests
 
         (await controller.Delete(entry.Id)).Should().BeOfType<NoContentResult>();
         (await ctx.TimeEntries.FindAsync(entry.Id)).Should().BeNull();
+    }
+
+    // #86: deleting a task snapshots its title into description-less entries so the tracked
+    // interval stays legible (instead of becoming "Untitled") once its TaskId is cleared.
+    [Fact]
+    public async Task DeletingTask_SnapshotsTitleIntoDescriptionlessEntries()
+    {
+        using var ctx = CreateContext();
+        var taskId = await SeedTask(ctx, "Write report");
+        ctx.TimeEntries.AddRange(
+            new TimeEntry { TaskId = taskId, StartedAt = DateTime.Now, EndedAt = DateTime.Now.AddMinutes(30), CreatedAt = DateTime.Now },
+            new TimeEntry { TaskId = taskId, Description = "own label", StartedAt = DateTime.Now, EndedAt = DateTime.Now.AddMinutes(30), CreatedAt = DateTime.Now });
+        await ctx.SaveChangesAsync();
+
+        await TasksController.SnapshotTaskTitlesIntoEntries(ctx, await ctx.Tasks.Where(t => t.Id == taskId).ToListAsync());
+        await ctx.SaveChangesAsync();
+
+        var entries = await ctx.TimeEntries.OrderBy(e => e.Id).ToListAsync();
+        entries[0].Description.Should().Be("Write report"); // was empty -> got the title
+        entries[1].Description.Should().Be("own label");     // kept its own description
     }
 
     [Fact]

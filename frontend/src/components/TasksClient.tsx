@@ -128,7 +128,7 @@ export default function TasksClient({
     loadTasks();
   }, [loadTasks]);
 
-  // Refetch when a task is quick-created from the tracking bar (#77), so it appears at once.
+  // Refetch when a timer starts/stops (#86), so time tracked against a task reflects at once.
   useEffect(() => {
     const onTasksChanged = () => loadTasks();
     window.addEventListener(TASKS_CHANGED_EVENT, onTasksChanged);

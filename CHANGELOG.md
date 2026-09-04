@@ -2,6 +2,33 @@
 
 ---
 
+## v3.2.0 - Flexible time tracking + Clients
+*September 2026*
+
+### Added
+
+- **Clients** (#86) - a grouping level above projects (a life area like Work, Family, Self). Manage them in a collapsible sidebar section; assign a project to a client from the project's edit dialog. Deleting a client keeps its projects - they just become Ungrouped.
+- **Task-free time tracking** - start a timer with just a description (and an optional project); no more phantom Inbox task. Time entries are first-class now: each carries its own description and project, and the task link is optional - so you can log life (sleep, chores, gaming) alongside task work.
+- **Edit the running entry from the timeline** - click the live block to fix its start / description / project (the end stays "running"), with a "Set start to last stop" button for gap-free chaining.
+- **Radial time picker** - a clock-dial 12-hour AM/PM picker for entry start/end, replacing the native dropdown.
+- **Journal "Today so far" breakdown** - the day's tracked time split by Client / Project with proportion bars.
+- MCP gains a **client** tool family and **task-optional** timers/logs; `get_time_summary` now groups by client/project. 45 tools total.
+
+### Changed
+
+- **Drag-reorder projects** in the sidebar; each row shows its client, and the edit/delete actions moved into a "..." menu so names aren't truncated. The rail is a touch wider.
+- **Timeline** opens in Day view and renders on a **5-minute-box grid** so short entries always fit; blocks that would collide **push down** instead of overlapping. The add/edit form is a **bottom sheet on mobile / centered modal on desktop** with a pinned Save - and clicking away saves.
+- **Timer entries are tidied on stop** - anything under 2.5 min is discarded (accidental taps), and kept entries snap both edges to the nearest 5 min, so the calendar stays clean and contiguous.
+- The running timer and timeline now **poll**, so a start/stop on one device shows on another within ~15s.
+
+### Notes
+
+- New `Clients` table; `Project` gains `ClientId` + `Position`; `TimeEntry.TaskId` is now nullable with its own `Description` + `ProjectId`. Deleting a task / project / client SET-NULLs the link on time entries (logged time is never lost; a deleted task's title is snapshotted into its entries first). Migration `AddClientsAndDecoupleTimeEntries`.
+- New endpoints: `/api/clients` CRUD, `POST /api/projects/reorder`, `GET /api/time-entries/suggestions`; time-entry start/log/edit accept an optional task + description + project.
+- No new runtime dependencies. Not yet deployed - ship, then deploy backend first and restart the phone MCP.
+
+---
+
 ## v3.1.0 - Journal QoL: drill-down feelings wheel
 *July 2026*
 

@@ -17,10 +17,12 @@ import {
 import { formatDuration } from "@/lib/format";
 import {
   PX_PER_MIN, DAY_PX, dateKey, startOfDay, addDays, dayColumns,
-  daySegment, dayTotalSeconds, perTaskTotals, clockLabel,
+  daySegment, layoutDay, dayTotalSeconds, perActivityTotals, entryLabel, clockLabel,
 } from "@/lib/time";
 import { useTimeTracking } from "@/contexts/TimeTrackingContext";
+import { usePolling } from "@/hooks/usePolling";
 import ColorPickerButton from "@/components/ColorPickerButton";
+import RadialTimePicker from "@/components/RadialTimePicker";
 
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
 const WEEKDAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -34,19 +36,23 @@ function isoFromDayTime(day: Date, time: string): string {
   return `${dateKey(day)}T${time}:00`;
 }
 
-// Add/edit popover state. `entry` set => editing; else adding a new one on `day`.
+// Add/edit popover state. `entry` set => editing; else adding a new one on `day`. As of #86
+// an entry can be task-free: it carries a free-text description and its own project, and the
+// task link is optional (taskId "" = none).
 interface PopoverState {
   day: Date;
   topPx: number;
   taskId: number | "";
+  description: string;
+  projectId: number | "";
   start: string; // HH:mm
   end: string;   // HH:mm
   entry?: TimeEntry;
 }
 
 export default function TimelineView() {
-  const { active } = useTimeTracking(); // subscribing makes the view re-render on the 1s tick
-  const [mode, setMode] = useState<"day" | "week">("week");
+  const { active, refreshActive } = useTimeTracking(); // subscribing re-renders on the 1s tick
+  const [mode, setMode] = useState<"day" | "week">("day");
   const [isDesktop, setIsDesktop] = useState(true);
   const [anchor, setAnchor] = useState<Date>(() => startOfDay(new Date()));
   const [entries, setEntries] = useState<TimeEntry[]>([]);
@@ -102,6 +108,10 @@ export default function TimelineView() {
     load();
   }, [load, active?.id]);
 
+  // Poll the visible range so entries logged/edited on another device appear (pauses when the
+  // tab is hidden). The context also polls the active timer, which refires the effect above.
+  usePolling(load, 30000);
+
   // Tasks and projects for the add-entry picker.
   useEffect(() => {
     getTasks().then(setTasks).catch(() => {});
@@ -146,30 +156,64 @@ export default function TimelineView() {
     setPopover({
       day,
       topPx: rounded * PX_PER_MIN,
-      taskId: tasks[0]?.id ?? "",
+      taskId: "",
+      description: "",
+      projectId: "",
       start: hhmm(startD),
       end: hhmm(endD),
     });
   }
 
   function openEdit(entry: TimeEntry) {
-    if (!entry.endedAt) return; // the running entry is controlled from the tracking bar
+    // Running entries are editable too (#86): you can fix the start / description / project
+    // while the timer runs; the end stays "running" (stopping is still done from the bar).
     const s = new Date(entry.startedAt);
     setFormError("");
     setPopover({
       day: startOfDay(s),
       topPx: daySegment(entry.startedAt, entry.endedAt, startOfDay(s), now)?.topPx ?? 0,
-      taskId: entry.taskId,
+      taskId: entry.taskId ?? "",
+      description: entry.description ?? "",
+      projectId: entry.projectId ?? "",
       start: hhmm(s),
-      end: hhmm(new Date(entry.endedAt)),
+      end: entry.endedAt ? hhmm(new Date(entry.endedAt)) : hhmm(now),
       entry,
     });
   }
 
   async function saveForm() {
     if (!popover) return;
-    if (popover.taskId === "") { setFormError("Pick a task."); return; }
+    // #86: an entry needs SOMETHING to identify it - a task or a description.
+    if (popover.taskId === "" && !popover.description.trim()) {
+      setFormError("Add a description or pick a task.");
+      return;
+    }
+    const taskId = popover.taskId === "" ? null : popover.taskId;
+    const projectId = popover.projectId === "" ? null : popover.projectId;
+    const description = popover.description.trim() || null;
     const startISO = isoFromDayTime(popover.day, popover.start);
+
+    // Running entry (#86): edit start / description / project in place; the end stays running
+    // (stopping is done from the tracking bar), so skip the end validation entirely.
+    if (popover.entry && !popover.entry.endedAt) {
+      if (new Date(startISO).getTime() > Date.now()) {
+        setFormError("Start can't be in the future.");
+        return;
+      }
+      setSaving(true);
+      try {
+        await updateTimeEntry(popover.entry.id, { startedAt: startISO, taskId, description, projectId });
+        await refreshActive(); // sync the bar's live elapsed to the new start
+        setPopover(null);
+        await load();
+      } catch (err) {
+        setFormError(err instanceof Error ? err.message : "Save failed.");
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
     const endISO = isoFromDayTime(popover.day, popover.end);
     if (new Date(endISO).getTime() <= new Date(startISO).getTime()) {
       setFormError("End must be after start.");
@@ -192,9 +236,10 @@ export default function TimelineView() {
     setSaving(true);
     try {
       if (popover.entry) {
-        await updateTimeEntry(popover.entry.id, { startedAt: startISO, endedAt: endISO });
+        // Present-key: send task/description/project too so edits (incl. clearing) stick.
+        await updateTimeEntry(popover.entry.id, { startedAt: startISO, endedAt: endISO, taskId, description, projectId });
       } else {
-        await addTimeEntry(popover.taskId as number, startISO, endISO);
+        await addTimeEntry({ startedAt: startISO, endedAt: endISO, taskId, description, projectId });
       }
       setPopover(null);
       await load();
@@ -219,8 +264,26 @@ export default function TimelineView() {
     }
   }
 
+  // "Exit saves" (#86): clicking the sheet backdrop commits the edit when there's something
+  // to save; an untouched/empty form is just discarded so exiting always closes.
+  async function dismissForm() {
+    if (!popover) return;
+    const hasContent = popover.taskId !== "" || popover.description.trim() !== "";
+    if (hasContent) await saveForm();
+    else setPopover(null);
+  }
+
   const rangeTotal = columns.reduce((sum, d) => sum + dayTotalSeconds(entries, d, now), 0);
-  const taskTotals = useMemo(() => perTaskTotals(entries, columns, now), [entries, columns, now]);
+  const activityTotals = useMemo(() => perActivityTotals(entries, columns, now), [entries, columns, now]);
+  // The most recent stopped timer's end, for the running-entry "set start to last stop" button.
+  const lastStopISO = useMemo(() => {
+    let latest: string | null = null;
+    for (const e of entries) {
+      if (!e.endedAt) continue;
+      if (!latest || new Date(e.endedAt) > new Date(latest)) latest = e.endedAt;
+    }
+    return latest;
+  }, [entries]);
 
   return (
     <div className="space-y-4">
@@ -389,10 +452,8 @@ export default function TimelineView() {
                       </div>
                     )}
 
-                    {/* Entry blocks for this day */}
-                    {entries.map((en) => {
-                      const seg = daySegment(en.startedAt, en.endedAt, day, now);
-                      if (!seg) return null;
+                    {/* Entry blocks for this day, laid out so short ones don't overlap (#86) */}
+                    {layoutDay(entries, day, now).map(({ entry: en, topPx, heightPx }) => {
                       const color = en.projectColor ?? inboxColor;
                       const running = !en.endedAt;
                       const isSelected = popover?.entry?.id === en.id;
@@ -401,21 +462,21 @@ export default function TimelineView() {
                           key={`${en.id}-${dateKey(day)}`}
                           type="button"
                           onClick={(e) => { e.stopPropagation(); openEdit(en); }}
-                          title={`${en.taskTitle} · ${clockLabel(en.startedAt)}${en.endedAt ? ` - ${clockLabel(en.endedAt)}` : " (running)"}`}
+                          title={`${entryLabel(en)} · ${clockLabel(en.startedAt)}${en.endedAt ? ` - ${clockLabel(en.endedAt)}` : " (running)"}`}
                           className={`absolute left-0.5 right-0.5 overflow-hidden rounded text-left px-1.5 py-0.5 focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer transition-shadow duration-75 ${
                             isSelected ? "ring-2 ring-accent" : ""
                           }`}
                           style={{
-                            top: seg.topPx,
-                            height: seg.heightPx,
+                            top: topPx,
+                            height: heightPx,
                             backgroundColor: color ? `${color}22` : "var(--color-surface-raised)",
                             borderLeft: `3px solid ${color ?? "var(--color-border)"}`,
                           }}
                         >
                           <span className="block truncate text-[11px] font-medium text-text-primary">
-                            {en.taskTitle}{running ? " ·" : ""}
+                            {entryLabel(en)}{running ? " ·" : ""}
                           </span>
-                          {seg.heightPx >= 32 && (
+                          {heightPx >= 32 && (
                             <span className="block truncate text-[10px] text-text-muted">
                               {clockLabel(en.startedAt)}{en.endedAt ? ` - ${clockLabel(en.endedAt)}` : ""}
                             </span>
@@ -424,20 +485,6 @@ export default function TimelineView() {
                       );
                     })}
 
-                    {/* Add/edit popover anchored at the slot for this column */}
-                    {popover && dateKey(popover.day) === dateKey(day) && (
-                      <EntryForm
-                        state={popover}
-                        tasks={tasks}
-                        projects={projects}
-                        error={formError}
-                        saving={saving}
-                        onChange={setPopover}
-                        onSave={saveForm}
-                        onDelete={removeEntry}
-                        onCancel={() => setPopover(null)}
-                      />
-                    )}
                   </div>
                 );
               })}
@@ -446,13 +493,30 @@ export default function TimelineView() {
         )}
       </div>
 
-      {/* Per-task breakdown for the visible range */}
-      {taskTotals.length > 0 && (
+      {/* Add/edit sheet: bottom sheet on mobile, centered modal on desktop, always in view */}
+      {popover && (
+        <EntryForm
+          state={popover}
+          tasks={tasks}
+          projects={projects}
+          lastStopISO={lastStopISO}
+          error={formError}
+          saving={saving}
+          onChange={setPopover}
+          onSave={saveForm}
+          onDelete={removeEntry}
+          onDismiss={dismissForm}
+          onCancel={() => setPopover(null)}
+        />
+      )}
+
+      {/* Per-activity breakdown for the visible range (tasks + task-free entries) */}
+      {activityTotals.length > 0 && (
         <div className="bg-surface border border-border rounded-lg p-4">
-          <h2 className="font-heading text-sm font-semibold text-text-primary mb-2">By task</h2>
+          <h2 className="font-heading text-sm font-semibold text-text-primary mb-2">By activity</h2>
           <ul className="divide-y divide-border-muted">
-            {taskTotals.map((t) => (
-              <li key={t.taskId} className="flex items-center justify-between py-1.5 text-sm">
+            {activityTotals.map((t) => (
+              <li key={t.key} className="flex items-center justify-between py-1.5 text-sm">
                 <span className="truncate text-text-primary">{t.title}</span>
                 <span className="tabular-nums text-text-muted shrink-0 ml-3">{formatDuration(t.seconds)}</span>
               </li>
@@ -464,22 +528,26 @@ export default function TimelineView() {
   );
 }
 
-// The inline add/edit form, anchored near the clicked slot within a day column.
+// The add/edit sheet: a bottom sheet on mobile, a centered modal on desktop. Always sits in
+// the viewport (independent of the tall scrolling grid) with a pinned footer so Save is always
+// visible, and clicking the backdrop saves-if-there's-content (#86).
 function EntryForm({
-  state, tasks, projects, error, saving, onChange, onSave, onDelete, onCancel,
+  state, tasks, projects, lastStopISO, error, saving, onChange, onSave, onDelete, onDismiss, onCancel,
 }: {
   state: PopoverState;
   tasks: Task[];
   projects: Project[];
+  lastStopISO: string | null;
   error: string;
   saving: boolean;
   onChange: (s: PopoverState) => void;
   onSave: () => void;
   onDelete: () => void;
+  onDismiss: () => void;
   onCancel: () => void;
 }) {
-  // Keep the popover on-screen: clamp its top within the day.
-  const top = Math.min(state.topPx, DAY_PX - 230);
+  // Editing the currently-running entry: end is "running", stopping is done from the bar.
+  const isRunning = !!state.entry && !state.entry.endedAt;
 
   // Group tasks by project for the optgroup layout.
   const inboxTasks = tasks.filter((t) => !t.projectId);
@@ -487,89 +555,146 @@ function EntryForm({
     .map((p) => ({ project: p, tasks: tasks.filter((t) => t.projectId === p.id) }))
     .filter((g) => g.tasks.length > 0);
 
+  // When a task is picked, default the entry's project from it (still overridable below).
+  function pickTask(value: string) {
+    if (!value) { onChange({ ...state, taskId: "" }); return; }
+    const id = Number(value);
+    const task = tasks.find((t) => t.id === id);
+    onChange({ ...state, taskId: id, projectId: state.projectId === "" ? (task?.projectId ?? "") : state.projectId });
+  }
+
   return (
-    <div
-      onClick={(e) => e.stopPropagation()}
-      className="absolute z-20 left-1 right-1 sm:left-auto sm:w-64 bg-surface border border-border rounded-lg shadow-xl p-3 space-y-2 tl-pop"
-      style={{ top: Math.max(0, top) }}
-    >
-      <div>
-        <label className="block text-xs font-medium text-text-muted mb-1">Task</label>
-        <select
-          value={state.taskId}
-          onChange={(e) => onChange({ ...state, taskId: e.target.value ? Number(e.target.value) : "" })}
-          className="w-full px-2 py-1.5 text-sm border border-border rounded-md bg-surface text-text-primary focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer"
-        >
-          <option value="">Select a task...</option>
-          {inboxTasks.length > 0 && (
-            <optgroup label="Inbox">
-              {inboxTasks.map((t) => (
-                <option key={t.id} value={t.id}>{t.title}</option>
+    <>
+      {/* Backdrop: clicking away saves (if there's content), matching "exit out also saves". */}
+      <div className="fixed inset-0 bg-black/40 z-40" onClick={onDismiss} aria-hidden="true" />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={state.entry ? "Edit time entry" : "Add time entry"}
+        className="fixed z-50 inset-x-0 bottom-0 sm:inset-x-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-80 bg-surface border border-border rounded-t-2xl sm:rounded-lg shadow-2xl flex flex-col max-h-[88vh] tl-fade"
+      >
+        {/* Scrollable field area */}
+        <div className="overflow-y-auto p-4 space-y-3 pb-[max(0.25rem,env(safe-area-inset-bottom))]">
+          <div>
+            <label className="block text-xs font-medium text-text-muted mb-1">Description</label>
+            <input
+              type="text"
+              value={state.description}
+              onChange={(e) => onChange({ ...state, description: e.target.value })}
+              placeholder="e.g. Rise and Shine"
+              className="w-full px-2 py-2 text-sm border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-text-muted mb-1">Task (optional)</label>
+            <select
+              value={state.taskId}
+              onChange={(e) => pickTask(e.target.value)}
+              className="w-full px-2 py-2 text-sm border border-border rounded-md bg-surface text-text-primary focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer"
+            >
+              <option value="">No task</option>
+              {inboxTasks.length > 0 && (
+                <optgroup label="Inbox">
+                  {inboxTasks.map((t) => (
+                    <option key={t.id} value={t.id}>{t.title}</option>
+                  ))}
+                </optgroup>
+              )}
+              {projectGroups.map(({ project, tasks: pts }) => (
+                <optgroup key={project.id} label={project.name}>
+                  {pts.map((t) => (
+                    <option key={t.id} value={t.id}>{t.title}</option>
+                  ))}
+                </optgroup>
               ))}
-            </optgroup>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-text-muted mb-1">Project</label>
+            <select
+              value={state.projectId}
+              onChange={(e) => onChange({ ...state, projectId: e.target.value ? Number(e.target.value) : "" })}
+              className="w-full px-2 py-2 text-sm border border-border rounded-md bg-surface text-text-primary focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer"
+            >
+              <option value="">No project</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>{p.client ? `${p.client.name} / ${p.name}` : p.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <label className="block text-xs font-medium text-text-muted mb-1">Start</label>
+              <RadialTimePicker
+                value={state.start}
+                onChange={(v) => onChange({ ...state, start: v })}
+                ariaLabel="Start time"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="block text-xs font-medium text-text-muted mb-1">End</label>
+              {isRunning ? (
+                <div className="w-full px-2 py-1.5 text-sm border border-border rounded-md text-text-muted bg-surface-raised">
+                  running…
+                </div>
+              ) : (
+                <RadialTimePicker
+                  value={state.end}
+                  onChange={(v) => onChange({ ...state, end: v })}
+                  ariaLabel="End time"
+                />
+              )}
+            </div>
+          </div>
+          {isRunning && lastStopISO && (
+            <button
+              type="button"
+              onClick={() => {
+                const d = new Date(lastStopISO);
+                onChange({ ...state, day: startOfDay(d), start: hhmm(d) });
+              }}
+              className="text-xs text-accent hover:underline focus:outline-none focus:underline cursor-pointer"
+            >
+              Set start to last stop ({clockLabel(lastStopISO)})
+            </button>
           )}
-          {projectGroups.map(({ project, tasks: pts }) => (
-            <optgroup key={project.id} label={project.name}>
-              {pts.map((t) => (
-                <option key={t.id} value={t.id}>{t.title}</option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
-      </div>
-      <div className="flex gap-2">
-        <div className="flex-1">
-          <label className="block text-xs font-medium text-text-muted mb-1">Start</label>
-          <input
-            type="time"
-            value={state.start}
-            onChange={(e) => onChange({ ...state, start: e.target.value })}
-            className="w-full px-2 py-1.5 text-sm border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent"
-          />
+          {error && <p className="text-xs text-danger" role="alert">{error}</p>}
         </div>
-        <div className="flex-1">
-          <label className="block text-xs font-medium text-text-muted mb-1">End</label>
-          <input
-            type="time"
-            value={state.end}
-            onChange={(e) => onChange({ ...state, end: e.target.value })}
-            className="w-full px-2 py-1.5 text-sm border border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-accent"
-          />
-        </div>
-      </div>
-      {error && <p className="text-xs text-danger" role="alert">{error}</p>}
-      <div className="flex items-center justify-between pt-1">
-        {state.entry ? (
-          <button
-            type="button"
-            onClick={onDelete}
-            disabled={saving}
-            aria-label="Delete entry"
-            className="flex items-center justify-center w-8 h-8 text-text-muted hover:text-danger focus:outline-none focus:ring-2 focus:ring-danger rounded cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {saving ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <Trash2 size={15} aria-hidden="true" />}
-          </button>
-        ) : <span />}
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={saving}
-            className="px-3 py-1.5 text-sm text-text-muted hover:text-text-primary focus:outline-none focus:underline cursor-pointer disabled:opacity-40"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={onSave}
-            disabled={saving}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary text-white rounded-md hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {saving && <Loader2 size={13} className="animate-spin" aria-hidden="true" />}
-            Save
-          </button>
+
+        {/* Pinned footer - Save always visible without scrolling */}
+        <div className="flex items-center gap-2 p-3 border-t border-border">
+          {state.entry && !isRunning ? (
+            <button
+              type="button"
+              onClick={onDelete}
+              disabled={saving}
+              aria-label="Delete entry"
+              className="flex items-center justify-center w-11 h-11 text-text-muted hover:text-danger focus:outline-none focus:ring-2 focus:ring-danger rounded cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {saving ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <Trash2 size={16} aria-hidden="true" />}
+            </button>
+          ) : <span />}
+          <div className="flex gap-2 ml-auto">
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={saving}
+              className="px-4 py-2 text-sm text-text-muted hover:text-text-primary border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer disabled:opacity-40"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={saving}
+              className="flex items-center gap-1.5 px-4 py-2 text-sm bg-primary text-white rounded-md hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {saving && <Loader2 size={14} className="animate-spin" aria-hidden="true" />}
+              Save
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

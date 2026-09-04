@@ -9,6 +9,7 @@ namespace Tasklog.Api.Data
 
         public DbSet<TaskModel> Tasks => Set<TaskModel>();
         public DbSet<Project> Projects => Set<Project>();
+        public DbSet<Client> Clients => Set<Client>();
         public DbSet<Label> Labels => Set<Label>();
         public DbSet<TaskComment> Comments => Set<TaskComment>();
         public DbSet<CheckIn> CheckIns => Set<CheckIn>();
@@ -52,16 +53,34 @@ namespace Tasklog.Api.Data
                 .HasIndex(c => new { c.TaskId, c.CheckInDate })
                 .IsUnique();
 
-            // Time-tracking intervals cascade-delete with the task. Index on EndedAt makes
-            // "find the running timer" (EndedAt == null) cheap; index on TaskId speeds the
-            // per-task totals + the timeline's date-range scan (#77).
+            // Projects are grouped under an optional Client (#86). Deleting a client
+            // SET-NULLs its projects' ClientId (Ungrouped) rather than cascading, so no
+            // projects/tasks are lost with the client. Index ClientId for the grouped sidebar.
+            modelBuilder.Entity<Project>()
+                .HasOne(p => p.Client)
+                .WithMany(c => c.Projects)
+                .HasForeignKey(p => p.ClientId)
+                .OnDelete(DeleteBehavior.SetNull);
+            modelBuilder.Entity<Project>().HasIndex(p => p.ClientId);
+
+            // Time-tracking intervals (#77) are decoupled from tasks in #86: an entry can be
+            // task-free and carries its own project. Deleting the linked task or project
+            // SET-NULLs the link (the entry survives as logged history) rather than cascading.
+            // Index on EndedAt makes "find the running timer" (EndedAt == null) cheap; indexes
+            // on TaskId and ProjectId speed the per-task/per-project totals + the timeline scan.
             modelBuilder.Entity<TimeEntry>()
                 .HasOne(e => e.Task)
                 .WithMany(t => t.TimeEntries)
                 .HasForeignKey(e => e.TaskId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.SetNull);
+            modelBuilder.Entity<TimeEntry>()
+                .HasOne(e => e.Project)
+                .WithMany()
+                .HasForeignKey(e => e.ProjectId)
+                .OnDelete(DeleteBehavior.SetNull);
             modelBuilder.Entity<TimeEntry>().HasIndex(e => e.EndedAt);
             modelBuilder.Entity<TimeEntry>().HasIndex(e => e.TaskId);
+            modelBuilder.Entity<TimeEntry>().HasIndex(e => e.ProjectId);
 
             // A task's subtasks cascade-delete with the task (#78). Index on TaskId speeds
             // the per-task load (GetById) and the list's subtask-count/projection queries.

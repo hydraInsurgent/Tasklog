@@ -472,11 +472,36 @@ namespace Tasklog.Api.Controllers
             if (task is null)
                 return NotFound(new { message = $"Task {id} not found." });
 
+            // Preserve tracked history (#86): before the task's time entries have their TaskId
+            // SET NULL, snapshot the task title into any entry that has no description of its
+            // own, so the interval stays legible on the timeline instead of showing "Untitled".
+            await SnapshotTaskTitleIntoEntries(new[] { task });
+
             _context.Tasks.Remove(task);
             await _context.SaveChangesAsync();
 
             return NoContent();
         }
+
+        // Snapshot each task's title into its time entries that have no description of their
+        // own, so when the task is deleted (and the entries' TaskId is SET NULL) the tracked
+        // interval stays legible on the timeline instead of showing "Untitled" (#86). Shared
+        // by the single-task delete here and the project cascade delete in ProjectsController.
+        public static async Task SnapshotTaskTitlesIntoEntries(
+            TasklogDbContext context, IReadOnlyCollection<TaskModel> tasks)
+        {
+            if (tasks.Count == 0) return;
+            var ids = tasks.Select(t => t.Id).ToList();
+            var titleById = tasks.ToDictionary(t => t.Id, t => t.Title);
+            var entries = await context.TimeEntries
+                .Where(e => e.TaskId != null && ids.Contains(e.TaskId.Value)
+                    && (e.Description == null || e.Description == ""))
+                .ToListAsync();
+            foreach (var e in entries) e.Description = titleById[e.TaskId!.Value];
+        }
+
+        private Task SnapshotTaskTitleIntoEntries(IReadOnlyCollection<TaskModel> tasks) =>
+            SnapshotTaskTitlesIntoEntries(_context, tasks);
 
         // PATCH /api/tasks/{id}/complete
         // Marks a task as complete or incomplete. Returns the (completed) task.

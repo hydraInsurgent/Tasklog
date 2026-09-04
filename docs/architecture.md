@@ -134,8 +134,10 @@ Tasklog/
 │       │   (list is representative - other components: TaskCard, FilterPanel, LabelsClient, etc.)
 │       └── lib/
 │           ├── api.ts             Typed API call functions (used by both server and client)
-│           ├── time.ts            Pure time-tracking geometry: PX_PER_MIN, daySegment(), dayColumns(),
-│           │                      dayTotalSeconds(), perTaskTotals(), clockLabel(), dateKey(), addDays() (v2.19.0)
+│           ├── time.ts            Pure time-tracking geometry: PX_PER_MIN (3.6 = 5-min box, #86),
+│           │                      daySegment(), layoutDay() (push-down so short blocks don't overlap),
+│           │                      dayColumns(), dayTotalSeconds(), perActivityTotals(), perProjectTotals()
+│           │                      (client/project breakdown), entryLabel(), clockLabel(), dateKey(), addDays() (v2.19.0; #86)
 │           ├── quickAdd.ts        Pure parseQuickAdd(): NL title -> {deadline, recurrence, project, labels, priority} + token spans (chrono-node for dates; recurrence/tokens hand-rolled) (v2.15.0)
 │           ├── deadlinePresets.ts Pure resolvePreset() for the quick-deadline popover (v2.10.2)
 │           ├── journal.ts         Journal content shapes (per-section-kind contracts, mirrored by
@@ -180,7 +182,7 @@ Controllers              Tasks / Projects / Labels / Comments / CheckIns / Habit
 TasklogDbContext         EF Core context. Direct DbSet access - no repository layer.
     │
     ▼
-TasklogDatabase.db       SQLite file. Tables: Tasks, Projects, Labels, LabelTaskModel,
+TasklogDatabase.db       SQLite file. Tables: Tasks, Projects, Clients, Labels, LabelTaskModel,
                          Comments, CheckIns, TimeEntries, Subtasks, JournalTemplates,
                          JournalEntries, MoodCheckins.
 ```
@@ -192,7 +194,17 @@ Projects
   Id          INTEGER  primary key, autoincrement
   Name        TEXT     not null
   Color       TEXT     nullable  ("#RRGGBB" hex string; null = no color. v2.19.0)
+  ClientId    INTEGER  nullable  foreign key -> Clients.Id (null = Ungrouped. SET NULL on client delete. v3.2.0/#86)
+  Position    INTEGER  not null  default 0  (manual sidebar order; max+1 on create, rewritten by /reorder. v3.2.0/#86)
   CreatedAt   TEXT     not null  (ISO 8601 datetime string)
+
+Clients  (v3.2.0/#86 - the grouping level above Project; a "life area" like Work/Family/Self)
+  Id          INTEGER  primary key, autoincrement
+  Name        TEXT     not null
+  Color       TEXT     nullable  ("#RRGGBB" hex; same convention as Project.Color)
+  CreatedAt   TEXT     not null
+  Deleting a client SET-NULLs its projects' ClientId (projects + their tasks survive, Ungrouped) -
+  it does NOT cascade, unlike Project delete which cascades to its tasks.
 
 Tasks
   Id          INTEGER  primary key, autoincrement
@@ -254,18 +266,28 @@ CheckIns  (v2.16.0 - one per habit per day)
   TaskId      INTEGER  not null  foreign key -> Tasks.Id  (cascade delete)
   UNIQUE (TaskId, CheckInDate)   (makes "done today" idempotent - one row per habit per day)
 
-TimeEntries  (v2.19.0 - one interval per start+stop cycle)
+TimeEntries  (v2.19.0; decoupled from tasks in v3.2.0/#86 - one interval per start+stop cycle)
   Id          INTEGER  primary key, autoincrement
-  TaskId      INTEGER  not null  foreign key -> Tasks.Id  (cascade delete)
+  TaskId      INTEGER  nullable  foreign key -> Tasks.Id (null = a task-free entry, e.g. "Sleep".
+                       SET NULL on task delete - the interval survives. v3.2.0. Was NOT NULL/cascade)
+  Description TEXT     nullable  (free-text label for the entry, e.g. "Rise and Shine"; <= 500. Null
+                       for a task-linked entry that just uses the task title. v3.2.0)
+  ProjectId   INTEGER  nullable  foreign key -> Projects.Id (the entry's OWN project - defaulted from
+                       the task's project when started on one, but independently editable; null = Inbox.
+                       SET NULL on project delete. v3.2.0)
   StartedAt   TEXT     not null  (local ISO datetime; no timezone suffix)
   EndedAt     TEXT     nullable  (null = currently running; set on stop or next-timer-start)
   CreatedAt   TEXT     not null  (ISO 8601 datetime string)
   (response-only) DurationSeconds  int  (EndedAt - StartedAt) in seconds; 0 while running. NOT a column.
-  (response-only) TaskTitle  string   denormalized from Task.Title. NOT a column.
-  (response-only) ProjectId  int?     denormalized from Task.ProjectId. NOT a column.
-  (response-only) ProjectColor  string?  denormalized from Task.Project.Color. NOT a column.
+  (response-only) TaskTitle  string   denormalized from Task.Title (""  when task-free). NOT a column.
+  (response-only) ProjectColor / ClientId / ClientName / ClientColor  denormalized from the effective
+                       project (the entry's own, else the linked task's) + its client. NOT columns.
   Single-timer invariant: at most one row has EndedAt == null at any time. POST /start auto-stops
   any running entry before opening the new one (StopAllRunning helper).
+  On close (stop / auto-stop), tidy rules are applied to the STORED row (v3.2.0/#86): an entry under
+  2.5 min is discarded (accidental tap); otherwise both edges snap to the nearest 5-min grid (so the
+  calendar is contiguous - a shared transition rounds identically on both sides). Manual add/edit
+  keep the user's exact times.
 
 JournalTemplates  (v3.0/#79 - a journal note type: Daily, Gratitude, Affirmations)
   Id           INTEGER  primary key, autoincrement
@@ -325,17 +347,23 @@ MoodCheckins  (v3.0/#79 - timestamped mood check-ins, several per day)
 | PATCH | `/api/tasks/{id}/complete` | Mark task complete or incomplete. Body: `{ isCompleted: bool }`. Returns the (completed) task. For a recurring task, completing it also spawns the next occurrence (deadline advanced per the rule; title/project/labels/priority/description/recurrence carried under the same SeriesId) and logs a completion comment on the finished one - UNLESS an end condition is reached (v2.14.1: UNTIL date passed or COUNT occurrences exist), in which case the series stops and a "series complete" comment is logged instead. COUNT is evaluated by counting rows with the same SeriesId. Bulk-complete does not spawn. Body may include `subtaskMode` (v2.20.0): when completing a parent with open subtasks, `"completeAll"` (default) ticks them all, `"pullOut"` graduates each open subtask into a standalone task in the parent's project (with a back-reference comment) and detaches it. A recurring occurrence spawns the next one with the subtask checklist reset to unchecked (title + order carried, deadlines dropped) |
 | PATCH | `/api/tasks/{id}/project` | Reassign task to a project or Inbox. Body: `{ projectId: int?, projectName?: string }`. projectName is resolved by name (case-insensitive, exact) and wins over projectId; 0/multiple matches → 400 |
 | POST | `/api/tasks/bulk` | Apply one operation to many tasks in one transaction. Body: `{ operation: "complete" \| "assignProject" \| "setDeadline" \| "setPriority", taskIds: int[], data?: { isCompleted?, projectId?, projectName?, deadline?, priority? } }`. assignProject accepts a project name (resolved, wins over id). No bulk delete. Unknown ids skipped; returns the affected tasks. 400 on empty ids / unknown op / invalid data (missing/ambiguous project name, priority out of 1-4) |
-| GET | `/api/projects` | All projects, ordered by name |
-| POST | `/api/projects` | Create project. Body: `{ name: string, color?: string }` (`color` = optional `#RRGGBB` hex). Returns created project (v2.19.0 adds color) |
-| PATCH | `/api/projects/{id}` | Rename/recolor project. Body: `{ name: string, color?: string }` (color omitted = unchanged). Returns updated project (v2.19.0 adds color) |
-| DELETE | `/api/projects/{id}` | Delete project and cascade delete all its tasks. 204 on success |
+| GET | `/api/projects` | All projects in sidebar order (`Position` asc, name breaking ties), each with its `client` (v3.2.0) |
+| POST | `/api/projects` | Create project. Body: `{ name, color?, clientId? }` (`color` = `#RRGGBB` hex; `clientId` groups under a client). Assigns `Position` = max+1. Returns created project (v2.19.0 color; v3.2.0 clientId+position) |
+| PATCH | `/api/projects/{id}` | Present-key update of `name` / `color` / `clientId` (JsonElement, like tasks): omit=keep, `color: null`/`clientId: null`=clear (recolor default / Ungrouped). Returns updated project w/ client (v3.2.0/#86) |
+| POST | `/api/projects/reorder` | Rewrite `Position` from `{ orderedIds }` (must be a permutation of all project ids). Returns the reordered list. 400 otherwise (v3.2.0/#86) |
+| DELETE | `/api/projects/{id}` | Delete project + cascade delete its tasks. Time entries that referenced it are SET NULL (kept), not deleted. 204 on success |
+| GET | `/api/clients` | All clients, ordered by name (v3.2.0/#86) |
+| POST | `/api/clients` | Create client. Body: `{ name, color? }`. Returns created client (v3.2.0/#86) |
+| PATCH | `/api/clients/{id}` | Rename/recolor. Body: `{ name, color? }` (color omitted = unchanged). Returns updated client (v3.2.0/#86) |
+| DELETE | `/api/clients/{id}` | Delete client; its projects survive with `ClientId` set null (Ungrouped). 204; 404 if missing (v3.2.0/#86) |
 | GET | `/api/time-entries` | Time entries overlapping `[from, to)` window. Query: `from` + `to` (local ISO datetimes, no zone). Defaults to today. Max 366-day range. Entries started before `from` but still running at `from` are included. (v2.19.0) |
 | GET | `/api/time-entries/active` | Currently running entry, or 204 No Content when idle. (v2.19.0) |
-| POST | `/api/time-entries/start` | Start a timer on a task. Body: `{ taskId }`. Auto-stops any running entry first. 404 if task not found. (v2.19.0) |
-| POST | `/api/time-entries/{id}/stop` | Stop a running entry. Idempotent: already-stopped entry returned unchanged. (v2.19.0) |
-| POST | `/api/time-entries` | Manually log a closed interval. Body: `{ taskId, startedAt, endedAt }` (local ISO, no zone). 400 if end <= start or end > now+5min. (v2.19.0) |
-| PATCH | `/api/time-entries/{id}` | Edit a closed entry's bounds. Body: `{ startedAt?, endedAt? }` (present-key). 400 if end <= start. (v2.19.0) |
+| POST | `/api/time-entries/start` | Start a timer. Body: `{ taskId?, description?, projectId? }` - all optional (v3.2.0): a task-free entry needs only a description; project defaults from the task when started on one. Auto-stops any running entry first. 404 if a supplied task/project id is missing. (v2.19.0/#86) |
+| POST | `/api/time-entries/{id}/stop` | Stop a running entry. Applies the on-close tidy rules (discard <2.5min / snap edges to 5-min grid, v3.2.0). Idempotent: an already-stopped entry is returned unchanged. (v2.19.0/#86) |
+| POST | `/api/time-entries` | Manually log a closed interval. Body: `{ startedAt, endedAt, taskId?, description?, projectId? }` (local ISO). Task/desc/project optional (v3.2.0). 400 if end <= start or end > now+5min. Manual entries are NOT auto-snapped. (v2.19.0/#86) |
+| PATCH | `/api/time-entries/{id}` | Present-key edit of `startedAt` / `endedAt` / `description` / `projectId` / `taskId` (null clears/unlinks). 400 if end <= start when closed. (v2.19.0/#86) |
 | DELETE | `/api/time-entries/{id}` | Delete a logged entry. 204 on success. (v2.19.0) |
+| GET | `/api/time-entries/suggestions` | Autocomplete: distinct recent entry descriptions matching `?text=` (case-insensitive), each with its most-recent `projectId`. `?limit=` (default 8), bounded to the last 500 entries. (v3.2.0/#86) |
 | GET | `/api/labels` | All labels, ordered by name |
 | POST | `/api/labels` | Create label. Body: `{ name, colorIndex }`. Returns created label |
 | PATCH | `/api/labels/{id}` | Update label name and/or color. Body: `{ name, colorIndex }`. Returns updated label |
@@ -404,10 +432,13 @@ src/app/
                        (client-fetched; owns date, entries, check-ins). (v3.0/#79)
 ```
 
-`TimeTrackingContext` (v2.19.0) - React context provider mounted at app root in `layout.tsx`.
+`TimeTrackingContext` (v2.19.0; #86) - React context provider mounted at app root in `layout.tsx`.
 Holds the single running `TimeEntry` (or null) and a `nowMs` that ticks at 1 s ONLY while active,
-so elapsed seconds are live across TrackingBar, TimerControl, and TimelineView without a separate
-polling loop. Rehydrates from `GET /api/time-entries/active` on mount.
+so elapsed seconds are live across TrackingBar, TimerControl, and TimelineView. Rehydrates from
+`GET /api/time-entries/active` on mount AND polls it every 15 s (skipping while a local start/stop
+is in flight) so a start/stop/edit on another device shows here (#86). Exposes `startEntry` (task/
+description/project), `quickStart` (task-free), `updateActive` (edit the running entry) and
+`refreshActive` (re-pull after the timeline edits the running start).
 
 ### Component responsibilities
 
@@ -487,20 +518,24 @@ LabelColorButton.tsx    Client Component. (v2.19.0)
                         - Same popover pattern but for colorIndex (0-9 label palette)
                         - Used by LabelsClient in table rows and mobile cards
 
-TimelineView.tsx        Client Component. (v2.19.0)
-                        - Toggl-style vertical hour grid (00:00-23:00) with day columns
-                        - Day / week toggle; date nav with a date-jump picker
-                        - Entry blocks absolutely positioned by start/duration; project-colored
-                        - Click empty slot -> add popover; click block -> edit/delete popover
-                        - Snap-to-5-min / exact setting (localStorage); Inbox color picker
-                        - Running entry grows live off the TimeTrackingContext 1 s tick
-                        - Per-task totals summary below the grid
+TimelineView.tsx        Client Component. (v2.19.0; #86)
+                        - Toggl-style vertical hour grid on a 5-min-box zoom (defaults to Day view)
+                        - Entry blocks by start/duration, project-colored, labelled by task-or-description
+                        - layoutDay() pushes colliding short blocks down instead of overlapping
+                        - Add/edit is a bottom sheet (mobile) / centered modal (desktop) via EntryForm:
+                          description + optional task + project + start/end; clicking the backdrop saves
+                        - Click the running block to edit it (start/desc/project; "Set start to last stop")
+                        - Polls the visible range; Inbox color picker; per-activity totals below the grid
 
-TrackingBar.tsx         Client Component. (v2.19.0)
-                        - Persistent bottom-left pill on desktop, full-width on mobile
-                        - Idle: "What are you working on?" input + Start button
-                        - Running: task title + live H:MM:SS + Stop button
-                        - Quick-start: creates an Inbox task then starts its timer in one step
+TrackingBar.tsx         Client Component. (v2.19.0; #86)
+                        - Persistent bar: idle launcher opens a composer (bottom sheet on mobile,
+                          card on desktop) with description + merged autocomplete (past entries +
+                          open tasks) + project picker; Start tracks a TASK-FREE entry (no phantom task)
+                        - Running: entry label + project dot + live H:MM:SS + Stop; tap label to edit
+
+RadialTimePicker.tsx    Client Component. (#86)
+                        - Clock-dial 12h AM/PM time picker (tap hour ring, then 5-min ring), portaled;
+                          replaces the native time input in the timeline edit sheet
 
 TimerControl.tsx        Client Component. (v2.19.0)
                         - Per-task start/stop button on each task row
@@ -597,7 +632,7 @@ POST /token                                     auth_code and refresh_token gran
 
 ### Tool layer
 
-36 MCP tools across five families (tasks: 19, subtasks: 6, projects: 4, labels: 4, time: 7). The subtask family (v2.20.0) - `add_subtask`, `list_subtasks`, `set_subtask_completion`, `update_subtask`, `delete_subtask`, `reorder_subtasks` - wraps the `/api/tasks/{taskId}/subtasks` sub-resource (registered from `tools/subtasks.ts`). The task family adds `find` (v2.20.0): a single by-name search over BOTH tasks and subtasks that returns each hit tagged `type: "task" | "subtask"` (subtasks carry `parentTaskId`/`parentTitle`), so the LLM resolves "I finished X" in one call without knowing whether X is a task or a checklist item; it merges `list_tasks(text)` with the `/api/subtasks` search. `list_tasks` stays for structured filtering (project/label/date/priority). The task family includes four bulk tools (`bulk_set_completion`, `bulk_assign_to_project`, `bulk_set_deadline`, `bulk_set_priority`) backed by the single `POST /api/tasks/bulk` endpoint; `add_task_comment`, `list_task_comments`, `delete_task_comment` (v2.19.0); `log_habit_checkin`, `undo_habit_checkin`, `get_habit_checkins` (v2.19.0); and `get_habits` (full habits dashboard with streak, done-today, weekly progress; v2.19.0). `assign_task_to_project` / `bulk_assign_to_project` / `set_task_labels` accept a name as an alternative to an id (resolved server-side). `create_task` and `update_task` accept an RRULE-shaped `recurrence` string (v2.14.0), an `isHabit` flag (v2.16.0), and a `weeklyTarget` (1-7) for "x times a week" habits (v2.18.0). `create_project` / `rename_project` accept an optional `color` hex (v2.19.0). The time family (v2.19.0) covers `start_timer`, `stop_timer`, `get_active_timer`, `log_time`, `edit_time_entry`, `delete_time_entry`, and `get_time_summary` (totals by task for a date range). Each tool is a thin wrapper around the corresponding Tasklog `/api` endpoint via `api-client.ts`. Input schemas use Zod and are inlined per tool. The `runTool()` helper in `result.ts` converts thrown `ApiError`s into MCP `isError: true` tool results (not JSON-RPC protocol errors), so the LLM can see and react to failures.
+45 MCP tools across six families (tasks: 20, subtasks: 6, projects: 4, clients: 4, labels: 4, time: 7). The client family (v3.2.0/#86 - `list_clients`, `create_client`, `rename_client`, `delete_client`) wraps `/api/clients`; `create_project`/`rename_project` accept an optional `clientId`. The time family is now task-optional: `start_timer`/`log_time` take `taskId?` + `description?` + `projectId?` (task-free entries), `edit_time_entry` edits description/project/task, and `get_time_summary` groups by client/project. The subtask family (v2.20.0) - `add_subtask`, `list_subtasks`, `set_subtask_completion`, `update_subtask`, `delete_subtask`, `reorder_subtasks` - wraps the `/api/tasks/{taskId}/subtasks` sub-resource (registered from `tools/subtasks.ts`). The task family adds `find` (v2.20.0): a single by-name search over BOTH tasks and subtasks that returns each hit tagged `type: "task" | "subtask"` (subtasks carry `parentTaskId`/`parentTitle`), so the LLM resolves "I finished X" in one call without knowing whether X is a task or a checklist item; it merges `list_tasks(text)` with the `/api/subtasks` search. `list_tasks` stays for structured filtering (project/label/date/priority). The task family includes four bulk tools (`bulk_set_completion`, `bulk_assign_to_project`, `bulk_set_deadline`, `bulk_set_priority`) backed by the single `POST /api/tasks/bulk` endpoint; `add_task_comment`, `list_task_comments`, `delete_task_comment` (v2.19.0); `log_habit_checkin`, `undo_habit_checkin`, `get_habit_checkins` (v2.19.0); and `get_habits` (full habits dashboard with streak, done-today, weekly progress; v2.19.0). `assign_task_to_project` / `bulk_assign_to_project` / `set_task_labels` accept a name as an alternative to an id (resolved server-side). `create_task` and `update_task` accept an RRULE-shaped `recurrence` string (v2.14.0), an `isHabit` flag (v2.16.0), and a `weeklyTarget` (1-7) for "x times a week" habits (v2.18.0). `create_project` / `rename_project` accept an optional `color` hex (v2.19.0). The time family (v2.19.0) covers `start_timer`, `stop_timer`, `get_active_timer`, `log_time`, `edit_time_entry`, `delete_time_entry`, and `get_time_summary` (totals by task for a date range). Each tool is a thin wrapper around the corresponding Tasklog `/api` endpoint via `api-client.ts`. Input schemas use Zod and are inlined per tool. The `runTool()` helper in `result.ts` converts thrown `ApiError`s into MCP `isError: true` tool results (not JSON-RPC protocol errors), so the LLM can see and react to failures.
 
 The `list_tasks` tool accepts an optional filter object (project, inbox, labels, deadline range, completion, title substring) that `api-client.ts` serializes into a query string on `GET /api/tasks`. Completion is a single `set_task_completion(id, isCompleted)` tool - the earlier `complete_task` / `uncomplete_task` split was consolidated in v2.10.1.
 

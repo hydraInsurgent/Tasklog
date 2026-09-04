@@ -4,12 +4,24 @@
 // that crosses midnight is clamped per day, so a single interval renders as a segment in each
 // day column it touches.
 
-import { TimeEntry } from "./api";
+import { TimeEntry, Project } from "./api";
 
-export const PX_PER_MIN = 0.8; // 1 hour = 48px
+// The human label for an entry (#86): a linked task's title, else its free-text
+// description, else a placeholder. Task-free entries carry only a description.
+export function entryLabel(en: Pick<TimeEntry, "taskTitle" | "description">): string {
+  return en.taskTitle || en.description || "Untitled";
+}
+
+// 1 hour = 216px. Entries are snapped to the 5-min grid and anything under 2.5 min is
+// discarded (#86), so the smallest possible block is exactly 5 min. Setting the zoom so
+// 5 min == MIN_BLOCK_PX (5 * 3.6 = 18px) means EVERY block renders at its true height:
+// nothing is inflated, push-down never triggers, and there is zero time-axis drift. The
+// trade is a tall day that scrolls (it opens scrolled to ~07:00). These are the timeline's
+// "5-minute boxes".
+export const PX_PER_MIN = 3.6;
 export const DAY_MINUTES = 24 * 60;
-export const DAY_PX = DAY_MINUTES * PX_PER_MIN; // 1152
-export const MIN_BLOCK_PX = 18; // tiny entries still get a readable, clickable height
+export const DAY_PX = DAY_MINUTES * PX_PER_MIN; // 5184
+export const MIN_BLOCK_PX = 18; // one 5-min box; also the readable/clickable minimum
 
 // Local "YYYY-MM-DD" for a date.
 export function dateKey(d: Date): string {
@@ -72,6 +84,35 @@ export function daySegment(
   };
 }
 
+export interface LaidOutBlock {
+  entry: TimeEntry;
+  topPx: number;
+  heightPx: number;
+}
+
+// Lay out a day's entries so short blocks that would visually collide - because each is forced
+// to a minimum readable height (MIN_BLOCK_PX) even when its real time-slot is tiny - are pushed
+// down to sit one under the other instead of overlapping. Timer entries never overlap in TIME
+// (single-timer invariant), so this is purely a render fix: walking in start order, each block
+// starts no higher than the previous one's bottom. Real gaps between entries are preserved.
+// Trade-off: a dense cluster of short entries drifts slightly later on screen, in exchange for
+// every block staying readable and separate.
+export function layoutDay(entries: TimeEntry[], day: Date, now: Date): LaidOutBlock[] {
+  const segs = entries
+    .map((e) => ({ e, seg: daySegment(e.startedAt, e.endedAt, day, now) }))
+    .filter((x): x is { e: TimeEntry; seg: DaySegment } => x.seg !== null)
+    .sort((a, b) => a.seg.startMin - b.seg.startMin);
+
+  const out: LaidOutBlock[] = [];
+  let prevBottom = -Infinity;
+  for (const { e, seg } of segs) {
+    const topPx = Math.max(seg.topPx, prevBottom);
+    out.push({ entry: e, topPx, heightPx: seg.heightPx });
+    prevBottom = topPx + seg.heightPx;
+  }
+  return out;
+}
+
 // Seconds of [start, end] that fall on `day` (for per-day totals; respects midnight split).
 export function secondsOnDay(startISO: string, endISO: string | null, day: Date, now: Date): number {
   const dayStart = startOfDay(day).getTime();
@@ -87,22 +128,61 @@ export function dayTotalSeconds(entries: TimeEntry[], day: Date, now: Date): num
   return entries.reduce((sum, en) => sum + secondsOnDay(en.startedAt, en.endedAt, day, now), 0);
 }
 
-// Per-task totals (taskId -> { title, seconds }) across the given days. Used by the breakdown.
-export function perTaskTotals(
+// Per-activity totals across the given days (#77, #86). Groups by task when the entry is
+// linked, otherwise by its description, so task-free entries ("Sleep") get their own row.
+// Used by the timeline's "By activity" breakdown.
+export function perActivityTotals(
   entries: TimeEntry[],
   days: Date[],
   now: Date,
-): { taskId: number; title: string; seconds: number }[] {
-  const totals = new Map<number, { title: string; seconds: number }>();
+): { key: string; title: string; seconds: number }[] {
+  const totals = new Map<string, { title: string; seconds: number }>();
   for (const en of entries) {
     const secs = days.reduce((sum, d) => sum + secondsOnDay(en.startedAt, en.endedAt, d, now), 0);
     if (secs <= 0) continue;
-    const prev = totals.get(en.taskId);
-    totals.set(en.taskId, { title: en.taskTitle, seconds: (prev?.seconds ?? 0) + secs });
+    // Task-linked entries collapse by task id; task-free entries collapse by description.
+    const key = en.taskId != null ? `t${en.taskId}` : `d${(en.description ?? "").toLowerCase()}`;
+    const prev = totals.get(key);
+    totals.set(key, { title: entryLabel(en), seconds: (prev?.seconds ?? 0) + secs });
   }
   return [...totals.entries()]
-    .map(([taskId, v]) => ({ taskId, title: v.title, seconds: v.seconds }))
+    .map(([key, v]) => ({ key, title: v.title, seconds: v.seconds }))
     .sort((a, b) => b.seconds - a.seconds);
+}
+
+// A grouped total for the client/project actuals breakdown (#86).
+export interface GroupTotal {
+  key: string;         // stable React key
+  label: string;       // "Client / Project", "Project", or "No project"
+  color: string | null;
+  seconds: number;
+}
+
+// Per-project totals across the given days, each labelled with its client (#86). Entries
+// with no project fall under "No project". `projects` supplies names/colors + the client,
+// which the entry itself doesn't carry (it only has projectId + clientName).
+export function perProjectTotals(
+  entries: TimeEntry[],
+  days: Date[],
+  now: Date,
+  projects: Project[],
+): GroupTotal[] {
+  const projectById = new Map(projects.map((p) => [p.id, p]));
+  const totals = new Map<string, GroupTotal>();
+  for (const en of entries) {
+    const secs = days.reduce((sum, d) => sum + secondsOnDay(en.startedAt, en.endedAt, d, now), 0);
+    if (secs <= 0) continue;
+    const key = en.projectId != null ? `p${en.projectId}` : "none";
+    const project = en.projectId != null ? projectById.get(en.projectId) : undefined;
+    const clientName = project?.client?.name ?? en.clientName ?? null;
+    const label = project
+      ? clientName ? `${clientName} / ${project.name}` : project.name
+      : "No project";
+    const color = project?.color ?? en.projectColor ?? null;
+    const prev = totals.get(key);
+    totals.set(key, { key, label, color, seconds: (prev?.seconds ?? 0) + secs });
+  }
+  return [...totals.values()].sort((a, b) => b.seconds - a.seconds);
 }
 
 // 12-hour clock label for a block, e.g. "4:40 AM".

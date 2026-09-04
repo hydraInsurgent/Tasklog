@@ -6,12 +6,18 @@ import { Menu, Plus, X } from "lucide-react";
 import {
   getProjects,
   createProject,
-  renameProject,
+  updateProject,
   deleteProject,
+  reorderProjects,
+  getClients,
+  createClient,
+  renameClient,
+  deleteClient,
   getHabits,
   addCheckIn,
   removeCheckIn,
   Project,
+  Client,
   Habit,
 } from "@/lib/api";
 import { applyOptimisticCheckIn } from "@/lib/habits";
@@ -41,7 +47,12 @@ function todayKey(): string {
 
 export default function ProjectLayout() {
   const [projects, setProjects] = useState<Project[]>([]);
+  // Clients (#86) - the grouping level above projects. Loaded + polled alongside projects.
+  const [clients, setClients] = useState<Client[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
+  // True while a drag-reorder is being persisted - pauses the projects poll so a stale
+  // server order can't briefly clobber the optimistic new order (#86).
+  const [reorderPending, setReorderPending] = useState(false);
   const [activeView, setActiveView] = useState<"all" | "inbox" | number>("all");
   // Whether the create-task sheet is open. Held here (not in TasksClient) so the
   // mobile "+ Add Task" button in this header can open the same sheet.
@@ -107,10 +118,12 @@ export default function ProjectLayout() {
     setTimeout(() => setFeedback(null), 4000);
   }
 
-  // Load projects + habits on mount.
+  // Load projects + clients + habits on mount.
   const loadProjects = useCallback(async () => {
     try {
-      setProjects(await getProjects());
+      const [p, c] = await Promise.all([getProjects(), getClients()]);
+      setProjects(p);
+      setClients(c);
     } catch {
       // Sidebar will show empty state.
     } finally {
@@ -123,13 +136,16 @@ export default function ProjectLayout() {
     getHabits().then(setHabits).catch(() => {});
   }, [loadProjects]);
 
-  // Background polling: projects + habits every 30s. Pause habit refresh while a
+  // Background polling: projects + clients + habits every 30s. Pause habit refresh while a
   // check-in toggle is in flight so the optimistic state isn't clobbered.
   usePolling(
     useCallback(async () => {
-      setProjects(await getProjects());
+      const [p, c] = await Promise.all([getProjects(), getClients()]);
+      setProjects(p);
+      setClients(c);
     }, []),
     30000,
+    !reorderPending,
   );
   usePolling(
     useCallback(async () => {
@@ -138,6 +154,15 @@ export default function ProjectLayout() {
     30000,
     pendingCheckIns.size === 0,
   );
+
+  // Lock background scroll while the mobile nav drawer is open, so touch-scrolling the drawer
+  // scrolls the drawer (not the task list behind it). Paired with overscroll-contain below.
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [drawerOpen]);
 
   // Persist filter state to sessionStorage so it survives navigation.
   useEffect(() => {
@@ -189,9 +214,9 @@ export default function ProjectLayout() {
     getHabits().then(setHabits).catch(() => {});
   }, []);
 
-  async function handleCreateProject(name: string, color?: string | null) {
+  async function handleCreateProject(name: string, color?: string | null, clientId?: number | null) {
     try {
-      const created = await createProject(name, color);
+      const created = await createProject(name, color, clientId);
       setProjects((prev) => [...prev, created]);
     } catch (err) {
       showFeedback("error", "Failed to create project. Please try again.");
@@ -199,12 +224,16 @@ export default function ProjectLayout() {
     }
   }
 
-  async function handleEditProject(id: number, name: string, color?: string | null) {
+  // Present-key edit: name/color/clientId. clientId of null clears (Ungrouped); undefined keeps.
+  async function handleEditProject(
+    id: number,
+    fields: { name?: string; color?: string | null; clientId?: number | null },
+  ) {
     try {
-      const updated = await renameProject(id, name, color);
+      const updated = await updateProject(id, fields);
       setProjects((prev) => prev.map((p) => (p.id === id ? updated : p)));
     } catch (err) {
-      showFeedback("error", "Failed to rename project. Please try again.");
+      showFeedback("error", "Failed to update project. Please try again.");
       throw err;
     }
   }
@@ -220,6 +249,62 @@ export default function ProjectLayout() {
     }
   }
 
+  // Persist a drag-reorder of the project sidebar. Optimistic: apply the new order locally,
+  // POST it, and reconcile from the server response (or revert on failure).
+  async function handleReorderProjects(orderedIds: number[]) {
+    const snapshot = projects;
+    const byId = new Map(projects.map((p) => [p.id, p]));
+    setReorderPending(true); // pause the projects poll so it can't clobber the optimistic order
+    setProjects(orderedIds.map((id) => byId.get(id)!).filter(Boolean));
+    try {
+      setProjects(await reorderProjects(orderedIds));
+    } catch {
+      setProjects(snapshot);
+      showFeedback("error", "Failed to reorder projects.");
+    } finally {
+      setReorderPending(false);
+    }
+  }
+
+  // --- Client (life-area) CRUD ---
+  async function handleCreateClient(name: string, color?: string | null) {
+    try {
+      const created = await createClient(name, color);
+      setClients((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+    } catch (err) {
+      showFeedback("error", "Failed to create client. Please try again.");
+      throw err;
+    }
+  }
+
+  async function handleEditClient(id: number, name: string, color?: string | null) {
+    try {
+      const updated = await renameClient(id, name, color);
+      setClients((prev) =>
+        prev.map((c) => (c.id === id ? updated : c)).sort((a, b) => a.name.localeCompare(b.name)),
+      );
+      // Projects embed the client object; refresh so their chip reflects the new name/color.
+      setProjects((prev) => prev.map((p) => (p.clientId === id ? { ...p, client: updated } : p)));
+    } catch (err) {
+      showFeedback("error", "Failed to update client. Please try again.");
+      throw err;
+    }
+  }
+
+  async function handleDeleteClient(id: number) {
+    try {
+      await deleteClient(id);
+      setClients((prev) => prev.filter((c) => c.id !== id));
+      // The client's projects survive, now Ungrouped - reflect that locally.
+      setProjects((prev) =>
+        prev.map((p) => (p.clientId === id ? { ...p, clientId: null, client: null } : p)),
+      );
+    } catch (err) {
+      showFeedback("error", "Failed to delete client. Please try again.");
+      throw err;
+    }
+  }
+
   function handleSelectView(view: "all" | "inbox" | number) {
     setActiveView(view);
     setDrawerOpen(false);
@@ -227,11 +312,16 @@ export default function ProjectLayout() {
 
   const sidebarProps = {
     projects,
+    clients,
     activeView,
     onSelectView: handleSelectView,
     onCreateProject: handleCreateProject,
     onEditProject: handleEditProject,
     onDeleteProject: handleDeleteProject,
+    onReorderProjects: handleReorderProjects,
+    onCreateClient: handleCreateClient,
+    onEditClient: handleEditClient,
+    onDeleteClient: handleDeleteClient,
     // Habits render as a compact check-in section below "Add project" (#76).
     habits,
     pendingCheckIns,
@@ -248,7 +338,7 @@ export default function ProjectLayout() {
   return (
     <div className="flex min-h-screen -my-8">
       {/* Desktop sidebar - hidden on mobile */}
-      <aside className="hidden md:flex md:flex-col md:w-56 bg-surface border-r border-border shrink-0">
+      <aside className="hidden md:flex md:flex-col md:w-64 bg-surface border-r border-border shrink-0">
         {loadingProjects ? (
           <div className="px-4 py-6 text-sm text-text-muted">Loading...</div>
         ) : (
@@ -318,11 +408,11 @@ export default function ProjectLayout() {
 
       {/* Mobile drawer panel */}
       <div
-        className={`fixed inset-y-0 left-0 z-50 w-56 bg-surface border-r border-border flex flex-col md:hidden transition-transform duration-200 ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-surface border-r border-border flex flex-col md:hidden transition-transform duration-200 ${
           drawerOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex items-center justify-end px-3 py-3 border-b border-border">
+        <div className="flex items-center justify-end px-3 py-3 border-b border-border shrink-0">
           <button
             onClick={() => setDrawerOpen(false)}
             aria-label="Close navigation"
@@ -332,11 +422,15 @@ export default function ProjectLayout() {
           </button>
         </div>
 
-        {loadingProjects ? (
-          <div className="px-4 py-6 text-sm text-text-muted">Loading...</div>
-        ) : (
-          <ProjectSidebar {...sidebarProps} />
-        )}
+        {/* Scrollable region: the nav can be tall (projects + clients + habits); it scrolls
+            within the drawer, and overscroll-contain stops the scroll chaining to the body. */}
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+          {loadingProjects ? (
+            <div className="px-4 py-6 text-sm text-text-muted">Loading...</div>
+          ) : (
+            <ProjectSidebar {...sidebarProps} />
+          )}
+        </div>
       </div>
     </div>
   );
