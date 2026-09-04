@@ -12,9 +12,12 @@ export function entryLabel(en: Pick<TimeEntry, "taskTitle" | "description">): st
   return en.taskTitle || en.description || "Untitled";
 }
 
-export const PX_PER_MIN = 0.8; // 1 hour = 48px
+// 1 hour = 72px. Chosen so any entry >= 15 min renders at its true height (15 * 1.2 = 18px =
+// MIN_BLOCK_PX), meaning only sub-15-min blocks ever get inflated - which keeps the push-down
+// layout's drift small and blocks aligned to the real time axis (#86).
+export const PX_PER_MIN = 1.2;
 export const DAY_MINUTES = 24 * 60;
-export const DAY_PX = DAY_MINUTES * PX_PER_MIN; // 1152
+export const DAY_PX = DAY_MINUTES * PX_PER_MIN; // 1728
 export const MIN_BLOCK_PX = 18; // tiny entries still get a readable, clickable height
 
 // Local "YYYY-MM-DD" for a date.
