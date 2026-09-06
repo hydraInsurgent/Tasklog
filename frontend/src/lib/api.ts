@@ -801,3 +801,127 @@ export async function getTasksCompletedOn(date: string): Promise<Task[]> {
   if (!res.ok) throw new Error("Failed to load completed tasks.");
   return res.json();
 }
+
+// ---------------------------------------------------------------------------
+// Companion (#87): daily conversation sessions + the Capture inbox trust loop.
+// The chat TURN itself goes to the same-origin Next.js route (/api/companion/
+// chat, NDJSON stream) - these functions cover the .NET persistence around it.
+// ---------------------------------------------------------------------------
+
+// One transcript message. The client owns this shape; the API stores it verbatim.
+export interface CompanionMessage {
+  role: "user" | "assistant";
+  content: string;
+  at: string; // ISO timestamp
+}
+
+// One conversation day (unique per SessionDate on the server).
+export interface CompanionSessionDto {
+  id: number;
+  sessionDate: string;
+  messages: CompanionMessage[];
+  sdkSessionId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// A staged proposal in the Capture inbox. v4.0 payloads are task-shaped.
+export interface CaptureDto {
+  id: number;
+  type: string; // "task" in v4.0
+  status: "proposed" | "confirmed" | "dismissed";
+  source: string;
+  sessionId: number | null;
+  payload: { title?: string; projectId?: number; newProjectName?: string; deadline?: string };
+  span: string | null;
+  confidence: number | null;
+  confirmedType: string | null;
+  confirmedId: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// GET /api/companion/sessions/today - today's session, or null when none exists
+// yet (the server returns 204; reads never auto-create).
+export async function getTodayCompanionSession(): Promise<CompanionSessionDto | null> {
+  const res = await fetch(`${getApiUrl()}/api/companion/sessions/today`, { cache: "no-store" });
+  if (res.status === 204) return null;
+  if (!res.ok) throw new Error("Failed to load today's companion session.");
+  return res.json();
+}
+
+// GET /api/companion/sessions?date= - a past day's conversation (history view),
+// or null when that day has no session.
+export async function getCompanionSessionByDate(date: string): Promise<CompanionSessionDto | null> {
+  const res = await fetch(`${getApiUrl()}/api/companion/sessions?date=${date}`, { cache: "no-store" });
+  if (res.status === 204) return null;
+  if (!res.ok) throw new Error("Failed to load that day's conversation.");
+  return res.json();
+}
+
+// GET /api/companion/sessions/dates?from=&to= - days having a conversation
+// (the history calendar's dots; the journal's entries/dates twin).
+export async function getCompanionSessionDates(from: string, to: string): Promise<string[]> {
+  const res = await fetch(`${getApiUrl()}/api/companion/sessions/dates?from=${from}&to=${to}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Failed to load conversation dates.");
+  return res.json();
+}
+
+// GET /api/captures?sessionId= - the session's proposal cards, oldest first.
+export async function getCaptures(sessionId: number): Promise<CaptureDto[]> {
+  const res = await fetch(`${getApiUrl()}/api/captures?sessionId=${sessionId}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Failed to load proposals.");
+  return res.json();
+}
+
+// PATCH /api/captures/{id} - edit a proposed card's payload before keeping it.
+export async function updateCapture(
+  id: number,
+  payload: CaptureDto["payload"],
+): Promise<CaptureDto> {
+  const res = await fetch(`${getApiUrl()}/api/captures/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ payload }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.message ?? "Failed to update the proposal.");
+  }
+  return res.json();
+}
+
+// POST /api/captures/{id}/confirm - KEEP: materializes the real task. Idempotent.
+export async function confirmCapture(
+  id: number,
+): Promise<{ capture: CaptureDto; task?: Task }> {
+  const res = await fetch(`${getApiUrl()}/api/captures/${id}/confirm`, { method: "POST" });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.message ?? "Failed to add the task.");
+  }
+  const data = await res.json();
+  // A repeat confirm returns the bare capture (idempotent); first confirm
+  // returns { capture, task }. Normalize to one shape for callers.
+  return "capture" in data ? data : { capture: data };
+}
+
+// POST /api/captures/{id}/dismiss - TOSS: stays recorded so it is not re-proposed.
+export async function dismissCapture(id: number): Promise<CaptureDto> {
+  const res = await fetch(`${getApiUrl()}/api/captures/${id}/dismiss`, { method: "POST" });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.message ?? "Failed to dismiss the proposal.");
+  }
+  return res.json();
+}
+
+// POST /api/captures/{id}/restore - undo an accidental toss (dismissed -> proposed).
+export async function restoreCapture(id: number): Promise<CaptureDto> {
+  const res = await fetch(`${getApiUrl()}/api/captures/${id}/restore`, { method: "POST" });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.message ?? "Failed to restore the proposal.");
+  }
+  return res.json();
+}
