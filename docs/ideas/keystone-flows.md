@@ -1,4 +1,4 @@
-# Keystone flows: the journaling companion (v4.0.0)
+# Keystone flows: the journaling companion (v4.0)
 
 **What this is:** the user stories and internal system flows for the **keystone** of the
 Living Profile, written before code so the behavior and the failure modes are settled on
@@ -18,7 +18,7 @@ seam sit underneath. This doc describes the full companion; the **v4.0 first rel
 deliberately basic cut** (see below) and the companion grows one facet per minor version.
 
 **The discipline that keeps it buildable:** the companion can *talk* about anything, but what
-it *saves* as structured captures stays `task` / `mood` / `mention` in v4.0.0. The richness
+it *saves* as structured captures stays `task` / `mood` / `mention` across the early 4.x line. The richness
 (questioning, suggesting, recalling) is conversation behavior driven by the system prompt and
 tools, not new data types. Everything else (life map, full CRM, goals, expenses, embeddings,
 needs, traits) is out of scope here.
@@ -36,21 +36,33 @@ cut** to prove the core bet end to end; the rest arrive one per minor version.
 - The companion proposes `task` captures only (`propose_capture` scoped to `task`).
 - The trust loop: proposed task cards -> keep / edit / toss -> a confirmed card writes a real
   row in the existing Tasks table.
+- **Semantic grounding:** local embeddings (Ollama `nomic-embed-text`, generic Embeddings
+  table, brute-force cosine - no vector extension) + a `find_relevant_tasks` retrieval tool,
+  so the companion recognizes existing tasks ("the tax thing" -> "File ITR") instead of
+  proposing duplicates. Embeddings shortlist, the model judges.
 - The raw conversation is saved as the source. Additive only: the v3.x journal tab is left
   untouched.
+- **History calendar** (added during build): month calendar with dots on conversation days
+  (the journal-calendar pattern in companion identity); past days read-only, their cards
+  still actionable. Sage knows the local date/time (injected per turn).
+- **Deployment stance:** PC/LAN-first. Subscription auth lives on the PC, and the public OCI
+  instance has no app auth - the companion route does NOT deploy publicly until gated.
 
-**Out of v4.0, arriving next (one per minor version):**
-- v4.1 `mood` -> writes a `MoodCheckin`
-- v4.2 `mention` / people seed
-- v4.3 the generated journal note (planning / reflection)
-- v4.4 recall (recent context + profile facts into the session)
-- v4.5+ the fuller companion (cross-questioning, front/back-of-mind, planning) + dashboard
-  home + journal-tab reorientation
+**Out of v4.0, arriving next (one per minor version - reordered 2026-09-05 so the felt
+journaling value lands first, since task capture alone is already possible via claude.ai +
+MCP):**
+- v4.1 **the generated journal note + mood** (planning / reflection synthesis; `mood` ->
+  writes a `MoodCheckin`) - the actual journaling value, one minor after the skeleton
+- v4.2 **recall** (recent context + profile facts into the session; the embedding infra from
+  v4.0 extends to history when it grows)
+- v4.3 `mention` / people seed
+- v4.4+ the fuller companion (cross-questioning, front/back-of-mind, planning ritual) +
+  dashboard home + journal-tab reorientation + gated public deploy
 
 Story-to-version map: **v4.0 core** = 1 (companion chat, basic form), 3 (cards emerge, task
 only), 4 (trust loop), 5 (tasks land), 9 (never lose it), 10 (own my AI, single provider).
-**Later minors** = 2 recall (v4.4), 6 mood (v4.1), 7 people (v4.2), 8 reflection (v4.3), and
-the deep cross-questioning of story 1 (v4.5+).
+**Later minors** = 6 mood + 8 reflection (v4.1), 2 recall (v4.2), 7 people (v4.3), and the
+deep cross-questioning of story 1 (v4.4+).
 
 ---
 
@@ -160,8 +172,9 @@ later increment.
 
 Keystone recall = load relevant **recent entries + profile facts** into the session context,
 the same approach the Obsidian system already uses (stable facts in Claude memory, episodic in
-daily notes). Embeddings/RAG for deep semantic recall come later, when history is large enough
-to need it (see north star). Do not build the vector layer in the keystone.
+daily notes). The **embedding infra is laid in v4.0 for task grounding** (Ollama + Embeddings
+table + retrieval tool); deep semantic recall over history (v4.2) reuses that same store and
+tool as the corpus grows - no new architecture, just more entity types embedded.
 
 ---
 

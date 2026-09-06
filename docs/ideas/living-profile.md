@@ -111,7 +111,7 @@ and prove that first. Not the pretty map.
   journals you, not a text area with AI attached. The earlier two-pane write-left /
   cards-right box is the lighter fallback, not the lead. Discipline that keeps this buildable:
   the companion can *talk* about anything, but what it *saves* as structured captures in
-  v4.0.0 stays the three keystone types. Richness is conversation behavior (prompt + tools),
+  the early 4.x line stays the three keystone types. Richness is conversation behavior (prompt + tools),
   not new data types.
 
 ---
@@ -238,9 +238,12 @@ parts wins (project ethos: understandable by one developer). So:
 - Keep the AI behind a clean **module / interface**, and make "separate process" a
   *deployment* choice, not an architectural mandate. This is a modular monolith, not
   microservices.
-- **Now:** host extraction in the existing Node layer (the MCP server, or a small module in
-  it). No new process. The .NET backend calls "the AI service" over HTTP, which today happens
-  to be that same Node process.
+- **Now (resolved at plan stage, P87):** the companion + its tools live in a **Next.js API
+  route** (`/api/companion/chat`, the doppel precedent) - no new process; the frontend talks
+  to the route, the route talks to the .NET API. The .NET backend never calls the chat LLM;
+  its only AI-adjacent call is **Ollama for embeddings** (embed-on-write, best-effort). The
+  older ".NET calls the AI service over HTTP" framing belongs to the deferred batch-extraction
+  path (keystone Flow B) if it is ever built.
 - **Later (only if a real force appears):** because the backend talks to it through an HTTP
   seam + provider interface, you can lift the AI service into its own container, run replicas,
   or vary the provider per tenant, with no backend change. Split when scaling or isolation
@@ -290,22 +293,29 @@ So "always deterministic" is achieved not by making the model perfect, but by gu
 output shape and gating the content through confirm. Good-enough model + strict schema + human
 gate = reliable structure.
 
-**The vector-embeddings question (later, not keystone).** Embeddings are the right tool for two
-jobs and the wrong tool for one:
+**Vector embeddings (decided 2026-09-05: semantic-first, from v4.0).** Embeddings are the
+right tool for two jobs and the wrong tool for one:
 
-- **Right - entity resolution:** "had coffee with Sam" → an existing person or new? Semantic
-  search over existing people / projects / goals links a mention to the right *instance*
-  instead of creating duplicates. This is the grounding problem.
+- **Right - entity resolution / grounding:** "the tax thing" → the existing "File ITR" task;
+  "had coffee with Sam" → an existing person or new? Keyword search cannot do this (substring
+  match fails on paraphrase), so this ships with the v4.0 companion, not later.
 - **Right - semantic search over history:** "what did I write when I felt burnt out",
   "everything about this person". The vault's own `JournalingSystem.md` already anticipates
-  this ("MemPalace for RAG once the vault is large enough").
+  this ("MemPalace for RAG once the vault is large enough"). Same store, later increment.
 - **Wrong - deciding the type.** Task-vs-person-vs-mood is a classification the LLM does better
   via the registry enum than embedding similarity does. Type = LLM + enum; embeddings = linking
   and search.
 
-No separate vector DB needed: `sqlite-vec` fits the current stack, or `pgvector` if it ever
-moves to Postgres. Defer until the people / projects set is big enough that linking gets hard,
-or semantic search is actually wanted.
+The shape (personal scale, AI-native): **local Ollama** (`nomic-embed-text`, ~270MB, CPU-fast;
+free, private, no second cloud vendor), a **generic Embeddings table** (EntityType + EntityId +
+Model + Vector BLOB) shared by every future entity type, and **brute-force cosine in app code**
+- deliberately NO `sqlite-vec` native extension until counts demand it (sub-ms at thousands of
+vectors; avoids the arm64/x64 native-binary matrix). Embed-on-write, best-effort, nullable:
+hosts without Ollama (OCI, phone) keep null vectors and search degrades to keyword. Division of
+labor everywhere: **embeddings shortlist top-k candidates; the model judges them** - never dump
+the whole corpus into context, never trust cosine alone. Retrieval stays a first-class tool
+behind a seam, so the implementation can later move to `sqlite-vec` / `pgvector` with no caller
+changes. A model swap = a cheap local re-embed at this scale.
 
 ---
 
@@ -452,19 +462,25 @@ The companion is v4.0. It ships basic first, then climbs one facet per **minor**
 same feature-per-minor cadence the project already uses (v4.0, v4.1, v4.2 ...). Journaling is
 an output of the companion, not the capture surface.
 
-- **v4.0 - basic companion (task-only).** A conversation surface (Agent SDK on the user's
-  Claude subscription) that proposes `task` captures; the trust loop confirms them into the
-  real Tasks table; the raw conversation is saved. The smallest end-to-end proof of "talk ->
-  structure -> confirm -> real data." No dashboard, no journal changes, one provider.
-- **v4.1 - mood.** A `mood` capture writes a `MoodCheckin` (reuse the existing feelings-wheel
-  + Hawkins MoC + energy model; change how it is captured, not the model).
-- **v4.2 - mention / people seed.** Soft person tags on the session; seeds the future CRM.
-- **v4.3 - the derived journal note.** The companion generates the day's note (end-of-day
-  reflection and/or start-of-day planning) from the conversation. "Journaling as output"
-  becomes real here.
-- **v4.4 - recall.** Feed recent context + profile facts into the session so it knows you.
-- **v4.5+ - the fuller companion** (cross-questioning, front/back-of-mind triage, planning
-  ritual) and the **dashboard-as-home + journal-tab reorientation**.
+- **v4.0 - basic companion (task-only, semantically grounded).** A conversation surface
+  (Agent SDK on the user's Claude subscription) that proposes `task` captures; the trust loop
+  confirms them into the real Tasks table; the raw conversation is saved. Includes the
+  **semantic grounding infra from day one**: local embeddings (Ollama) + a generic Embeddings
+  store + a `find_relevant_tasks` retrieval tool, so the companion recognizes existing tasks
+  instead of duplicating them. The smallest end-to-end proof of "talk -> structure -> confirm
+  -> real data." No dashboard, no journal changes, one provider. PC/LAN-first (no public
+  deploy until the route is gated; the app has no auth).
+- **v4.1 - the derived journal note + mood.** The companion generates the day's note
+  (end-of-day reflection and/or start-of-day planning) and captures `mood` -> writes a
+  `MoodCheckin` (reuse the feelings-wheel + Hawkins MoC + energy model; change how it is
+  captured, not the model). Pulled forward (2026-09-05): this is the felt journaling value
+  the whole line exists for - task capture alone is already possible via claude.ai + MCP, so
+  the note must not wait three minors.
+- **v4.2 - recall.** Feed recent context + profile facts into the session so it knows you;
+  the v4.0 embedding store extends over history as the corpus grows.
+- **v4.3 - mention / people seed.** Soft person tags on the session; seeds the future CRM.
+- **v4.4+ - the fuller companion** (cross-questioning, front/back-of-mind triage, planning
+  ritual), the **dashboard-as-home + journal-tab reorientation**, and the gated public deploy.
 
 Then the lenses (life map, CRM, goals, needs, traits) ride on the accumulated data, each its
 own increment via the graduation rule.
