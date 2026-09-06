@@ -12,10 +12,15 @@ namespace Tasklog.Api.Controllers
     public class TasksController : ControllerBase
     {
         private readonly TasklogDbContext _context;
+        private readonly EmbeddingService? _embeddings;
 
-        public TasksController(TasklogDbContext context)
+        // EmbeddingService is optional (#87): DI supplies it in the running app so task
+        // writes refresh their semantic vector; tests construct the controller without it
+        // and simply skip embedding (it is best-effort enrichment, never load-bearing).
+        public TasksController(TasklogDbContext context, EmbeddingService? embeddings = null)
         {
             _context = context;
+            _embeddings = embeddings;
         }
 
         // GET /api/tasks
@@ -303,6 +308,11 @@ namespace Tasklog.Api.Controllers
             _context.Tasks.Add(task);
             await _context.SaveChangesAsync();
 
+            // Embed-on-write (#87): refresh this task's semantic vector so companion
+            // grounding can find it. Best-effort - the task is already committed.
+            if (_embeddings is not null)
+                await _embeddings.UpsertAsync("task", task.Id, task.Title);
+
             return CreatedAtAction(nameof(GetById), new { id = task.Id }, task);
         }
 
@@ -329,11 +339,14 @@ namespace Tasklog.Api.Controllers
                 return BadRequest(new { message = "Request body must be a JSON object." });
 
             // title: present must be a non-empty string; absent leaves it unchanged.
+            var titleChanged = false;
             if (body.TryGetProperty("title", out var titleEl))
             {
                 if (titleEl.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(titleEl.GetString()))
                     return BadRequest(new { message = "Title must be a non-empty string." });
-                task.Title = titleEl.GetString()!.Trim();
+                var newTitle = titleEl.GetString()!.Trim();
+                titleChanged = newTitle != task.Title;
+                task.Title = newTitle;
             }
 
             // description: present + null/blank clears it; present + string sets it
@@ -458,6 +471,10 @@ namespace Tasklog.Api.Controllers
             }
 
             await _context.SaveChangesAsync();
+
+            // Embed-on-write (#87): a renamed task means its old vector is stale.
+            if (titleChanged && _embeddings is not null)
+                await _embeddings.UpsertAsync("task", task.Id, task.Title);
 
             return Ok(task);
         }
