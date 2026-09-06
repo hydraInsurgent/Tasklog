@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Space_Grotesk, DM_Sans } from "next/font/google";
 import "./globals.css";
 import { DoppelWidget } from "@/components/DoppelWidget";
@@ -42,13 +43,21 @@ export default function RootLayout({
         {/* Site header */}
         <header className="sticky top-0 z-30 border-b border-border bg-surface/95 backdrop-blur-sm">
           <div className="px-4 h-14 flex items-center gap-3">
-            <a
+            {/* Client-side Link, NOT a raw <a>: a full-page reload here re-boots
+                the theme script, and if localStorage is unavailable (some mobile
+                browsers / private mode) that reload silently dropped dark mode.
+                Link navigation keeps the <html> class untouched. On phones the
+                wordmark shrinks to "T" so all four tabs fit without scrolling. */}
+            <Link
               href="/"
-              className="font-heading text-lg font-bold text-text-primary hover:text-accent transition-colors duration-150"
+              aria-label="Tasklog home"
+              className="shrink-0 font-heading text-lg font-bold text-text-primary hover:text-accent transition-colors duration-150"
             >
-              Tasklog
-            </a>
-            <div className="flex-1 flex justify-center">
+              T<span className="hidden sm:inline">asklog</span>
+            </Link>
+            {/* min-w-0 lets the tab strip shrink inside the flex row instead of
+                widening the page (the Sage tab made 4 tabs overflow on phones). */}
+            <div className="flex-1 min-w-0 flex justify-center">
               <NavTabs />
             </div>
             <ThemeToggle />

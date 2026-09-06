@@ -9,6 +9,7 @@
  * Bottom full-width on mobile, bottom-left card on desktop. Driven by TimeTrackingContext. */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Clock, Play, Square, Loader2, Pencil, ListChecks, X } from "lucide-react";
 import { formatClock } from "@/lib/format";
 import { entryLabel } from "@/lib/time";
@@ -76,8 +77,14 @@ export default function TrackingBar() {
     }
   }
 
-  const shellClass =
-    "fixed z-40 inset-x-0 bottom-0 sm:inset-x-auto sm:bottom-6 sm:left-6 tl-fade pb-[env(safe-area-inset-bottom,0)] sm:pb-0";
+  // Desktop: a bottom-RIGHT pill on every page (#87 - moved from bottom-left,
+  // one consistent home instead of per-page exceptions). Mobile: the usual
+  // full-width dock - except on /companion, where Sage's composer owns the
+  // bottom edge and there is no room for both, so the bar hides below lg.
+  const onCompanion = usePathname().startsWith("/companion");
+  const shellClass = onCompanion
+    ? "hidden lg:block fixed z-40 lg:bottom-6 lg:right-6 tl-fade"
+    : "fixed z-40 inset-x-0 bottom-0 sm:inset-x-auto sm:bottom-6 sm:right-6 tl-fade pb-[env(safe-area-inset-bottom,0)] sm:pb-0";
 
   return (
     <>
@@ -225,7 +232,7 @@ function Composer({
       <div
         role="dialog"
         aria-label={mode === "new" ? "Start a timer" : "Edit the running entry"}
-        className="fixed z-50 inset-x-0 bottom-0 sm:inset-x-auto sm:bottom-6 sm:left-6 sm:w-96 bg-surface border border-border shadow-2xl rounded-t-2xl sm:rounded-2xl p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-4 space-y-3"
+        className="fixed z-50 inset-x-0 bottom-0 sm:inset-x-auto sm:bottom-6 sm:right-6 sm:w-96 bg-surface border border-border shadow-2xl rounded-t-2xl sm:rounded-2xl p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-4 space-y-3"
       >
         <div className="flex items-center justify-between">
           <h2 className="font-heading text-sm font-semibold text-text-primary">
