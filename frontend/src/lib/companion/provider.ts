@@ -1,0 +1,147 @@
+import {
+  createSdkMcpServer,
+  query,
+  tool,
+  type SDKMessage,
+} from "@anthropic-ai/claude-agent-sdk";
+import type { ZodRawShape, z } from "zod";
+
+/**
+ * The companion's AI provider seam (#87, P87 Decision 1).
+ *
+ * The interface is shaped around MESSAGES + TOOLS (not `complete(text)`) on purpose:
+ * a raw Anthropic Messages-API tool loop or a local model can implement the same
+ * contract later without the route changing. v4.0 ships one implementation -
+ * ClaudeCodeProvider - which runs each turn on the user's own Claude subscription
+ * via the Agent SDK (no API key, Decision 8: PC-first).
+ */
+
+/** Events a provider yields while running one conversational turn. */
+export type CompanionTurnEvent =
+  | { type: "text_delta"; text: string }
+  | { type: "card"; capture: unknown }
+  | { type: "done"; sdkSessionId: string | null; text: string }
+  | { type: "error"; message: string };
+
+/**
+ * One tool the companion may call mid-turn. `handler` returns the payload sent
+ * back to the model; when it also returns `event`, the provider forwards it to
+ * the client stream (how a propose_capture card reaches the UI live).
+ */
+export interface CompanionTool<Shape extends ZodRawShape = ZodRawShape> {
+  name: string;
+  description: string;
+  schema: Shape;
+  handler: (args: z.infer<z.ZodObject<Shape>>) => Promise<{
+    result: unknown;
+    event?: CompanionTurnEvent;
+  }>;
+}
+
+export interface CompanionTurnInput {
+  /** The user's new message (one turn; history lives in the resumed session). */
+  message: string;
+  /** Provider-native session id from the previous turn; null starts fresh. */
+  resumeSessionId: string | null;
+  /** Full system prompt: the persona spec + injected grounding context. */
+  systemPrompt: string;
+  tools: CompanionTool[];
+}
+
+export interface CompanionProvider {
+  runTurn(input: CompanionTurnInput): AsyncGenerator<CompanionTurnEvent>;
+}
+
+/**
+ * Claude Code implementation. Per-turn `query()` with `resume` (P87 Decision 9):
+ * Next.js route handlers are request-scoped, so no long-lived session object is
+ * held across requests - the SDK's own session storage carries the conversation.
+ */
+export class ClaudeCodeProvider implements CompanionProvider {
+  async *runTurn(input: CompanionTurnInput): AsyncGenerator<CompanionTurnEvent> {
+    // Tool events land here while the SDK is mid-message; the loop below flushes
+    // the queue between SDK messages so cards stream out in order.
+    const pending: CompanionTurnEvent[] = [];
+
+    const server = createSdkMcpServer({
+      name: "companion",
+      version: "1.0.0",
+      tools: input.tools.map((t) =>
+        tool(t.name, t.description, t.schema, async (args) => {
+          const { result, event } = await t.handler(
+            args as Parameters<typeof t.handler>[0],
+          );
+          if (event) pending.push(event);
+          return { content: [{ type: "text", text: JSON.stringify(result) }] };
+        }),
+      ),
+    });
+
+    const q = query({
+      prompt: input.message,
+      options: {
+        cwd: process.cwd(),
+        ...(input.resumeSessionId ? { resume: input.resumeSessionId } : {}),
+        // A fully custom system prompt: Sage must NOT inherit the claude_code
+        // coding persona, and settingSources: [] keeps CLAUDE.md files (global
+        // and repo) out of an intimate journaling context.
+        systemPrompt: input.systemPrompt,
+        settingSources: [],
+        includePartialMessages: true,
+        permissionMode: "default",
+        mcpServers: { companion: server },
+        // The companion is a conversation, not an agent loose in the repo: only
+        // our own tools are reachable, everything else is denied outright.
+        // NOTE deliberately NO allowedTools list - bare entries there auto-approve
+        // before canUseTool is consulted (the SDK's CAN_USE_TOOL_SHADOWED warning);
+        // our mcp__companion__* tools fall through to canUseTool below instead.
+        disallowedTools: [
+          "Bash", "Read", "Write", "Edit", "Glob", "Grep", "WebFetch",
+          "WebSearch", "Task", "TodoWrite", "NotebookEdit", "AskUserQuestion",
+        ],
+        canUseTool: async (toolName, toolInput) =>
+          toolName.startsWith("mcp__companion__")
+            ? { behavior: "allow", updatedInput: toolInput }
+            : { behavior: "deny", message: "Tool not available in the companion.", interrupt: false },
+        maxTurns: 12,
+      },
+    });
+
+    let sdkSessionId: string | null = input.resumeSessionId;
+    let finalText = "";
+
+    try {
+      for await (const msg of q as AsyncIterable<SDKMessage>) {
+        while (pending.length > 0) yield pending.shift()!;
+
+        if (msg.type === "system" && msg.subtype === "init") {
+          sdkSessionId = msg.session_id;
+        } else if (msg.type === "stream_event") {
+          // Partial-message stream: surface assistant text as it is generated.
+          const ev = msg.event as {
+            type?: string;
+            delta?: { type?: string; text?: string };
+          };
+          if (ev.type === "content_block_delta" && ev.delta?.type === "text_delta" && ev.delta.text) {
+            yield { type: "text_delta", text: ev.delta.text };
+          }
+        } else if (msg.type === "result") {
+          finalText = msg.subtype === "success" ? msg.result : "";
+        }
+      }
+      while (pending.length > 0) yield pending.shift()!;
+      yield { type: "done", sdkSessionId, text: finalText };
+    } catch (err) {
+      while (pending.length > 0) yield pending.shift()!;
+      const message = err instanceof Error ? err.message : String(err);
+      // Self-heal a stale resume cursor: if the SDK no longer recognizes the
+      // stored session id (cleaned storage, invalid id), rerun the turn fresh
+      // instead of bricking the day's session. The new id is saved on `done`.
+      if (input.resumeSessionId && /resume|session/i.test(message)) {
+        yield* this.runTurn({ ...input, resumeSessionId: null });
+        return;
+      }
+      yield { type: "error", message };
+    }
+  }
+}
