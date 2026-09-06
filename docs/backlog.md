@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| - | - | - | - |
+| [P87-companion-v4.md](plans/P87-companion-v4.md) | #87 | feature/companion-#87 | In Progress |
 
 ---
 

@@ -18,6 +18,9 @@ namespace Tasklog.Api.Data
         public DbSet<JournalTemplate> JournalTemplates => Set<JournalTemplate>();
         public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
         public DbSet<MoodCheckin> MoodCheckins => Set<MoodCheckin>();
+        public DbSet<CompanionSession> CompanionSessions => Set<CompanionSession>();
+        public DbSet<Capture> Captures => Set<Capture>();
+        public DbSet<Embedding> Embeddings => Set<Embedding>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -109,6 +112,33 @@ namespace Tasklog.Api.Data
 
             // Mood check-ins are queried by day; index the timestamp for the date-range scan.
             modelBuilder.Entity<MoodCheckin>().HasIndex(m => m.CheckinAt);
+
+            // Companion (#87). One conversation per calendar day is a DB guarantee (the
+            // JournalEntry precedent) - the API get-or-creates today's session against
+            // this index instead of ever opening a duplicate thread.
+            modelBuilder.Entity<CompanionSession>()
+                .HasIndex(s => s.SessionDate)
+                .IsUnique();
+
+            // Captures (#87) reference the session they were proposed in. Deleting a
+            // session SET-NULLs its captures rather than cascading: a confirmed capture
+            // is an audit record that outlives its source (the #86 keep-history rule).
+            // Status is indexed for the "pending cards" filter; SessionId for the
+            // per-session card list.
+            modelBuilder.Entity<Capture>()
+                .HasOne(c => c.Session)
+                .WithMany(s => s.Captures)
+                .HasForeignKey(c => c.SessionId)
+                .OnDelete(DeleteBehavior.SetNull);
+            modelBuilder.Entity<Capture>().HasIndex(c => c.SessionId);
+            modelBuilder.Entity<Capture>().HasIndex(c => c.Status);
+
+            // Embeddings (#87): one vector per entity per model. The unique composite key
+            // makes embed-on-write an upsert, and a model swap writes new rows instead of
+            // corrupting old ones (vectors across models are not comparable).
+            modelBuilder.Entity<Embedding>()
+                .HasIndex(e => new { e.EntityType, e.EntityId, e.Model })
+                .IsUnique();
         }
     }
 }
