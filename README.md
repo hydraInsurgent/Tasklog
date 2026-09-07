@@ -81,6 +81,13 @@ I wanted a task system I understood completely - one where the data, the workflo
 - All data stored locally - no cloud, no account, no sync service required
 - Cross-platform and runs on Windows, macOS, and Linux - your laptop or a home server, whatever fits your setup
 
+**Sage - a journaling companion (v4.0)**
+- Talk about your day on the Sage tab; when something actionable comes up, Sage proposes a **task card** you Keep / Edit / Toss (Restore covers a mis-tap). Kept cards become real tasks - Sage never writes without your tap
+- **Understands meaning, not keywords** - "the tax thing" matches your existing "File the income tax return" via local Ollama embeddings, so it says "already on your list" instead of duplicating
+- Time-aware (knows the clock, notices when you come back after hours) and conversationally editable ("put that in its own project" morphs the card; one Keep creates project + task)
+- One conversation per day with a history calendar; past days read-only, their cards still actionable; your words save before the AI ever runs
+- Runs on **your own Claude subscription** (Claude Agent SDK - no API key) with the persona in one editable spec file; the whole surface is opt-in via `COMPANION_ENABLED=1` and stays off your public instance
+
 **Talk to your tasks via Claude (v2.10)**
 - Tasklog can be plugged into claude.ai as a custom connector (Model Context Protocol server)
 - 45 MCP tools: create/manage tasks and subtasks, find any task or subtask by name, check in habits, start/stop timers (task or task-free), query time summaries by client/project, manage projects, clients, and labels - all from claude.ai web or mobile
@@ -239,7 +246,7 @@ Runs on `http://localhost:3000`. Configure the API base URL in `frontend/.env.lo
 
 Tasklog is intentionally opinionated. Some things are not included by design:
 
-- No cloud sync — all data stays local 
+- No cloud sync - all data stays local 
 - Runs as a local server - on your laptop, desktop, or a dedicated home server
 - Not built for team collaboration (yet)
 - Limited integrations compared to SaaS tools

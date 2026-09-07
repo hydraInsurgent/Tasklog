@@ -2,6 +2,60 @@
 
 ---
 
+## v4.0.0 - Sage, the journaling companion
+*September 2026*
+
+Opens the v4.x "Living Profile" line: talk to the app, structure falls out. Full vision in
+`docs/ideas/living-profile.md`.
+
+### Added
+
+- **Sage** (#87) - a conversational companion on its own tab. Talk about your day; when
+  something actionable comes up, Sage proposes a **task card** you can **Keep / Edit / Toss**
+  (an accidental toss has **Restore**). Kept cards become real tasks in your list - Sage never
+  writes anything without your tap. Runs on your own Claude subscription via the Claude Agent
+  SDK (no API key), with a persona defined in one editable spec file.
+- **Semantic grounding** - before proposing, Sage searches your open tasks by *meaning*
+  (local Ollama embeddings, `nomic-embed-text`): "the tax thing" finds "File the income tax
+  return", so it says "already on your list" instead of duplicating. Degrades to keyword
+  search when Ollama is absent - nothing breaks.
+- **Conversational card edits** - "put that in its own project called ProcureFlow" morphs the
+  existing card in place; one Keep then creates the new project AND the task together.
+- **Time-aware** - Sage knows the current date/time each turn and when each message was sent
+  (invisible `<app_time>` markers on the model's copy only), so "first thing", "tonight", and
+  "back after ~2h" all mean what you mean.
+- **One conversation per day** + a **history calendar** (desktop rail / mobile pull-out
+  drawer): dots mark days you talked; past days open read-only, but their cards stay
+  actionable. A **Cards panel** keeps pending cards in reach while the chat scrolls.
+- **Never loses your words** - the transcript saves before the AI runs, append-only (two
+  devices can't clobber each other), and streamed replies persist even when a turn errors.
+
+### Changed
+
+- **Header**: new Sage tab; the tab row swipes on narrow phones instead of widening the page;
+  the logo shrinks to "T" on mobile; logo click no longer resets dark mode.
+- **Timer pill** moved to the bottom-RIGHT on desktop (all pages, one consistent home) and
+  hides on the companion tab below desktop width, where Sage's composer owns the bottom edge.
+
+### Notes
+
+- New tables `Captures` (the staged-proposal inbox: proposed/confirmed/dismissed, source-aware
+  for future MCP parity), `CompanionSessions` (one per day, unique date, append-only
+  transcript), `Embeddings` (generic per-entity vectors as BLOBs; brute-force cosine, no
+  native vector extension). Migration `AddCompanionCapturesAndEmbeddings`.
+- New endpoints: `/api/captures` (CRUD + confirm/dismiss/restore), `/api/companion/sessions`
+  (get-or-create today, by-date, dates, save, append), `POST /api/search/tasks` (semantic with
+  keyword fallback). New Next.js route `/api/companion/chat` (NDJSON streaming turn).
+- **The companion is gated**: the chat route is a 404 unless `COMPANION_ENABLED=1` is in the
+  runtime env - set on the PC (and optionally the phone), deliberately NOT on the public VM
+  (no app auth exists; see #88 for the remaining public-exposure hardening, #89 for polish).
+- New frontend dependency: `@anthropic-ai/claude-agent-sdk` + `zod`. Optional host dependency:
+  Ollama with `nomic-embed-text` for semantic search (verified on PC ~40-80ms/embed and on the
+  phone ~3.6s/embed).
+- Code-reviewed (3-agent) with 31 findings fixed pre-ship; backend suite 389/389.
+
+---
+
 ## v3.2.0 - Flexible time tracking + Clients
 *September 2026*
 
