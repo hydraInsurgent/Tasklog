@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| [P87-companion-v4.md](plans/P87-companion-v4.md) | #87 | feature/companion-#87 | In Progress |
+| - | - | - | - |
 
 ---
 
@@ -81,6 +81,7 @@ Recently completed work (keep last 10):
 
 | # | Title | Type | Closed |
 |---|-------|------|--------|
+| #87 | Sage, the journaling companion (v4.0.0) - opens the Living Profile line | feature | 2026-09-07 |
 | #86 | Flexible time tracking: Client level + task-free entries (v3.2.0) | feature | 2026-09-02 |
 | #85 | Journal QoL (wheel drill-down + task sheet) | improvement | 2026-07-08 |
 | #79 | Journaling | feature | 2026-07-04 |
@@ -90,7 +91,6 @@ Recently completed work (keep last 10):
 | #75 | Habits v2 Step 2: x-times-a-week frequency + deadline-free habit schedules (v2.18.0) | feature | 2026-05-31 |
 | #73 | UI uplift: design tokens + chip-driven sheet + board view + Habits v2 Step 1 (v2.17.0) | feature | 2026-05-30 |
 | #74 | Habit tracking (IsHabit + daily check-ins + streaks) (v2.16.0) - completes the recurring+habits program | feature | 2026-05-28 |
-| #72 | Natural-language quick-add (Todoist-style title parsing) (v2.15.0) | feature | 2026-05-27 |
 
 ---
 
