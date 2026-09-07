@@ -323,6 +323,14 @@ function buildTools(sessionId: number): CompanionTool[] {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  // Kill-switch (#88 R1): the companion runs ONLY where explicitly enabled -
+  // COMPANION_ENABLED=1 in the RUNTIME env (PC .env.local; phone service env).
+  // Anywhere else (the public OCI VM included) this route is an inert 404, so
+  // a routine deploy can never violate the PC/LAN-only stance by accident.
+  if (process.env.COMPANION_ENABLED !== "1") {
+    return new Response(null, { status: 404 });
+  }
+
   let message: string;
   try {
     const body = (await request.json()) as { message?: string };
