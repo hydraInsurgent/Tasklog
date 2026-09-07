@@ -53,7 +53,7 @@ Tasklog/
 │       ├── Data/                  EF Core DbContext
 │       ├── Migrations/            EF Core schema migrations
 │       ├── Models/                Data model classes
-│       ├── Services/              Pure domain helpers (RecurrenceRule - parse/validate/advance RRULE + OccursOn schedule membership, v2.14.0/#73; HabitStreak - schedule-aware day streak from check-in dates, v2.16.0/#73; HabitFrequency - "x times a week" weekly count/streak/week-status, v2.18.0/#75; JournalMarkdown - render a day's journal to an Obsidian-compatible markdown note, v3.0/#79; JournalTemplates - code-defined journal template definitions upserted at startup, v3.0/#79)
+│       ├── Services/              Pure domain helpers (RecurrenceRule - parse/validate/advance RRULE + OccursOn schedule membership, v2.14.0/#73; HabitStreak - schedule-aware day streak from check-in dates, v2.16.0/#73; HabitFrequency - "x times a week" weekly count/streak/week-status, v2.18.0/#75; JournalMarkdown - render a day's journal to an Obsidian-compatible markdown note, v3.0/#79; JournalTemplates - code-defined journal template definitions upserted at startup, v3.0/#79) + EmbeddingService (v4.0/#87 - the first true DI service: Ollama embed calls, vector BLOB upserts, brute-force cosine + RankBySimilarity, bounded startup backfill; everything best-effort)
 │       ├── Properties/            Launch settings (ports)
 │       ├── Program.cs             App startup and service registration
 │       ├── appsettings.json       Config (connection string, logging)
@@ -131,6 +131,12 @@ Tasklog/
 │       │   │                      resets to cores, hints under names + in center, ⓘ opens
 │       │   │                      MocLadder - log-scaled Hawkins reference with today marker),
 │       │   │                      (3-ring SVG picker, derived MoC), JournalPreview (react-markdown)
+│       │   ├── companion/         Sage, the v4.0 companion tab (#87): CompanionClient
+│       │   │                      (orchestrator: daily session, NDJSON stream consumption,
+│       │   │                      timeline merge, history browsing, acting lock),
+│       │   │                      ProposalCard (keep/quick-edit/toss/restore),
+│       │   │                      CardsPanel (rail/drawer triage), CompanionCalendar
+│       │   │                      (c-token twin of the journal CalendarWidget)
 │       │   (list is representative - other components: TaskCard, FilterPanel, LabelsClient, etc.)
 │       └── lib/
 │           ├── api.ts             Typed API call functions (used by both server and client)
@@ -143,10 +149,18 @@ Tasklog/
 │           ├── journal.ts         Journal content shapes (per-section-kind contracts, mirrored by
 │           │                      Services/JournalMarkdown.cs) + derived helpers: moodShift(),
 │           │                      energyEod(), rolloverCandidates() (v3.0/#79)
-│           └── feelingsWheel.ts   Curated feelings-wheel dataset: 7 cores / 41 secondaries /
-│                                  (+ per-feeling differentiating `hint` glosses on all 130, #85)
-│                                  82 tertiaries, each with a Hawkins MoC level + deriveMoc()/
-│                                  mocBand(). Sourced in docs/research/feelings-wheel-moc.md (v3.0/#79)
+│           ├── feelingsWheel.ts   Curated feelings-wheel dataset: 7 cores / 41 secondaries /
+│           │                      (+ per-feeling differentiating `hint` glosses on all 130, #85)
+│           │                      82 tertiaries, each with a Hawkins MoC level + deriveMoc()/
+│           │                      mocBand(). Sourced in docs/research/feelings-wheel-moc.md (v3.0/#79)
+│           └── companion/         The companion's AI layer (v4.0/#87):
+│                                  provider.ts (CompanionProvider seam - messages+tools shape -
+│                                  + ClaudeCodeProvider: per-turn Agent SDK query() with resume,
+│                                  stale-cursor self-heal, streamed-text preservation),
+│                                  persona.md (Sage's entire identity/rulebook - a reusable spec
+│                                  that can double as claude.ai custom instructions; PAIRED with
+│                                  meta.ts which gives the UI the name/greeting/chips)
+│       (app/api/companion/chat/route.ts is the turn endpoint - see "Companion AI layer" below)
 │
 ├── docs/
 │   ├── architecture.md            This file
@@ -173,10 +187,12 @@ HTTP request
     │
     ▼
 Controllers              Tasks / Projects / Labels / Comments / CheckIns / Habits /
-                         Subtasks / TimeEntries / Journal / MoodCheckins.
+                         Subtasks / TimeEntries / Journal / MoodCheckins /
+                         Captures / CompanionSessions / Search (v4.0/#87).
                          Handle routing, validation, HTTP response codes; no business
                          logic beyond input checking (pure helpers like RecurrenceRule
-                         and HabitStreak live in Services/).
+                         and HabitStreak live in Services/; EmbeddingService (v4.0) is
+                         the first true DI service - needs HttpClient + DbContext).
     │
     ▼
 TasklogDbContext         EF Core context. Direct DbSet access - no repository layer.
@@ -324,6 +340,53 @@ MoodCheckins  (v3.0/#79 - timestamped mood check-ins, several per day)
                        feelings-wheel picks - never self-tagged; null = free words only)
   CreatedAt   TEXT     not null
   First table with no Task FK - mood belongs to the day, not to a task.
+
+CompanionSessions  (v4.0/#87 - one Sage conversation per calendar day)
+  Id          INTEGER  primary key, autoincrement
+  SessionDate TEXT     not null, UNIQUE  (date-only, local midnight - one thread per day
+                       is a DB guarantee; the API get-or-creates, and a create race on the
+                       unique index is caught and returns the winner's row)
+  MessagesJson TEXT    not null  (full transcript as a JSON array of { role, content, at };
+                       APPEND-ONLY via POST .../{id}/messages so concurrent turns from two
+                       devices interleave instead of clobbering. Caps: 8k chars/message,
+                       2000 messages/day, ~1MB/day)
+  SdkSessionId TEXT    nullable  (the Claude Agent SDK's session id; passed back as
+                       `resume` each turn so per-request route handlers continue one
+                       coherent conversation)
+  CreatedAt / UpdatedAt TEXT not null
+
+Captures  (v4.0/#87 - the staged-proposal inbox of the Living Profile)
+  Id          INTEGER  primary key, autoincrement
+  Type        TEXT     not null  (registry name; v4.0 writes only "task")
+  Status      TEXT     not null, indexed  ("proposed" -> "confirmed" | "dismissed";
+                       restore flips dismissed back to proposed - user-only)
+  Source      TEXT     not null  ("companion" today; anticipates mcp / claude.ai / manual)
+  SessionId   INTEGER  nullable  FK -> CompanionSessions (SET NULL on session delete -
+                       the audit row outlives its source), indexed
+  PayloadJson TEXT     not null  (type-specific; for "task": { title, projectId?,
+                       newProjectName?, deadline? } - paired contract with the route's zod
+                       schemas and api.ts CaptureDto)
+  Span        TEXT     nullable  (the user's words that triggered the proposal - shown on
+                       the card so trust is inspectable)
+  Confidence  REAL     nullable
+  ConfirmedType TEXT / ConfirmedId INTEGER  nullable  (set on confirm: which typed home +
+                       row id, e.g. "task"/123)
+  CreatedAt / UpdatedAt TEXT not null
+  Confirm is a transactional guarded claim on relational providers (two concurrent Keeps
+  cannot both create a task); proposing a duplicate normalized title into the same session
+  returns the existing row (dismissed stays dismissed - the model cannot resurrect a toss).
+
+Embeddings  (v4.0/#87 - generic per-entity semantic vectors)
+  Id          INTEGER  primary key, autoincrement
+  EntityType  TEXT     not null  ("task" today; people/notes later reuse the table)
+  EntityId    INTEGER  not null
+  Model       TEXT     not null  ("nomic-embed-text"; part of the unique key so a model
+                       swap re-embeds into new rows)
+  Vector      BLOB     not null  (float32[] little-endian; compared with brute-force
+                       cosine in C# - deliberately NO native vector extension)
+  UpdatedAt   TEXT     not null
+  UNIQUE (EntityType, EntityId, Model). Rows are best-effort: written on task create /
+  title change + a bounded startup backfill, all silently skipped when Ollama is absent.
 ```
 
 ### API endpoints
@@ -381,6 +444,20 @@ MoodCheckins  (v3.0/#79 - timestamped mood check-ins, several per day)
 | GET | `/api/tasks/{taskId}/checkins` | List a habit's check-in dates, newest first. 404 if task missing (v2.16.0) |
 | POST | `/api/tasks/{taskId}/checkins` | Log a check-in. Body: `{ date? }` (default today, reduced to date-only). Idempotent: existing day → 200 with that check-in; new day → 201. 404 if task missing (v2.16.0) |
 | DELETE | `/api/tasks/{taskId}/checkins` | Undo a check-in. Query `?date=yyyy-MM-dd` (default today). 204 on success; 404 if there was no check-in that day (v2.16.0) |
+| GET | `/api/captures?sessionId=&status=` | Filtered capture list, oldest first (the session's cards) (v4.0/#87) |
+| GET | `/api/captures/{id}` | Single capture (201-Created Location target) (v4.0) |
+| POST | `/api/captures` | Create a PROPOSED capture. Body: `{ type, payload, sessionId?, span?, confidence?, source? }`. Per-session dedupe by normalized title returns the existing row (any status). Caps on payload/span/source/title (v4.0) |
+| PATCH | `/api/captures/{id}` | Edit a proposed capture's payload (quick-edit / update_capture). `sessionId` in the body (the companion always sends it) scopes the edit to that conversation; resolved captures are immutable (v4.0) |
+| POST | `/api/captures/{id}/confirm` | KEEP: materializes the typed home (task -> Tasks row; `newProjectName` get-or-creates the project in the same transaction), records ConfirmedType/Id. Idempotent; guarded claim under concurrency (v4.0) |
+| POST | `/api/captures/{id}/dismiss` | TOSS: recorded so it is not re-proposed. Idempotent (v4.0) |
+| POST | `/api/captures/{id}/restore` | Undo an accidental toss: dismissed -> proposed. User-only (the companion has no restore tool) (v4.0) |
+| GET | `/api/companion/sessions/today` | Today's session or 204 (reads never auto-create) (v4.0) |
+| GET | `/api/companion/sessions?date=` | That day's session (history view) or 204 (v4.0) |
+| GET | `/api/companion/sessions/dates?from=&to=` | Days having a conversation - the history calendar's dots (journal entries/dates twin; 400-day cap) (v4.0) |
+| POST | `/api/companion/sessions` | Get-or-create TODAY's session (idempotent; unique-date race returns the winner) (v4.0) |
+| PUT | `/api/companion/sessions/{id}` | Replace the transcript + present-key `sdkSessionId` (validated shape + caps) (v4.0) |
+| POST | `/api/companion/sessions/{id}/messages` | APPEND messages (+ present-key sdkSessionId) - the route's save path; concurrency-safe vs whole-array PUT (v4.0) |
+| POST | `/api/search/tasks` | Semantic search over OPEN tasks: `{ query, limit? (1-25) }` -> scored top-k. Embeds the query via Ollama + brute-force cosine over stored vectors; merges keyword hits for open tasks lacking vectors; falls back to keyword LIKE entirely when Ollama is unreachable (`matchedBy` says which) (v4.0) |
 | GET | `/api/habits` | Habit dashboard: every task where `IsHabit`, each as `{ task, currentStreak, doneToday, recentCheckIns[], weeklyTarget, thisWeekCount, recentWeeks[] }` (last ~90 days of check-ins, newest-first). `currentStreak` is unit-aware: consecutive **days** for a specific-days/daily habit (grace through yesterday), consecutive **weeks** with >= 1 check-in for a frequency habit (`weeklyTarget != null`, v2.18.0). For frequency habits, `thisWeekCount` = days done this calendar week (Mon-Sun) and `recentWeeks[]` = the last 8 weeks `{ weekStart, count, status }` (status met/partial/none); these three fields are null for non-frequency habits. Ordered newest-created first (v2.16.0) |
 
 ### CORS
@@ -595,7 +672,15 @@ from a server-side Node.js process. Breaks in production. See GitHub issue #1.
 NEXT_PUBLIC_API_URL     Base URL for API calls. Defined in frontend/.env.local.
                         Currently: http://localhost:5115
                         NEXT_PUBLIC_ prefix = available in both browser and server code.
+API_URL                 Server-side base URL (private; used by SSR + the companion route).
+                        Falls back to http://localhost:5115.
+COMPANION_ENABLED       "1" enables the Sage chat route (v4.0). Runtime env, deliberately
+                        NOT NEXT_PUBLIC_. Set on the PC (.env.local) and optionally the
+                        phone service; absent on the public VM -> the route 404s.
 ```
+
+Backend config (appsettings.json): `Ollama:Url` (default http://localhost:11434) - where
+EmbeddingService reaches Ollama; hosts without Ollama simply never get vectors.
 
 ---
 
@@ -706,6 +791,56 @@ See [docs/learnings/oauth-2-1-for-mcp.md](learnings/oauth-2-1-for-mcp.md) for th
 | `AUTH_DB_PATH` | SQLite path (default data/auth.db) | no |
 
 In production, `config.ts` throws on startup if any required var is missing or still at its dev default. Secrets live in `/root/.tasklog-mcp.env` (chmod 600) inside proot, sourced by the runit service script.
+
+---
+
+## Companion AI layer (v4.0/#87)
+
+Sage is the first INBOUND LLM in the system (the MCP server is outbound - claude.ai calling
+us). It lives in a Next.js API route, not the .NET backend (the Agent SDK is Node-only) and
+not the MCP server (that is the public OAuth surface). The .NET API stays the system of
+record; the route is a thin AI orchestrator over it.
+
+```
+Browser /companion tab
+  │  POST /api/companion/chat { message }          (same-origin Next.js route)
+  ▼
+route.ts                                            gate: 404 unless COMPANION_ENABLED=1
+  1. get-or-create today's CompanionSession (idempotent)
+  2. APPEND the user's raw words to the transcript  ← save-first: words persist even
+     (fails -> 502, turn never starts)                 if the AI never answers
+  3. build the system prompt: persona.md + live projects/clients + this session's
+     card ledger (kept/tossed/pending) + "Right now" date-time
+  4. decorate the MODEL-facing copy only: <app_time now=".." since_last_message=".."/>
+     (user text sanitized so pasted "<app_time" cannot impersonate the tag;
+      the DB/UI always keep the raw words)
+  5. ClaudeCodeProvider.runTurn: per-turn Agent SDK query() on the user's Claude
+     subscription, resume: SdkSessionId (self-heals a stale cursor by rerunning fresh)
+     - settingSources: [], custom system prompt (no CLAUDE.md, no coding persona)
+     - tool cage: canUseTool allows only mcp__companion__*, built-ins disallowed
+     - in-process tools (thin wrappers over the .NET API):
+         find_relevant_tasks  -> POST /api/search/tasks   (semantic grounding)
+         propose_capture      -> POST /api/captures       (a card, status=proposed)
+         update_capture       -> PATCH /api/captures/{id} (session-scoped card edits)
+  6. NDJSON stream to the browser: text_delta | card | done | error
+     - done: assistant turn + new sdk cursor APPENDED before the event is sent
+     - error: any streamed partial text is appended too (words are never lost)
+     - consumer-gone: enqueue failures flip a `closed` flag; the loop keeps
+       draining so the saves still run
+  ▼
+CompanionClient renders the stream; Keep/Edit/Toss/Restore call the captures API
+directly (the human trust loop - the model never writes a task itself).
+```
+
+Key properties: the transcript is append-only (two devices interleave, never clobber);
+one session per day maps 1:1 to an SDK resume id; the provider seam (`CompanionProvider`,
+messages+tools shape) is where an Anthropic-API/BYOK or local-model implementation slots in
+later without touching the route. Semantic grounding is embeddings-shortlist + the model
+judges: Ollama `nomic-embed-text` vectors stored once per task, brute-force cosine in C#.
+
+Deployment stance: PC/LAN-first. The route is INERT (404) without `COMPANION_ENABLED=1` in
+the runtime env, so `deploy-oci.sh` cannot accidentally expose it on the public VM (which has
+no app auth). Remaining public-exposure hardening is tracked in #88.
 
 ---
 

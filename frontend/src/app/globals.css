@@ -49,6 +49,17 @@
   --color-moc-low: #bf463e;
   --color-moc-mid: #ce9433;
   --color-moc-high: #3d7a4e;
+
+  /* Companion-scoped identity (#87) - warm rose/cream calm, the "refuge, not
+     dashboard" feel (Rosebud-like). Same page-scoped pattern as the j- journal
+     tokens above. All text pairs verified >= 4.5:1 (AA) on both grounds. */
+  --color-c-bg: #f7f2ee;           /* warm cream page ground */
+  --color-c-card: #fdfaf7;         /* Sage bubbles + proposal cards */
+  --color-c-ink: #2b2422;          /* text */
+  --color-c-muted: #6d5e54;        /* captions, timestamps (AA on bg AND card) */
+  --color-c-line: #eadfd6;         /* warm borders */
+  --color-c-accent: #9c4a56;       /* dusty rose accent (AA as text on bg; white on it AA) */
+  --color-c-accent-soft: #f6e8e6;  /* user bubble + chip tint */
 }
 
 /* Dark mode - applied when <html class="dark">.
@@ -88,6 +99,15 @@ html.dark {
   --color-moc-low: #d06a62;
   --color-moc-mid: #d8a954;
   --color-moc-high: #6fb584;
+
+  /* Companion identity, night mode (#87) - warm dark, soft rose. */
+  --color-c-bg: #191512;
+  --color-c-card: #221d19;
+  --color-c-ink: #e8e1da;
+  --color-c-muted: #9b8f86;
+  --color-c-line: #332c26;
+  --color-c-accent: #d99a8f;
+  --color-c-accent-soft: rgba(217, 154, 143, 0.14);
 }
 
 /* The journal's prose voice (#79): a serif stack - no font dependency; system serifs

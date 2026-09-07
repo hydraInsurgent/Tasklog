@@ -6,6 +6,11 @@ var builder = WebApplication.CreateBuilder(args);
 // Register controllers (TasksController and any future controllers).
 builder.Services.AddControllers();
 
+// Semantic embeddings via local Ollama (#87). Typed HttpClient: EmbeddingService gets
+// its own client (base address + timeout set in its ctor from Ollama:Url config).
+// Everything it does is best-effort - no Ollama on this host just means no vectors.
+builder.Services.AddHttpClient<Tasklog.Api.Services.EmbeddingService>();
+
 // In development, the DB is in the project root (working directory for dotnet run).
 // In production/distributable, resolve relative to the exe's directory so it works
 // regardless of where the exe is launched from (fixes issue #3).
@@ -97,5 +102,25 @@ using (var scope = app.Services.CreateScope())
     }
     db.SaveChanges();
 }
+
+// Embedding backfill (#87): catch up open tasks that have no vector yet (rows created
+// while Ollama was down, plus the pre-#87 backlog). Fire-and-forget with its own scope
+// so startup never blocks on a cold model load; it stops at the first failure, so a
+// host without Ollama pays one refused connection and moves on.
+_ = Task.Run(async () =>
+{
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var embeddings = scope.ServiceProvider.GetRequiredService<Tasklog.Api.Services.EmbeddingService>();
+        await embeddings.BackfillOpenTasksAsync();
+    }
+    catch (Exception ex)
+    {
+        // A discarded task swallows exceptions (e.g. the DB briefly locked right
+        // after migration) - leave at least a trace instead of vanishing silently.
+        app.Logger.LogWarning("Embedding backfill failed: {Reason}", ex.Message);
+    }
+});
 
 app.Run();

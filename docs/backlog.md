@@ -22,7 +22,7 @@ What is currently being planned or built:
 
 | Plan file | Issue | Branch | Status |
 |-----------|-------|--------|--------|
-| - | - | - | - |
+| [P87-companion-v4.md](plans/P87-companion-v4.md) | #87 | feature/companion-#87 | In Progress |
 
 ---
 
@@ -110,6 +110,8 @@ Untracked ideas - not estimated, not prioritized, not committed to. Just things 
 - Watch list / content tracker - a standing list of shows, movies, and other content to watch, doubling as a tracker of what has been watched (status per item). Same standing-list family as the dream journal / wishlist; post-#79.
 - Recurring task progress log (auto-comments) - when a recurring occurrence is completed, automatically write a log entry capturing the outcome (e.g. "Completed 4/5 subtasks", completion date) so each series builds its own history/streak record without manual notes. Depends on subtasks (#78) for the progress count. Open design question: log onto the series (SeriesId) vs the individual occurrence.
 - Domain event log + notification foundation - persist system events (deadline crossed / task went overdue, task completed, recurring occurrence spawned or completed, subtask went overdue) as structured, durable log entries. Purpose: give a future notification service a reliable event stream to consume so reminders/notifications can be built on top and keep working. Key design decision to resolve first: reuse the TaskComment table (simple, but mixes system events into the user's comment stream) vs a dedicated Activity/Event table (cleaner separation, own schema). Leaning toward a dedicated table so user comments stay human-authored. This is the substrate a notification service would poll or subscribe to.
+
+- Companion rail dashboard (#87 follow-on, 2026-09-06) - the sticky right rail on /companion currently holds the history calendar + the cards panel; grow it into a small dashboard (day streaks, mood glance, pending-card badge on the tab, quick stats). Explicitly deferred by the user during the v4.0 build ("some kind of dashboard. later").
 
 ### Time-tracking + "record of life" cluster (from #86 exploration, 2026-08-29)
 

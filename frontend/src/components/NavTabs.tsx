@@ -12,13 +12,21 @@ const TABS = [
   { href: "/", label: "Tasks", isActive: (p: string) => p === "/" || p.startsWith("/tasks") },
   { href: "/time", label: "Time", isActive: (p: string) => p.startsWith("/time") },
   { href: "/journal", label: "Journal", isActive: (p: string) => p.startsWith("/journal") },
+  { href: "/companion", label: "Sage", isActive: (p: string) => p.startsWith("/companion") },
 ];
 
 export default function NavTabs() {
   const pathname = usePathname();
 
   return (
-    <nav aria-label="Sections" className="flex items-center gap-1">
+    // A swipeable strip on narrow screens: when the tabs fit they sit centered
+    // (the wrapper centers a content-width nav); when they don't, the nav takes
+    // max-w-full and scrolls horizontally INSIDE itself - the page body must
+    // never scroll sideways (ux rule no-horizontal-scroll).
+    <nav
+      aria-label="Sections"
+      className="flex items-center gap-1 max-w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
       {TABS.map(({ href, label, isActive }) => {
         const active = isActive(pathname);
         return (
@@ -26,7 +34,7 @@ export default function NavTabs() {
             key={href}
             href={href}
             aria-current={active ? "page" : undefined}
-            className={`px-3 py-2 rounded-lg text-sm transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+            className={`shrink-0 whitespace-nowrap px-2.5 sm:px-3 py-2 rounded-lg text-sm transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
               active
                 ? "bg-surface-raised text-text-primary font-semibold"
                 : "text-text-muted hover:text-text-primary"

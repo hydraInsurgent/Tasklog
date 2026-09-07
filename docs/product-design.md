@@ -77,6 +77,8 @@ A reminder or alert system would be a meaningful scope addition.
 
 **Single data file** - all task data lives in one SQLite file. A second small SQLite file (`mcp/data/auth.db`) holds OAuth state for the MCP server; this is operational state, not user data, and is safe to wipe at any time to force re-consent.
 
+**AI companion is opt-in and host-bound** (v4.0) - Sage runs only where `COMPANION_ENABLED=1` is set AND a Claude Code subscription login exists on that machine. It is deliberately absent from the public VM (no app auth exists). Two AI doors, one brain: the in-app companion (owns the transcript, proposes-only) and the public MCP connector (claude.ai, direct writes) both operate on the same API.
+
 ---
 
 ## How features currently work
@@ -125,6 +127,16 @@ A reminder or alert system would be a meaningful scope addition.
 - The **"Today so far"** widget shows a **Client/Project time breakdown** of the day's tracked time (v3.2.0/#86) - proportion bars beside the single total - so task and non-task time unite in the day's actuals. The plan stays intent-only (tasks/habits); actuals live here.
 - The journal page carries its **own scoped visual identity** (fog paper / plum accent / serif prose voice, with a soft dark mode) via `--color-j-*` tokens; the rest of the app is unchanged. Journal prose is bilingual-friendly (Hinglish + Devanagari fall through to system fonts).
 - **Sensitivity note:** journal prose and mood history are the most sensitive data the app holds. They stay LAN-only; the MCP surface does NOT expose journal endpoints yet, and minimal auth (v3.1) is planned before it ever does.
+- **Direction (v4.x):** the fill-the-sections journal is being SUPERSEDED as the capture surface by the companion (below) - its hard-won structure survives as the companion's question agenda and, later, as a *generated* daily note (planned v4.1). The tab stays untouched until that replacement is proven; manual editing remains for no-talk days. See `docs/ideas/living-profile.md`.
+
+**Sage, the journaling companion** (v4.0, #87)
+- A conversational companion on its own tab (`/companion`), with a warm scoped identity (`--color-c-*`, rose/cream - "a refuge, not a dashboard") and a name defined in one spec file (`persona.md`, paired with `meta.ts`).
+- **The trust loop is the core rule: Sage proposes, the human disposes.** When the conversation surfaces an actionable, Sage raises a *card* (title, guessed project, the exact words it heard, confidence). Keep materializes a real task; Edit adjusts it first; Toss declines (and the model can never re-raise a tossed item - only the human's Restore can). Nothing enters the data unconfirmed.
+- **Grounded, not naive:** before proposing, Sage semantically searches open tasks (local Ollama embeddings; "the tax thing" matches "File the income tax return") and says "already on your list" instead of duplicating. Projects are never invented - a new project happens only when the user asks ("put that in its own project"), and one Keep then creates project + task together.
+- **Time-aware:** each turn carries the current date/time, and each message carries an invisible timestamp marker on the model's copy only - so "first thing", "tonight", and returning after a 2h gap all read correctly. The user's stored words are never decorated.
+- **One conversation per day** (the daily-note rhythm), with a history calendar - dots on days you talked, past days read-only, their cards still actionable. The transcript saves BEFORE the AI runs and is append-only; words are never lost to an AI failure or a second device.
+- Runs on the user's own Claude subscription (Claude Agent SDK), gated by `COMPANION_ENABLED=1` per host. The provider is a seam: an API-key or local-model implementation can replace Claude Code later without changing the product.
+- **Deferred by design** (the v4.x ladder in `docs/ideas/living-profile.md`): mood capture -> MoodCheckins (v4.1, with the generated daily note), people/mentions (CRM seed), recall, richer facets. v4.0 captures only tasks.
 
 **Projects & Clients**
 - Projects let the user categorize tasks (and time entries).

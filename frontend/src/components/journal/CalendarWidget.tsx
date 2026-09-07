@@ -3,6 +3,8 @@
 // Month calendar for date selection (default today). A dot under a day = at least one
 // journal entry exists (from GET /api/journal/entries/dates). Month navigation refetches
 // the dots for the shown month. Local-calendar math throughout (never toISOString).
+// NOTE: a companion twin lives at components/companion/CompanionCalendar.tsx (#87,
+// c- tokens) - mirror any logic fixes (month-follow effect, Monday-first math) there.
 
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
