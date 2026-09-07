@@ -85,7 +85,7 @@ export default function CompanionCalendar({ selected, sessionDates, onSelect, on
               onClick={() => onSelect(day)}
               aria-label={day.toDateString()}
               aria-current={isSelected ? "date" : undefined}
-              className={`relative rounded-lg py-2.5 lg:py-1 text-[0.78rem] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-c-accent hover:bg-c-accent-soft ${
+              className={`relative rounded-lg min-h-11 lg:min-h-0 py-2.5 lg:py-1 text-[0.78rem] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-c-accent hover:bg-c-accent-soft ${
                 isToday ? "bg-c-ink text-c-bg font-bold hover:bg-c-ink" : "text-c-ink"
               } ${isSelected && !isToday ? "ring-[1.6px] ring-c-accent" : ""}`}
             >

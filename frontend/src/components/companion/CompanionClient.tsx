@@ -19,7 +19,7 @@
 // cards stay fully actionable: the talk is day-bound, the inbox is not.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CalendarDays, Check, X } from "lucide-react";
+import { CalendarDays, X } from "lucide-react";
 import {
   confirmCapture,
   dismissCapture,
@@ -34,13 +34,15 @@ import {
   type CompanionMessage,
   type Project,
 } from "@/lib/api";
-import { dateKey } from "@/lib/time";
+import { dateKey, localIso } from "@/lib/time";
 import {
   COMPANION_GREETING,
   COMPANION_NAME,
   STARTER_CHIPS,
 } from "@/lib/companion/meta";
 import CompanionCalendar from "./CompanionCalendar";
+import ProposalCard from "./ProposalCard";
+import CardsPanel from "./CardsPanel";
 
 // ---------- small shared bits ----------
 
@@ -57,13 +59,6 @@ function SageGlyph({ className }: { className?: string }) {
       />
     </svg>
   );
-}
-
-// Local wall-clock ISO, no timezone suffix (codebase convention; the route
-// stores the same shape). toISOString would write UTC and lie by hours.
-function localIso(d = new Date()): string {
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
 
 function timeLabel(iso: string): string {
@@ -94,348 +89,6 @@ function monthRange(anchor: Date): { from: string; to: string } {
   };
 }
 
-// ---------- proposal card ----------
-
-function ProposalCard({
-  capture,
-  projects,
-  onKeep,
-  onToss,
-  onRestore,
-  onSaveEdit,
-}: {
-  capture: CaptureDto;
-  projects: Project[];
-  onKeep: (id: number) => Promise<void>;
-  onToss: (id: number) => Promise<void>;
-  onRestore: (id: number) => Promise<void>;
-  onSaveEdit: (id: number, payload: CaptureDto["payload"]) => Promise<void>;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [title, setTitle] = useState(capture.payload.title ?? "");
-  const [projectId, setProjectId] = useState<number | "">(
-    capture.payload.projectId ?? "",
-  );
-  const [newProj, setNewProj] = useState(capture.payload.newProjectName ?? "");
-  const [busy, setBusy] = useState<"keep" | "toss" | "save" | "restore" | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const resolved = capture.status !== "proposed";
-  const project = projects.find(
-    (p) => p.id === (editing ? projectId : capture.payload.projectId),
-  );
-
-  // Sage can update a proposed card mid-conversation (update_capture): sync the
-  // edit fields from the fresh payload so opening Edit never shows stale values.
-  const startEdit = () => {
-    setTitle(capture.payload.title ?? "");
-    setProjectId(capture.payload.projectId ?? "");
-    setNewProj(capture.payload.newProjectName ?? "");
-    setEditing(true);
-  };
-
-  const run = async (
-    action: "keep" | "toss" | "save" | "restore",
-    fn: () => Promise<void>,
-  ) => {
-    setBusy(action);
-    setError(null);
-    try {
-      await fn();
-      if (action === "save") setEditing(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong - retry.");
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  return (
-    <div
-      className={`rounded-2xl border bg-c-card px-4 py-3 transition-opacity duration-200 ${
-        resolved ? "opacity-60 border-c-line" : "border-c-accent/40"
-      }`}
-    >
-      <p className="text-[11px] uppercase tracking-wide text-c-muted mb-1">
-        {COMPANION_NAME} suggests a task
-      </p>
-
-      {editing ? (
-        <div className="space-y-2">
-          <div>
-            <label htmlFor={`cap-title-${capture.id}`} className="block text-xs text-c-muted mb-1">
-              Title
-            </label>
-            <input
-              id={`cap-title-${capture.id}`}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full rounded-lg border border-c-line bg-c-bg px-3 py-2 text-base text-c-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-c-accent"
-            />
-          </div>
-          {capture.payload.newProjectName !== undefined && (
-            <div>
-              <label htmlFor={`cap-newproj-${capture.id}`} className="block text-xs text-c-muted mb-1">
-                New project (clear to use the dropdown instead)
-              </label>
-              <input
-                id={`cap-newproj-${capture.id}`}
-                value={newProj}
-                onChange={(e) => setNewProj(e.target.value)}
-                className="w-full rounded-lg border border-c-line bg-c-bg px-3 py-2 text-base text-c-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-c-accent"
-              />
-            </div>
-          )}
-          <div>
-            <label htmlFor={`cap-project-${capture.id}`} className="block text-xs text-c-muted mb-1">
-              Project
-            </label>
-            <select
-              id={`cap-project-${capture.id}`}
-              value={projectId}
-              onChange={(e) => setProjectId(e.target.value === "" ? "" : Number(e.target.value))}
-              disabled={newProj.trim() !== ""}
-              className="w-full rounded-lg border border-c-line bg-c-bg px-3 py-2 text-base text-c-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-c-accent disabled:opacity-50"
-            >
-              <option value="">Inbox (no project)</option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                  {p.client ? ` - ${p.client.name}` : ""}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex gap-2 pt-1">
-            <button
-              type="button"
-              disabled={busy !== null || title.trim() === ""}
-              onClick={() =>
-                run("save", () =>
-                  // A typed new-project name wins; otherwise the dropdown choice
-                  // applies and any stale newProjectName is dropped.
-                  onSaveEdit(capture.id, {
-                    ...capture.payload,
-                    title: title.trim(),
-                    ...(newProj.trim() !== ""
-                      ? { newProjectName: newProj.trim(), projectId: undefined }
-                      : {
-                          newProjectName: undefined,
-                          ...(projectId === "" ? { projectId: undefined } : { projectId }),
-                        }),
-                  }),
-                )
-              }
-              className="min-h-11 px-4 rounded-lg bg-c-accent text-white text-sm font-medium disabled:opacity-50 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-c-accent"
-            >
-              {busy === "save" ? "Saving..." : "Save"}
-            </button>
-            <button
-              type="button"
-              disabled={busy !== null}
-              onClick={() => setEditing(false)}
-              className="min-h-11 px-4 rounded-lg border border-c-line text-sm text-c-ink cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-c-accent"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : (
-        <>
-          <p className="text-base font-medium text-c-ink">{capture.payload.title}</p>
-          <p className="text-sm text-c-muted mt-0.5">
-            {capture.payload.newProjectName ? (
-              <>
-                {capture.payload.newProjectName}{" "}
-                <span className="text-c-accent">· new project</span>
-              </>
-            ) : project ? (
-              project.name
-            ) : (
-              "Inbox"
-            )}
-            {capture.payload.deadline ? ` · due ${capture.payload.deadline.slice(0, 10)}` : ""}
-          </p>
-          {capture.span && (
-            <p className="text-xs text-c-muted italic mt-1.5 line-clamp-2">
-              &ldquo;{capture.span}&rdquo;
-            </p>
-          )}
-
-          {resolved ? (
-            // Resolved state: icon + word + color (never color alone).
-            <p
-              className={`mt-2 inline-flex items-center gap-1.5 text-sm font-medium ${
-                capture.status === "confirmed" ? "text-success" : "text-c-muted"
-              }`}
-            >
-              {capture.status === "confirmed" ? (
-                <>
-                  <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none" aria-hidden="true">
-                    <path d="M3 8.5 6.5 12 13 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  Added to your tasks
-                </>
-              ) : (
-                <>
-                  <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none" aria-hidden="true">
-                    <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
-                  Dismissed
-                  <button
-                    type="button"
-                    disabled={busy !== null}
-                    onClick={() => run("restore", () => onRestore(capture.id))}
-                    className="ml-1 min-h-11 px-3 rounded-lg border border-c-line text-sm text-c-ink cursor-pointer hover:bg-c-accent-soft transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-c-accent"
-                  >
-                    {busy === "restore" ? "..." : "Restore"}
-                  </button>
-                </>
-              )}
-            </p>
-          ) : (
-            <div className="flex gap-2 mt-2.5">
-              <button
-                type="button"
-                disabled={busy !== null}
-                onClick={() => run("keep", () => onKeep(capture.id))}
-                className="min-h-11 px-4 rounded-lg bg-c-accent text-white text-sm font-medium disabled:opacity-50 cursor-pointer transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-c-accent"
-              >
-                {busy === "keep" ? "Adding..." : "Keep"}
-              </button>
-              <button
-                type="button"
-                disabled={busy !== null}
-                onClick={startEdit}
-                className="min-h-11 px-4 rounded-lg border border-c-line text-sm text-c-ink cursor-pointer transition-colors duration-150 hover:bg-c-accent-soft focus:outline-none focus-visible:ring-2 focus-visible:ring-c-accent"
-              >
-                Edit
-              </button>
-              <button
-                type="button"
-                disabled={busy !== null}
-                onClick={() => run("toss", () => onToss(capture.id))}
-                className="min-h-11 px-4 rounded-lg text-sm text-c-muted cursor-pointer transition-colors duration-150 hover:bg-c-accent-soft focus:outline-none focus-visible:ring-2 focus-visible:ring-c-accent"
-              >
-                {busy === "toss" ? "..." : "Toss"}
-              </button>
-            </div>
-          )}
-        </>
-      )}
-
-      {error && <p className="text-sm text-danger mt-2">{error}</p>}
-    </div>
-  );
-}
-
-// ---------- cards panel (rail / drawer) ----------
-
-// Always-in-reach card triage (#87): proposed cards scroll away inside the
-// conversation, so the rail/drawer mirrors them for deciding without scrolling.
-// Same captures state as the inline cards - two views, one truth. Tossed cards
-// keep a Restore here for the mis-tap case; kept ones just count.
-function CardsPanel({
-  captures,
-  projects,
-  onKeep,
-  onToss,
-  onRestore,
-}: {
-  captures: CaptureDto[];
-  projects: Project[];
-  onKeep: (id: number) => Promise<void>;
-  onToss: (id: number) => Promise<void>;
-  onRestore: (id: number) => Promise<void>;
-}) {
-  const [busyId, setBusyId] = useState<number | null>(null);
-  const pending = captures.filter((c) => c.status === "proposed");
-  const tossed = captures.filter((c) => c.status === "dismissed");
-  const keptCount = captures.filter((c) => c.status === "confirmed").length;
-
-  const act = async (id: number, fn: () => Promise<void>) => {
-    setBusyId(id);
-    try {
-      await fn();
-    } catch {
-      // the inline card surfaces errors; the panel stays quiet
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  const projectLine = (c: CaptureDto) =>
-    c.payload.newProjectName
-      ? `${c.payload.newProjectName} · new`
-      : projects.find((p) => p.id === c.payload.projectId)?.name ?? "Inbox";
-
-  return (
-    <div className="rounded-2xl border border-c-line bg-c-card p-3">
-      <p className="text-sm font-medium text-c-ink mb-2">
-        Cards
-        <span className="text-c-muted font-normal">
-          {" "}· {pending.length} pending
-          {keptCount > 0 ? ` · ${keptCount} kept` : ""}
-        </span>
-      </p>
-
-      {pending.length === 0 && tossed.length === 0 && (
-        <p className="text-xs text-c-muted">Nothing suggested yet today.</p>
-      )}
-
-      <ul className="space-y-2">
-        {pending.map((c) => (
-          <li key={c.id} className="rounded-xl border border-c-accent/40 bg-c-bg px-3 py-2">
-            <p className="text-sm text-c-ink leading-snug">{c.payload.title}</p>
-            <div className="flex items-center justify-between mt-1">
-              <span className="text-xs text-c-muted truncate">{projectLine(c)}</span>
-              <span className="flex gap-1 shrink-0">
-                <button
-                  type="button"
-                  disabled={busyId !== null}
-                  onClick={() => act(c.id, () => onKeep(c.id))}
-                  aria-label={`Keep "${c.payload.title}"`}
-                  className="min-h-11 min-w-11 flex items-center justify-center rounded-lg bg-c-accent text-white disabled:opacity-50 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-c-accent"
-                >
-                  <Check size={16} aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  disabled={busyId !== null}
-                  onClick={() => act(c.id, () => onToss(c.id))}
-                  aria-label={`Toss "${c.payload.title}"`}
-                  className="min-h-11 min-w-11 flex items-center justify-center rounded-lg border border-c-line text-c-muted hover:bg-c-accent-soft disabled:opacity-50 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-c-accent"
-                >
-                  <X size={16} aria-hidden="true" />
-                </button>
-              </span>
-            </div>
-          </li>
-        ))}
-
-        {tossed.map((c) => (
-          <li key={c.id} className="rounded-xl border border-c-line bg-c-bg px-3 py-2 opacity-70">
-            <p className="text-sm text-c-ink leading-snug line-through decoration-c-muted/60">
-              {c.payload.title}
-            </p>
-            <div className="flex items-center justify-between mt-1">
-              <span className="text-xs text-c-muted">tossed</span>
-              <button
-                type="button"
-                disabled={busyId !== null}
-                onClick={() => act(c.id, () => onRestore(c.id))}
-                className="min-h-11 px-3 rounded-lg border border-c-line text-xs text-c-ink hover:bg-c-accent-soft disabled:opacity-50 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-c-accent"
-              >
-                Restore
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
 // ---------- the surface ----------
 
 export default function CompanionClient() {
@@ -457,6 +110,14 @@ export default function CompanionClient() {
   const isToday = dateKey(selectedDate) === dateKey(new Date());
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  // Bumped whenever the viewed day changes; an in-flight stream captured the
+  // old value and must stop touching UI state (review R11 - no bleeding a live
+  // turn into a browsed past day). The stream itself keeps draining so the
+  // server-side saves complete.
+  const dayGenRef = useRef(0);
+  // One card action in flight at a time, shared by the inline cards AND the
+  // rail/drawer panel (review R5 - the UX half of the double-Keep guard).
+  const [actingId, setActingId] = useState<number | null>(null);
 
   // Load the selected day's conversation (today = the live session).
   const loadDay = useCallback(async (day: Date) => {
@@ -474,6 +135,7 @@ export default function CompanionClient() {
       setMessages([]);
       setCaptures([]);
     }
+    setLoadError(false); // a successful load heals a sticky earlier failure (review R36)
   }, []);
 
   // Mount: projects + today's conversation + this month's calendar dots.
@@ -497,6 +159,7 @@ export default function CompanionClient() {
 
   const selectDay = useCallback(
     async (day: Date) => {
+      dayGenRef.current += 1;
       setSelectedDate(day);
       setShowCalendar(false);
       setTurnError(null);
@@ -517,6 +180,19 @@ export default function CompanionClient() {
       // dots are decoration; a failed month fetch must not break the page
     }
   }, []);
+
+  // Drawer a11y (design review D1): Escape closes, and focus lands inside the
+  // dialog when it opens so keyboard users are not left stranded behind it.
+  const drawerRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!showCalendar) return;
+    drawerRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowCalendar(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showCalendar]);
 
   // Keep the latest turn in view as text streams in (today only).
   useEffect(() => {
@@ -558,6 +234,11 @@ export default function CompanionClient() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      // The generation this turn belongs to: if the user browses to another day
+      // mid-stream, gen goes stale and this loop stops touching UI state while
+      // still draining the stream (the route finishes its saves regardless).
+      const gen = dayGenRef.current;
+      const live = () => dayGenRef.current === gen;
       try {
         for (;;) {
           const { done, value } = await reader.read();
@@ -573,6 +254,7 @@ export default function CompanionClient() {
             } catch {
               continue;
             }
+            if (!live()) continue;
             if (event.type === "text_delta") {
               acc += event.text;
               setStreamText(acc);
@@ -586,6 +268,15 @@ export default function CompanionClient() {
               );
             } else if (event.type === "done") {
               if (typeof event.sessionId === "number") {
+                if (sessionId !== null && event.sessionId !== sessionId) {
+                  // Day rolled over mid-conversation (a 23:58 -> 00:02 send):
+                  // this turn landed in a NEW daily session. Reload today so
+                  // the screen matches the DB instead of stitching two days
+                  // into one thread (review R10).
+                  setStreamText(null);
+                  void selectDay(new Date());
+                  continue;
+                }
                 setSessionId(event.sessionId);
                 // First message of the day: light today's calendar dot.
                 setSessionDates((prev) => new Set(prev).add(dateKey(new Date())));
@@ -599,7 +290,7 @@ export default function CompanionClient() {
               }
               setStreamText(null);
             } else if (event.type === "error") {
-              // The route saved the user's words before the AI ran.
+              // The route saved the user's words (and any partial reply) first.
               if (acc) {
                 setMessages((prev) => [
                   ...prev,
@@ -608,29 +299,57 @@ export default function CompanionClient() {
               }
               setStreamText(null);
               setTurnError("ai");
+              // Cards created before the failure exist in the DB but their
+              // stream events may never have arrived - reconcile so the user
+              // sees what Sage will be told about next turn (review R22).
+              if (sessionId !== null) {
+                getCaptures(sessionId)
+                  .then((c) => { if (live()) setCaptures(c); })
+                  .catch(() => {});
+              }
             }
           }
         }
+      } catch {
+        // Mid-stream drop (WiFi blip, route crash): the words were saved before
+        // the AI ran, so the calm copy is the true one (review R13/R8-mobile).
+        if (live()) setTurnError("ai");
       } finally {
-        setStreamText(null);
-        setSending(false);
+        if (live()) {
+          setStreamText(null);
+          setSending(false);
+        } else {
+          setSending(false);
+        }
       }
     },
-    [sending],
+    [sending, sessionId, selectDay],
   );
 
   // ---- trust-loop actions (shared state update) ----
   const swapCapture = (updated: CaptureDto) =>
     setCaptures((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
 
-  const keep = async (id: number) => {
-    const { capture } = await confirmCapture(id);
-    swapCapture(capture);
+  // Every card action runs through one gate: while any is in flight, all card
+  // buttons everywhere are disabled (review R5). Errors rethrow so the calling
+  // view (card or panel) can display them.
+  const acting = async (id: number, fn: () => Promise<void>) => {
+    if (actingId !== null) return;
+    setActingId(id);
+    try {
+      await fn();
+    } finally {
+      setActingId(null);
+    }
   };
-  const toss = async (id: number) => swapCapture(await dismissCapture(id));
-  const restore = async (id: number) => swapCapture(await restoreCapture(id));
-  const saveEdit = async (id: number, payload: CaptureDto["payload"]) =>
-    swapCapture(await updateCapture(id, payload));
+  const keep = (id: number) =>
+    acting(id, async () => swapCapture((await confirmCapture(id)).capture));
+  const toss = (id: number) =>
+    acting(id, async () => swapCapture(await dismissCapture(id)));
+  const restore = (id: number) =>
+    acting(id, async () => swapCapture(await restoreCapture(id)));
+  const saveEdit = (id: number, payload: CaptureDto["payload"]) =>
+    acting(id, async () => swapCapture(await updateCapture(id, payload)));
 
   // ---- timeline: messages + cards interleaved by real time ----
   // Parse-based comparison: transcripts contain both legacy UTC "Z" strings
@@ -660,6 +379,7 @@ export default function CompanionClient() {
     <CardsPanel
       captures={captures}
       projects={projects}
+      actingId={actingId}
       onKeep={keep}
       onToss={toss}
       onRestore={restore}
@@ -697,13 +417,32 @@ export default function CompanionClient() {
             sticky rail instead. Plain fixed is safe here - no transformed
             ancestor on this page (the /time-sheet precedent). */}
         {showCalendar && (
-          <div className="lg:hidden fixed inset-0 z-40" role="dialog" aria-label="Calendar and cards">
+          <div
+            className="lg:hidden fixed inset-0 z-40"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Calendar and cards"
+          >
             <div
               className="absolute inset-0 bg-black/30"
               onClick={() => setShowCalendar(false)}
               aria-hidden="true"
             />
-            <div className="absolute right-0 top-0 bottom-0 w-[85vw] max-w-sm bg-c-bg border-l border-c-line p-4 space-y-4 overflow-y-auto">
+            <div
+              ref={drawerRef}
+              tabIndex={-1}
+              className="absolute right-0 top-0 bottom-0 w-[85vw] max-w-sm bg-c-bg border-l border-c-line p-4 space-y-4 overflow-y-auto focus:outline-none"
+            >
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowCalendar(false)}
+                  aria-label="Close calendar and cards"
+                  className="min-h-11 min-w-11 flex items-center justify-center rounded-lg text-c-muted hover:text-c-ink hover:bg-c-accent-soft cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-c-accent"
+                >
+                  <X size={18} aria-hidden="true" />
+                </button>
+              </div>
               {calendar}
               {cardsPanel}
             </div>
@@ -747,10 +486,10 @@ export default function CompanionClient() {
             </p>
           )}
 
-          {timeline.map((item) =>
+          {timeline.map((item, i) =>
             item.kind === "msg" ? (
               <div
-                key={`m-${item.at}-${item.msg.role}-${item.msg.content.slice(0, 24)}`}
+                key={`m-${i}`}
                 className={item.msg.role === "user" ? "flex justify-end" : "flex justify-start"}
               >
                 <div
@@ -772,6 +511,7 @@ export default function CompanionClient() {
                   <ProposalCard
                     capture={item.capture}
                     projects={projects}
+                    actingId={actingId}
                     onKeep={keep}
                     onToss={toss}
                     onRestore={restore}

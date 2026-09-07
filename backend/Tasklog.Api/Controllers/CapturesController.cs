@@ -20,6 +20,13 @@ namespace Tasklog.Api.Controllers
         // adding a type is a writer method + an entry here, never a migration.
         private static readonly HashSet<string> RegisteredTypes = new() { "task" };
 
+        // Input sanity caps (review R8): a card is a small thing; nothing about it
+        // should ever be page-sized.
+        private const int MaxTitleChars = 500;
+        private const int MaxSpanChars = 500;
+        private const int MaxSourceChars = 50;
+        private const int MaxPayloadChars = 4000;
+
         private readonly TasklogDbContext _context;
         private readonly Services.EmbeddingService? _embeddings;
 
@@ -43,6 +50,17 @@ namespace Tasklog.Api.Controllers
             return Ok(captures.Select(Project).ToList());
         }
 
+        // GET /api/captures/{id} - single capture; gives 201 Created a real Location
+        // target (review R28 - avoids reproducing known issue #17's shape).
+        [HttpGet("{id:int}")]
+        public async Task<IActionResult> GetById(int id)
+        {
+            var capture = await _context.Captures.FindAsync(id);
+            if (capture is null)
+                return NotFound(new { message = $"Capture {id} not found." });
+            return Ok(Project(capture));
+        }
+
         // POST /api/captures  { type, payload: {...}, sessionId?, span?, confidence?, source? }
         // Creates a PROPOSED capture. Structurally validated only (a task payload must have
         // a title); a bad project guess is not rejected here - confirm validates strictly.
@@ -56,12 +74,20 @@ namespace Tasklog.Api.Controllers
                 return BadRequest(new { message = $"type must be one of: {string.Join(", ", RegisteredTypes)}." });
             if (request.Payload.ValueKind != JsonValueKind.Object)
                 return BadRequest(new { message = "payload must be a JSON object." });
+            if (request.Payload.GetRawText().Length > MaxPayloadChars)
+                return BadRequest(new { message = "payload too large." });
             if (request.Confidence is < 0 or > 1)
                 return BadRequest(new { message = "confidence must be between 0 and 1." });
+            if (request.Span is { Length: > MaxSpanChars })
+                return BadRequest(new { message = $"span must be {MaxSpanChars} characters or fewer." });
+            if (request.Source is { Length: > MaxSourceChars })
+                return BadRequest(new { message = $"source must be {MaxSourceChars} characters or fewer." });
 
             var title = GetTaskTitle(request.Payload);
             if (request.Type == "task" && title is null)
                 return BadRequest(new { message = "a task payload requires a non-empty title." });
+            if (title is { Length: > MaxTitleChars })
+                return BadRequest(new { message = $"title must be {MaxTitleChars} characters or fewer." });
 
             if (request.SessionId is not null)
             {
@@ -99,12 +125,16 @@ namespace Tasklog.Api.Controllers
             };
             _context.Captures.Add(capture);
             await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(List), Project(capture));
+            return CreatedAtAction(nameof(GetById), new { id = capture.Id }, Project(capture));
         }
 
-        // PATCH /api/captures/{id}  { payload: {...} } - edit a proposal before confirming
-        // (the card's quick-edit). Only proposed captures are editable; resolved ones are
-        // an audit record.
+        // PATCH /api/captures/{id}  { payload: {...}, sessionId? } - edit a proposal
+        // before confirming (the card's quick-edit, and the companion's update_capture
+        // tool). Only proposed captures are editable; resolved ones are an audit record.
+        // When sessionId is present (the companion always sends it) the capture must
+        // belong to that session - the model must not be able to rewrite another day's
+        // pending cards (review R7). The UI's own edit omits it: the human may edit any
+        // day's card from history, by design.
         [HttpPatch("{id:int}")]
         public async Task<IActionResult> Update(int id, [FromBody] JsonElement body)
         {
@@ -114,10 +144,21 @@ namespace Tasklog.Api.Controllers
             if (capture.Status != "proposed")
                 return BadRequest(new { message = $"Capture {id} is {capture.Status}; only proposed captures can be edited." });
 
+            if (body.TryGetProperty("sessionId", out var sid))
+            {
+                if (sid.ValueKind != JsonValueKind.Number || capture.SessionId != sid.GetInt32())
+                    return BadRequest(new { message = $"Capture {id} does not belong to this conversation." });
+            }
+
             if (!body.TryGetProperty("payload", out var payload) || payload.ValueKind != JsonValueKind.Object)
                 return BadRequest(new { message = "payload must be a JSON object." });
-            if (capture.Type == "task" && GetTaskTitle(payload) is null)
+            if (payload.GetRawText().Length > MaxPayloadChars)
+                return BadRequest(new { message = "payload too large." });
+            var newTitle = GetTaskTitle(payload);
+            if (capture.Type == "task" && newTitle is null)
                 return BadRequest(new { message = "a task payload requires a non-empty title." });
+            if (newTitle is { Length: > MaxTitleChars })
+                return BadRequest(new { message = $"title must be {MaxTitleChars} characters or fewer." });
 
             capture.PayloadJson = payload.GetRawText();
             capture.UpdatedAt = DateTime.Now;
@@ -154,6 +195,41 @@ namespace Tasklog.Api.Controllers
                     return BadRequest(new { message = $"Project {projectId} not found. Edit the capture first." });
             }
 
+            DateTime? deadline = null;
+            if (payload.TryGetProperty("deadline", out var dl) && dl.ValueKind == JsonValueKind.String)
+            {
+                if (!DateTime.TryParse(dl.GetString(), out var parsed))
+                    return BadRequest(new { message = "deadline is not a valid date. Edit the capture first." });
+                deadline = parsed;
+            }
+
+            // Claim + materialize atomically (review R5/R18). On the real (relational)
+            // database the status flip is a guarded UPDATE inside one transaction, so two
+            // concurrent Keeps (the inline card and the rail button are both live) cannot
+            // both create a task, a keep/toss interleave cannot confirm a dismissed card,
+            // and a crash cannot leave a confirmed capture without its ConfirmedId or an
+            // orphan new project. The InMemory test provider supports neither transactions
+            // nor ExecuteUpdate, so tests run the same body on the optimistic path.
+            var relational = _context.Database.IsRelational();
+            await using var tx = relational ? await _context.Database.BeginTransactionAsync() : null;
+            if (relational)
+            {
+                var claimed = await _context.Captures
+                    .Where(c => c.Id == id && c.Status == "proposed")
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(c => c.Status, "confirmed")
+                        .SetProperty(c => c.UpdatedAt, DateTime.Now));
+                if (claimed == 0)
+                {
+                    await tx!.RollbackAsync();
+                    await _context.Entry(capture).ReloadAsync();
+                    return capture.Status == "confirmed"
+                        ? Ok(Project(capture)) // the other tap won; same idempotent answer
+                        : BadRequest(new { message = $"Capture {id} was dismissed; it cannot be confirmed." });
+                }
+                await _context.Entry(capture).ReloadAsync();
+            }
+
             // newProjectName (#87): the user asked for a NEW project for this task, so one
             // confirm materializes BOTH. Get-or-create by name (case-insensitive) - if the
             // project came to exist between propose and confirm, reuse it, never duplicate.
@@ -178,14 +254,6 @@ namespace Tasklog.Api.Controllers
                 projectId = project.Id;
             }
 
-            DateTime? deadline = null;
-            if (payload.TryGetProperty("deadline", out var dl) && dl.ValueKind == JsonValueKind.String)
-            {
-                if (!DateTime.TryParse(dl.GetString(), out var parsed))
-                    return BadRequest(new { message = "deadline is not a valid date. Edit the capture first." });
-                deadline = parsed;
-            }
-
             var task = new TaskModel
             {
                 Title = title,
@@ -203,7 +271,10 @@ namespace Tasklog.Api.Controllers
             capture.ConfirmedId = task.Id;
             await _context.SaveChangesAsync();
 
-            // The new task enters the semantic index like any other write (#87).
+            if (tx is not null) await tx.CommitAsync();
+
+            // The new task enters the semantic index like any other write (#87) -
+            // after commit, so a failed embed can never roll back a kept card.
             if (_embeddings is not null)
                 await _embeddings.UpsertAsync("task", task.Id, task.Title);
 

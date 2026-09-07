@@ -28,6 +28,15 @@ export function dateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+// Local wall-clock ISO with NO timezone suffix - the app-wide storage convention
+// (TimeEntry, CheckIns, companion transcripts). toISOString() would store UTC and
+// shift times by the offset. Shared here (#87 review) so the companion route and
+// client cannot drift apart on the format.
+export function localIso(d = new Date()): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
 // Local midnight of the given date.
 export function startOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());

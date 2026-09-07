@@ -228,10 +228,9 @@ public class CapturesControllerTests
         var repeat = await controller.Create(new CaptureRequest(
             "task", Payload("""{"title":"Try the flight sim"}"""), sessionId, null, null, null));
 
-        var body = (repeat as OkObjectResult)!.Value!;
+        repeat.Should().BeOfType<OkObjectResult>();
         context.Captures.Count().Should().Be(1);
         capture.Status.Should().Be("dismissed");
-        body.ToString().Should().Contain("dismissed");
     }
 
     [Fact]

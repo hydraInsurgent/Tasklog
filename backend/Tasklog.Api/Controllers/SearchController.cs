@@ -46,31 +46,48 @@ namespace Tasklog.Api.Controllers
                 .Select(t => new { t.Id, t.Title, t.ProjectId, ProjectName = t.Project != null ? t.Project.Name : null, t.Deadline })
                 .ToListAsync();
 
+            var needle = request.Query.Trim().ToLower();
             var queryVector = await _embeddings.EmbedAsync(request.Query.Trim());
             if (queryVector is not null)
             {
+                // Only vectors that belong to OPEN tasks count (review R9): orphan
+                // vectors of completed/deleted tasks must not make search claim
+                // "semantic" while every actual candidate is unembedded.
+                var openIds = openTasks.Select(t => t.Id).ToList();
                 var vectors = await _context.Embeddings
-                    .Where(e => e.EntityType == "task" && e.Model == EmbeddingService.ModelName)
+                    .Where(e => e.EntityType == "task" && e.Model == EmbeddingService.ModelName
+                                && openIds.Contains(e.EntityId))
                     .ToDictionaryAsync(e => e.EntityId, e => e.Vector);
 
                 if (vectors.Count > 0)
                 {
-                    var ranked = openTasks
-                        .Where(t => vectors.ContainsKey(t.Id))
-                        .Select(t => new
+                    var taskById = openTasks.ToDictionary(t => t.Id);
+                    var ranked = EmbeddingService.RankBySimilarity(queryVector, vectors, limit)
+                        .Select(r => new
                         {
-                            t.Id, t.Title, t.ProjectId, t.ProjectName, t.Deadline,
-                            Score = Math.Round(EmbeddingService.Cosine(queryVector, EmbeddingService.FromBytes(vectors[t.Id])), 4),
+                            taskById[r.EntityId].Id,
+                            taskById[r.EntityId].Title,
+                            taskById[r.EntityId].ProjectId,
+                            taskById[r.EntityId].ProjectName,
+                            taskById[r.EntityId].Deadline,
+                            Score = Math.Round(r.Score, 4),
                         })
-                        .OrderByDescending(t => t.Score)
-                        .Take(limit)
                         .ToList();
-                    return Ok(new { matchedBy = "semantic", results = ranked });
+
+                    // Open tasks WITHOUT a vector (created while Ollama napped) must
+                    // still be findable - merge keyword hits for them so a coverage
+                    // gap can never make grounding lie about what exists (review R9).
+                    var unembeddedHits = openTasks
+                        .Where(t => !vectors.ContainsKey(t.Id) && t.Title.ToLower().Contains(needle))
+                        .Select(t => new { t.Id, t.Title, t.ProjectId, t.ProjectName, t.Deadline, Score = 0.0 })
+                        .ToList();
+
+                    var results = ranked.Concat(unembeddedHits).Take(limit).ToList();
+                    return Ok(new { matchedBy = "semantic", results });
                 }
             }
 
             // Degraded path: substring match on the title. Honest about being keyword.
-            var needle = request.Query.Trim().ToLower();
             var fallback = openTasks
                 .Where(t => t.Title.ToLower().Contains(needle))
                 .Take(limit)

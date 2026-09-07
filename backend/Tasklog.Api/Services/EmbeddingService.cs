@@ -64,9 +64,11 @@ namespace Tasklog.Api.Services
 
         // Embed-on-write: upsert the vector for one entity. Swallows failure entirely -
         // the caller's SaveChanges has already happened and must stay committed.
-        public async Task UpsertAsync(string entityType, int entityId, string text)
+        // `precomputed` lets a caller that already embedded the text (the backfill
+        // probe, review R24) skip a second Ollama round-trip.
+        public async Task UpsertAsync(string entityType, int entityId, string text, float[]? precomputed = null)
         {
-            var vector = await EmbedAsync(text);
+            var vector = precomputed ?? await EmbedAsync(text);
             if (vector is null) return;
 
             try
@@ -109,7 +111,7 @@ namespace Tasklog.Api.Services
                 // One probe is enough to learn Ollama is absent - stop, don't hammer.
                 var vector = await EmbedAsync(task.Title);
                 if (vector is null) return;
-                await UpsertAsync("task", task.Id, task.Title);
+                await UpsertAsync("task", task.Id, task.Title, vector);
             }
             if (missing.Count > 0)
                 _logger.LogInformation("Embedding backfill covered {Count} tasks.", missing.Count);
@@ -122,6 +124,19 @@ namespace Tasklog.Api.Services
 
         public static float[] FromBytes(byte[] bytes) =>
             MemoryMarshal.Cast<byte, float>(bytes).ToArray();
+
+        // Ranks candidate entities by cosine similarity to a query vector: the pure,
+        // provider-free core of semantic search (review R34 - unit-testable without
+        // Ollama, the ComputeDueStatus/RecurrenceRule shape).
+        public static List<(int EntityId, double Score)> RankBySimilarity(
+            float[] queryVector, IReadOnlyDictionary<int, byte[]> vectorsByEntityId, int limit)
+        {
+            return vectorsByEntityId
+                .Select(kv => (EntityId: kv.Key, Score: Cosine(queryVector, FromBytes(kv.Value))))
+                .OrderByDescending(x => x.Score)
+                .Take(limit)
+                .ToList();
+        }
 
         // Plain cosine similarity. Not assuming pre-normalized vectors.
         public static double Cosine(float[] a, float[] b)

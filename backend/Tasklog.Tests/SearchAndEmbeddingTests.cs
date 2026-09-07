@@ -73,6 +73,31 @@ public class SearchAndEmbeddingTests
             EmbeddingService.Cosine(query, far));
     }
 
+    [Fact]
+    public void RankBySimilarity_OrdersDescending_AndRespectsLimit()
+    {
+        var query = new float[] { 1, 0 };
+        var vectors = new Dictionary<int, byte[]>
+        {
+            [1] = EmbeddingService.ToBytes(new float[] { 0, 1 }),      // orthogonal
+            [2] = EmbeddingService.ToBytes(new float[] { 1, 0 }),      // identical
+            [3] = EmbeddingService.ToBytes(new float[] { 0.7f, 0.7f }),// diagonal
+        };
+
+        var ranked = EmbeddingService.RankBySimilarity(query, vectors, 2);
+
+        ranked.Should().HaveCount(2);
+        ranked[0].EntityId.Should().Be(2);
+        ranked[1].EntityId.Should().Be(3);
+    }
+
+    [Fact]
+    public void RankBySimilarity_EmptyVectors_ReturnsEmpty()
+    {
+        EmbeddingService.RankBySimilarity(new float[] { 1 }, new Dictionary<int, byte[]>(), 5)
+            .Should().BeEmpty();
+    }
+
     // ---- endpoint fallback behavior (no vectors / no Ollama) ----
 
     [Fact]

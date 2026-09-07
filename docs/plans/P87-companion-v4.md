@@ -227,3 +227,15 @@ Built 2026-09-05, all steps complete. Deltas vs. the plan:
 - Session 1's test debris (curl smoke-test messages) deliberately KEPT as history-view test
   data, per user.
 - Dev-LAN note: the PC's DHCP IP drifted .41 -> .47; `allowedDevOrigins` now lists both.
+
+**Review round (2026-09-06, 3-agent review + fixes):** 2 Blocks / 15 Warns / 23 Suggests
+found; all fixed on the branch except four deferred to #88 (hardening before public
+exposure: R1 deploy gate, R19-R21) and four to #89 (polish). Structural outcomes: the
+transcript is now APPEND-only over a new /messages endpoint (concurrent devices cannot
+clobber), confirm is a transactional guarded claim (double-Keep cannot duplicate tasks),
+streamed words always reach the DB (non-success turns save the streamed text; error paths
+save partials), update_capture is session-scoped, <app_time is neutralized in user text,
+input caps everywhere, semantic search merges keyword hits for unembedded open tasks,
+midnight rollover reloads, history browsing is generation-guarded against a live stream,
+ProposalCard/CardsPanel extracted to own files, drawer got dialog a11y. Backend suite
+389/389; prod build + live turn re-verified after fixes.

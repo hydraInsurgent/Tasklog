@@ -93,6 +93,44 @@ public class CompanionSessionsControllerTests
         result.Should().BeOfType<NotFoundObjectResult>();
     }
 
+    // ---- append (#87 review R4: turns save without clobbering) ----
+
+    [Fact]
+    public async Task Append_AddsToExistingTranscript_InsteadOfReplacing()
+    {
+        using var context = CreateContext();
+        var controller = new CompanionSessionsController(context);
+        await controller.Create();
+        var id = context.CompanionSessions.Single().Id;
+        await controller.Save(id, Body(
+            """{"messages":[{"role":"user","content":"first","at":"2026-09-06T10:00:00"}]}"""));
+
+        var result = await controller.Append(id, Body(
+            """{"messages":[{"role":"assistant","content":"second","at":"2026-09-06T10:00:05"}],"sdkSessionId":"sdk-1"}"""));
+
+        result.Should().BeOfType<OkObjectResult>();
+        var row = context.CompanionSessions.Single();
+        row.MessagesJson.Should().Contain("first").And.Contain("second");
+        row.SdkSessionId.Should().Be("sdk-1");
+    }
+
+    [Fact]
+    public async Task Append_RejectsMalformedMessages()
+    {
+        using var context = CreateContext();
+        var controller = new CompanionSessionsController(context);
+        await controller.Create();
+        var id = context.CompanionSessions.Single().Id;
+
+        var badRole = await controller.Append(id, Body(
+            """{"messages":[{"role":"system","content":"x","at":"t"}]}"""));
+        var noContent = await controller.Append(id, Body(
+            """{"messages":[{"role":"user","at":"t"}]}"""));
+
+        badRole.Should().BeOfType<BadRequestObjectResult>();
+        noContent.Should().BeOfType<BadRequestObjectResult>();
+    }
+
     // ---- history view (#87 calendar) ----
 
     [Fact]

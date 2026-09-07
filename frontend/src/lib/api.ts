@@ -870,7 +870,7 @@ export async function getCompanionSessionDates(from: string, to: string): Promis
 // GET /api/captures?sessionId= - the session's proposal cards, oldest first.
 export async function getCaptures(sessionId: number): Promise<CaptureDto[]> {
   const res = await fetch(`${getApiUrl()}/api/captures?sessionId=${sessionId}`, { cache: "no-store" });
-  if (!res.ok) throw new Error("Failed to load proposals.");
+  if (!res.ok) throw new Error("Failed to load cards.");
   return res.json();
 }
 
@@ -886,7 +886,7 @@ export async function updateCapture(
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.message ?? "Failed to update the proposal.");
+    throw new Error(body.message ?? "Failed to update the card.");
   }
   return res.json();
 }
@@ -911,7 +911,7 @@ export async function dismissCapture(id: number): Promise<CaptureDto> {
   const res = await fetch(`${getApiUrl()}/api/captures/${id}/dismiss`, { method: "POST" });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.message ?? "Failed to dismiss the proposal.");
+    throw new Error(body.message ?? "Failed to toss the card.");
   }
   return res.json();
 }
@@ -921,7 +921,7 @@ export async function restoreCapture(id: number): Promise<CaptureDto> {
   const res = await fetch(`${getApiUrl()}/api/captures/${id}/restore`, { method: "POST" });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.message ?? "Failed to restore the proposal.");
+    throw new Error(body.message ?? "Failed to restore the card.");
   }
   return res.json();
 }

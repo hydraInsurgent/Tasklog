@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
+import { localIso } from "@/lib/time";
 import {
   ClaudeCodeProvider,
   type CompanionTool,
@@ -19,7 +20,14 @@ import {
 // v4.0 (P87 Decision 8); this route must not ship to the public OCI instance.
 export const dynamic = "force-dynamic";
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5115";
+// Server-to-server base URL: the house convention (lib/api.ts getApiUrl) is the
+// private API_URL for server-side code - NEXT_PUBLIC_* is the browser value and
+// would loop through the public hostname in a deployed environment (review R14).
+const API = process.env.API_URL ?? "http://localhost:5115";
+
+// One chat message is a thought, not a document (review R8). The UI can show
+// this limit as a friendly error; the transcript endpoint enforces its own caps.
+const MAX_MESSAGE_CHARS = 4000;
 
 // The persona spec is the single authored source of Sage's behavior (and name).
 // A file, not inline code, so the same text can serve as claude.ai custom
@@ -42,12 +50,8 @@ interface SessionRow {
   sdkSessionId: string | null;
 }
 
-// Local wall-clock ISO with NO timezone suffix - the codebase convention
-// (TimeEntry, CheckIns). toISOString() would store UTC and shift the day.
-function localIso(d = new Date()): string {
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
-}
+// localIso comes from lib/time (shared with the client - review R23) so the
+// storage format cannot drift between the two writers.
 
 // Sage is a companion, not an oracle: it must know the user's "now" (this
 // server IS the user's machine, so server-local time is user-local time).
@@ -91,19 +95,27 @@ async function getOrCreateTodaySession(): Promise<SessionRow> {
   return (await res.json()) as SessionRow;
 }
 
-async function saveSession(
+// APPENDS the new turn's lines server-side (review R4): concurrent turns from
+// two devices interleave instead of last-write-wins clobbering each other.
+// Throws on a non-ok response (review R3) - "your words are saved" must never
+// be claimed unverified.
+async function appendMessages(
   id: number,
   messages: SessionRow["messages"],
   sdkSessionId?: string | null,
 ): Promise<void> {
-  await fetch(`${API}/api/companion/sessions/${id}`, {
-    method: "PUT",
+  const res = await fetch(`${API}/api/companion/sessions/${id}/messages`, {
+    method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       messages,
       ...(sdkSessionId ? { sdkSessionId } : {}),
     }),
   });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`transcript append failed: ${res.status} ${body.slice(0, 200)}`);
+  }
 }
 
 // Card outcomes, injected per turn: Sage proposes cards but is never told what
@@ -163,6 +175,8 @@ function buildTools(sessionId: number): CompanionTool[] {
       const res = await fetch(`${API}/api/search/tasks`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        // 6 candidates (not the API's default 8): enough for the model to judge
+        // a match, small enough not to crowd the turn's context.
         body: JSON.stringify({ query: text, limit: 6 }),
       });
       if (!res.ok) return { result: { error: `search failed: ${res.status}` } };
@@ -276,6 +290,9 @@ function buildTools(sessionId: number): CompanionTool[] {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          // sessionId scopes the edit to THIS conversation (review R7): the
+          // model must not be able to rewrite another day's pending cards.
+          sessionId,
           payload: {
             title,
             ...(projectId ? { projectId } : {}),
@@ -316,6 +333,12 @@ export async function POST(request: Request): Promise<Response> {
   if (!message) {
     return Response.json({ message: "message is required." }, { status: 400 });
   }
+  if (message.length > MAX_MESSAGE_CHARS) {
+    return Response.json(
+      { message: `A message can be at most ${MAX_MESSAGE_CHARS} characters - split the long one up.` },
+      { status: 400 },
+    );
+  }
 
   // Save-first: the user's words reach the DB before the AI is even attempted.
   let session: SessionRow;
@@ -327,11 +350,24 @@ export async function POST(request: Request): Promise<Response> {
       { status: 502 },
     );
   }
-  const messages = Array.isArray(session.messages) ? session.messages : [];
-  // Tag computed BEFORE appending, so the gap measures the previous exchange.
-  const timeTag = timeContextTag(messages.length > 0 ? messages[messages.length - 1].at : undefined);
-  messages.push({ role: "user", content: message, at: localIso() });
-  await saveSession(session.id, messages);
+  const prior = Array.isArray(session.messages) ? session.messages : [];
+  // Tag computed from the previous exchange's last message.
+  const timeTag = timeContextTag(prior.length > 0 ? prior[prior.length - 1].at : undefined);
+  try {
+    await appendMessages(session.id, [{ role: "user", content: message, at: localIso() }]);
+  } catch {
+    // If the words cannot be persisted, the turn must not run at all - the
+    // client's "NOT saved" copy depends on this being honest (review R3).
+    return Response.json(
+      { message: "Could not save your message - the turn was not started." },
+      { status: 502 },
+    );
+  }
+
+  // Neutralize any <app_time-shaped text inside the USER's words before the
+  // genuine tag is prepended (review R6): pasted content must never be able to
+  // masquerade as the app's own machine context.
+  const safeMessage = message.replace(/<app_time/gi, "&lt;app_time");
 
   const [persona, projects, cards] = await Promise.all([
     readPersona(),
@@ -343,28 +379,62 @@ export async function POST(request: Request): Promise<Response> {
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      const send = (event: CompanionTurnEvent & { sessionId?: number }) =>
-        controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
+      // The consumer can vanish mid-stream (tab closed, phone locked). The
+      // provider loop must keep draining so the done-save still runs (review
+      // R12) - enqueue failures just flip `closed` instead of aborting.
+      let closed = false;
+      const send = (event: CompanionTurnEvent & { sessionId?: number }) => {
+        if (closed) return;
+        try {
+          controller.enqueue(encoder.encode(JSON.stringify(event) + "\n"));
+        } catch {
+          closed = true;
+        }
+      };
 
       try {
         for await (const event of provider.runTurn({
           // Decorated copy for the model only; the DB stored the raw words above.
           // Tag on its own line - structurally separate from the user's words.
-          message: `${timeTag}\n${message}`,
+          message: `${timeTag}\n${safeMessage}`,
           resumeSessionId: session.sdkSessionId,
           systemPrompt: persona + projects + cards + nowContext(),
           tools: buildTools(session.id),
         })) {
           if (event.type === "done") {
-            // Persist the assistant turn + the resume cursor, then hand the
-            // client its session id (it reloads cards keyed on it).
-            messages.push({
-              role: "assistant",
-              content: event.text,
-              at: localIso(),
-            });
-            await saveSession(session.id, messages, event.sdkSessionId);
-            send({ ...event, sessionId: session.id });
+            // Persist the assistant turn + resume cursor BEFORE telling the
+            // client the turn is done. Empty turns save nothing (review R2) -
+            // but the sdk cursor is still recorded for resume. The sessionId on
+            // the event lets the client detect a midnight rollover and
+            // reconcile (review R10/R22).
+            try {
+              await appendMessages(
+                session.id,
+                event.text
+                  ? [{ role: "assistant", content: event.text, at: localIso() }]
+                  : [],
+                event.sdkSessionId,
+              );
+              send({ ...event, sessionId: session.id });
+            } catch {
+              send({
+                type: "error",
+                message: "Sage replied, but the reply could not be saved to the transcript.",
+              });
+            }
+          } else if (event.type === "error") {
+            // Words the user already watched stream must survive a failure
+            // (review R2): persist the partial text before surfacing the error.
+            if (event.partialText) {
+              try {
+                await appendMessages(session.id, [
+                  { role: "assistant", content: event.partialText, at: localIso() },
+                ]);
+              } catch {
+                // the error event below already tells the user things went wrong
+              }
+            }
+            send(event);
           } else {
             send(event);
           }
@@ -376,7 +446,11 @@ export async function POST(request: Request): Promise<Response> {
           message: err instanceof Error ? err.message : String(err),
         });
       } finally {
-        controller.close();
+        try {
+          controller.close();
+        } catch {
+          // already closed/cancelled by the consumer
+        }
       }
     },
   });

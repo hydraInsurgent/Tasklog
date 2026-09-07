@@ -109,9 +109,18 @@ using (var scope = app.Services.CreateScope())
 // host without Ollama pays one refused connection and moves on.
 _ = Task.Run(async () =>
 {
-    using var scope = app.Services.CreateScope();
-    var embeddings = scope.ServiceProvider.GetRequiredService<Tasklog.Api.Services.EmbeddingService>();
-    await embeddings.BackfillOpenTasksAsync();
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var embeddings = scope.ServiceProvider.GetRequiredService<Tasklog.Api.Services.EmbeddingService>();
+        await embeddings.BackfillOpenTasksAsync();
+    }
+    catch (Exception ex)
+    {
+        // A discarded task swallows exceptions (e.g. the DB briefly locked right
+        // after migration) - leave at least a trace instead of vanishing silently.
+        app.Logger.LogWarning("Embedding backfill failed: {Reason}", ex.Message);
+    }
 });
 
 app.Run();

@@ -21,7 +21,9 @@ export type CompanionTurnEvent =
   | { type: "text_delta"; text: string }
   | { type: "card"; capture: unknown }
   | { type: "done"; sdkSessionId: string | null; text: string }
-  | { type: "error"; message: string };
+  // partialText carries whatever streamed before the failure so the caller can
+  // still persist it - words shown to the user must never exist only on screen.
+  | { type: "error"; message: string; partialText?: string };
 
 /**
  * One tool the companion may call mid-turn. `handler` returns the payload sent
@@ -103,12 +105,19 @@ export class ClaudeCodeProvider implements CompanionProvider {
           toolName.startsWith("mcp__companion__")
             ? { behavior: "allow", updatedInput: toolInput }
             : { behavior: "deny", message: "Tool not available in the companion.", interrupt: false },
+        // Bounds a runaway tool loop. 12 = enough for a long brain dump
+        // (find + propose per actionable, ~5-6 items); when it IS hit, the
+        // streamed-text fallback below still preserves the reply.
         maxTurns: 12,
       },
     });
 
     let sdkSessionId: string | null = input.resumeSessionId;
     let finalText = "";
+    // Everything streamed so far. THE fallback for finalText: on a non-"success"
+    // result (error_max_turns etc.) the SDK gives no result string, but the user
+    // already watched this text - it must reach the transcript (review R2).
+    let streamed = "";
 
     try {
       for await (const msg of q as AsyncIterable<SDKMessage>) {
@@ -123,25 +132,32 @@ export class ClaudeCodeProvider implements CompanionProvider {
             delta?: { type?: string; text?: string };
           };
           if (ev.type === "content_block_delta" && ev.delta?.type === "text_delta" && ev.delta.text) {
+            streamed += ev.delta.text;
             yield { type: "text_delta", text: ev.delta.text };
           }
         } else if (msg.type === "result") {
-          finalText = msg.subtype === "success" ? msg.result : "";
+          finalText = msg.subtype === "success" ? msg.result : streamed;
         }
       }
       while (pending.length > 0) yield pending.shift()!;
-      yield { type: "done", sdkSessionId, text: finalText };
+      yield { type: "done", sdkSessionId, text: finalText || streamed };
     } catch (err) {
       while (pending.length > 0) yield pending.shift()!;
       const message = err instanceof Error ? err.message : String(err);
       // Self-heal a stale resume cursor: if the SDK no longer recognizes the
       // stored session id (cleaned storage, invalid id), rerun the turn fresh
       // instead of bricking the day's session. The new id is saved on `done`.
-      if (input.resumeSessionId && /resume|session/i.test(message)) {
+      // Matched narrowly against the SDK's actual unknown-session wording
+      // (review R17): a transient error merely containing "session" must NOT
+      // discard the day's conversation memory by re-running fresh.
+      if (
+        input.resumeSessionId &&
+        /--resume requires|not a UUID|No conversation found with session/i.test(message)
+      ) {
         yield* this.runTurn({ ...input, resumeSessionId: null });
         return;
       }
-      yield { type: "error", message };
+      yield { type: "error", message, partialText: streamed || undefined };
     }
   }
 }

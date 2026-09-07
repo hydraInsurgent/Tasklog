@@ -35,8 +35,13 @@ namespace Tasklog.Api.Models
         [JsonIgnore]
         public CompanionSession? Session { get; set; }
 
-        // Type-specific payload as JSON TEXT (e.g. for "task": { title, projectId?,
-        // deadline? }). Opaque to SQL; the typed home is materialized from it on confirm.
+        // Type-specific payload as JSON TEXT. For "task":
+        // { title, projectId?, newProjectName?, deadline? }.
+        // Opaque to SQL; the typed home is materialized from it on confirm.
+        // PAIRED CONTRACT (change all together): the writer is
+        // CapturesController.Confirm, the producer schemas are the zod tools in
+        // frontend/src/app/api/companion/chat/route.ts, and the client type is
+        // CaptureDto.payload in frontend/src/lib/api.ts.
         public string PayloadJson { get; set; } = "{}";
 
         // The words that triggered the proposal - a short quote from the user's own
