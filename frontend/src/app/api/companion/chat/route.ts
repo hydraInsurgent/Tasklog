@@ -400,6 +400,13 @@ export async function POST(request: Request): Promise<Response> {
         }
       };
 
+      // Flush a ping IMMEDIATELY (#90): until the first byte, fetch() hangs
+      // pending - ~50s on the phone brain (CLI spawn) - and browsers/users give
+      // up, showing a false "NOT saved" while the turn completes server-side.
+      // One early line = headers sent, the thinking indicator renders, the
+      // connection looks alive. The client ignores unknown event types.
+      send({ type: "ping" } as unknown as CompanionTurnEvent);
+
       try {
         for await (const event of provider.runTurn({
           // Decorated copy for the model only; the DB stored the raw words above.

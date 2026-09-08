@@ -265,7 +265,10 @@ exec 2>&1
 # ASPNETCORE_URLS -> bind on every interface (LAN-friendly, see learnings/network-bind-addresses.md)
 # TZ -> the guest runs in UTC otherwise; the backend's computed dueStatus uses
 #       DateTime.Today, so it must match the user's wall-clock day (see SERVER_TZ).
-exec proot-distro login ubuntu -- bash -c 'cd /root/tasklog/backend && exec env TZ=${SERVER_TZ} DOTNET_gcServer=0 ASPNETCORE_URLS=http://0.0.0.0:${BACKEND_PORT} ASPNETCORE_ENVIRONMENT=Production dotnet Tasklog.Api.dll'
+# Ollama__Url -> semantic search (#87/#90): Ollama runs NATIVE in Termux on 11434;
+#       proot shares the network namespace, so localhost reaches it. Absent/dead
+#       Ollama just degrades search to keyword - never breaks.
+exec proot-distro login ubuntu -- bash -c 'cd /root/tasklog/backend && exec env TZ=${SERVER_TZ} Ollama__Url=http://127.0.0.1:11434 DOTNET_gcServer=0 ASPNETCORE_URLS=http://0.0.0.0:${BACKEND_PORT} ASPNETCORE_ENVIRONMENT=Production dotnet Tasklog.Api.dll'
 RUN
 chmod +x \$PREFIX/var/service/tasklog-api/run
 
@@ -281,7 +284,12 @@ mkdir -p \$PREFIX/var/service/tasklog-web/log
 cat > \$PREFIX/var/service/tasklog-web/run <<'RUN'
 #!/data/data/com.termux/files/usr/bin/bash
 exec 2>&1
-exec proot-distro login ubuntu -- bash -c 'cd /root/tasklog/frontend && exec env PORT=${FRONTEND_PORT} HOSTNAME=0.0.0.0 node server.js'
+# TZ -> Node otherwise runs UTC in proot; Sage's time injection + message
+#       timestamps must speak the user's wall clock (#90 - "12:51 AM" at 6:21 IST).
+# COMPANION_ENABLED=1 -> the phone web is LAN-only, so its Sage brain is ON
+#       (the public OCI VM never gets this var - route stays 404 there, #88 R1).
+#       Requires Claude Code installed+logged-in inside proot (claude /login).
+exec proot-distro login ubuntu -- bash -c 'cd /root/tasklog/frontend && exec env TZ=${SERVER_TZ} COMPANION_ENABLED=1 PORT=${FRONTEND_PORT} HOSTNAME=0.0.0.0 node server.js'
 RUN
 chmod +x \$PREFIX/var/service/tasklog-web/run
 

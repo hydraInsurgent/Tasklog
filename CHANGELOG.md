@@ -2,6 +2,23 @@
 
 ---
 
+## v4.0.1 - Phone companion fixes
+*September 2026*
+
+### Fixed
+
+- **Dead air until Sage's first token** (#90) - the chat stream now flushes an immediate
+  `ping`, so the connection resolves in under a second and "Sage is thinking..." shows right
+  away. Previously the fetch hung silently (~50s on the phone brain) and browsers gave up,
+  showing a false "NOT saved" while the turn actually completed and saved server-side.
+- **Phone Sage told UTC time** - `deploy-phone.sh` now sets `TZ` on the web service too
+  (it said "12:51 AM" at 6:21 AM IST).
+- **Phone service env is config-as-code** - `COMPANION_ENABLED=1` and `Ollama__Url` moved
+  into the deploy script's service templates, so a redeploy can no longer wipe the phone's
+  Sage wiring.
+
+---
+
 ## v4.0.0 - Sage, the journaling companion
 *September 2026*
 
