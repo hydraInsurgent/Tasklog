@@ -29,6 +29,29 @@ const API = process.env.API_URL ?? "http://localhost:5115";
 // this limit as a friendly error; the transcript endpoint enforces its own caps.
 const MAX_MESSAGE_CHARS = 4000;
 
+// Per-session turn coordination (#91): the Agent SDK allows ONE active turn per
+// conversation (a second concurrent resume fails), and a turn is 5-12s on the
+// PC and ~50s on the phone brain - so crossing messages are normal, not edge.
+// The texting model: the in-flight reply lands as composed; everything sent
+// meanwhile queues and drains as ONE combined follow-up turn (each message
+// keeps its own time tag), so Sage catches up like a person reading their
+// texts. Module-level state is correct here: one Node process per host.
+type QueuedTurn = { decorated: string };
+const runningSessions = new Set<number>();
+const pendingBySession = new Map<number, QueuedTurn[]>();
+const MAX_QUEUED_TURNS = 3;
+
+// A one-line NDJSON response for queued / rejected sends: the words are already
+// appended by the time this is returned, so closing immediately is safe.
+function ndjsonOnce(event: Record<string, unknown>): Response {
+  return new Response(JSON.stringify(event) + "\n", {
+    headers: {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-store",
+    },
+  });
+}
+
 // The persona spec is the single authored source of Sage's behavior (and name).
 // A file, not inline code, so the same text can serve as claude.ai custom
 // instructions later (behavior parity across the two AI doors).
@@ -376,6 +399,24 @@ export async function POST(request: Request): Promise<Response> {
   // genuine tag is prepended (review R6): pasted content must never be able to
   // masquerade as the app's own machine context.
   const safeMessage = message.replace(/<app_time/gi, "&lt;app_time");
+  const decorated = `${timeTag}\n${safeMessage}`;
+
+  // Crossing-message handling (#91): if this session's brain is mid-thought,
+  // the words are already saved - queue the decorated copy for the running
+  // request's drain loop and answer immediately. No collisions, no errors.
+  if (runningSessions.has(session.id)) {
+    const pending = pendingBySession.get(session.id) ?? [];
+    if (pending.length >= MAX_QUEUED_TURNS) {
+      return ndjsonOnce({
+        type: "error",
+        message: "Sage already has a queue of your messages - your words are saved; give it a moment to catch up.",
+      });
+    }
+    pending.push({ decorated });
+    pendingBySession.set(session.id, pending);
+    return ndjsonOnce({ type: "queued" });
+  }
+  runningSessions.add(session.id);
 
   const [persona, projects, cards] = await Promise.all([
     readPersona(),
@@ -404,63 +445,91 @@ export async function POST(request: Request): Promise<Response> {
       // pending - ~50s on the phone brain (CLI spawn) - and browsers/users give
       // up, showing a false "NOT saved" while the turn completes server-side.
       // One early line = headers sent, the thinking indicator renders, the
-      // connection looks alive. The client ignores unknown event types.
+      // connection looks alive.
       send({ type: "ping" } as unknown as CompanionTurnEvent);
 
-      try {
-        for await (const event of provider.runTurn({
-          // Decorated copy for the model only; the DB stored the raw words above.
-          // Tag on its own line - structurally separate from the user's words.
-          message: `${timeTag}\n${safeMessage}`,
-          resumeSessionId: session.sdkSessionId,
-          systemPrompt: persona + projects + cards + nowContext(),
-          tools: buildTools(session.id),
-        })) {
-          if (event.type === "done") {
-            // Persist the assistant turn + resume cursor BEFORE telling the
-            // client the turn is done. Empty turns save nothing (review R2) -
-            // but the sdk cursor is still recorded for resume. The sessionId on
-            // the event lets the client detect a midnight rollover and
-            // reconcile (review R10/R22).
-            try {
-              await appendMessages(
-                session.id,
-                event.text
-                  ? [{ role: "assistant", content: event.text, at: localIso() }]
-                  : [],
-                event.sdkSessionId,
-              );
-              send({ ...event, sessionId: session.id });
-            } catch {
-              send({
-                type: "error",
-                message: "Sage replied, but the reply could not be saved to the transcript.",
-              });
-            }
-          } else if (event.type === "error") {
-            // Words the user already watched stream must survive a failure
-            // (review R2): persist the partial text before surfacing the error.
-            if (event.partialText) {
+      // Runs ONE provider turn on this stream and returns the resume cursor to
+      // chain the next turn on. Shared by the first turn and the drain loop.
+      const runOneTurn = async (
+        turnMessage: string,
+        resumeSessionId: string | null,
+      ): Promise<string | null> => {
+        let cursor = resumeSessionId;
+        try {
+          for await (const event of provider.runTurn({
+            message: turnMessage,
+            resumeSessionId,
+            systemPrompt: persona + projects + cards + nowContext(),
+            tools: buildTools(session.id),
+          })) {
+            if (event.type === "done") {
+              cursor = event.sdkSessionId ?? cursor;
+              // Persist the assistant turn + resume cursor BEFORE telling the
+              // client the turn is done. Empty turns save nothing (review R2);
+              // the sessionId on the event lets the client detect a midnight
+              // rollover and reconcile (review R10/R22).
               try {
-                await appendMessages(session.id, [
-                  { role: "assistant", content: event.partialText, at: localIso() },
-                ]);
-              } catch {
-                // the error event below already tells the user things went wrong
+                await appendMessages(
+                  session.id,
+                  event.text
+                    ? [{ role: "assistant", content: event.text, at: localIso() }]
+                    : [],
+                  event.sdkSessionId,
+                );
+                send({ ...event, sessionId: session.id });
+              } catch (saveErr) {
+                console.error("[companion] reply save failed:", saveErr);
+                send({
+                  type: "error",
+                  message: "Sage replied, but the reply could not be saved to the transcript.",
+                });
               }
+            } else if (event.type === "error") {
+              // Words the user already watched stream must survive a failure
+              // (review R2): persist the partial text, and leave a server-side
+              // trace (#91 - the exact error used to evaporate client-side).
+              console.error("[companion] turn error:", event.message);
+              if (event.partialText) {
+                try {
+                  await appendMessages(session.id, [
+                    { role: "assistant", content: event.partialText, at: localIso() },
+                  ]);
+                } catch {
+                  // the error event below already tells the user things went wrong
+                }
+              }
+              send(event);
+            } else {
+              send(event);
             }
-            send(event);
-          } else {
-            send(event);
           }
+        } catch (err) {
+          console.error("[companion] turn threw:", err);
+          send({
+            type: "error",
+            message: err instanceof Error ? err.message : String(err),
+          });
         }
-      } catch (err) {
-        // The user's message is already saved; the UI shows a soft error.
-        send({
-          type: "error",
-          message: err instanceof Error ? err.message : String(err),
-        });
+        return cursor;
+      };
+
+      try {
+        let cursor = await runOneTurn(decorated, session.sdkSessionId);
+
+        // Drain the crossing-message queue (#91): everything that arrived while
+        // the turn above was thinking becomes ONE combined follow-up turn -
+        // Sage catches up on all of it together, with its own prior reply in
+        // view (so it can self-correct). Bounded so a stuck brain cannot loop.
+        for (let drained = 0; drained < 5; drained++) {
+          const pending = pendingBySession.get(session.id) ?? [];
+          if (pending.length === 0) break;
+          const batch = pending.splice(0, pending.length);
+          const combined = batch.map((b) => b.decorated).join("\n\n");
+          cursor = await runOneTurn(combined, cursor);
+        }
       } finally {
+        runningSessions.delete(session.id);
+        pendingBySession.delete(session.id);
         try {
           controller.close();
         } catch {

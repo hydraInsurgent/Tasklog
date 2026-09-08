@@ -73,7 +73,11 @@ type TurnEvent =
   | { type: "text_delta"; text: string }
   | { type: "card"; capture: CaptureDto }
   | { type: "done"; sdkSessionId: string | null; text: string; sessionId?: number }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string }
+  // ping = instant first byte (#90); queued = this send is waiting its turn
+  // behind an in-flight one and will be answered in a combined follow-up (#91).
+  | { type: "ping" }
+  | { type: "queued" };
 
 // The stream interleaves messages and cards by time (cards appear where they
 // were proposed, and stay after resolution as the trust-loop record).
@@ -199,10 +203,15 @@ export default function CompanionClient() {
     if (isToday) bottomRef.current?.scrollIntoView({ block: "end" });
   }, [messages, streamText, captures.length, isToday]);
 
+  // Crossing messages are allowed (#91): sends during a live turn queue
+  // server-side and drain as one combined reply. Track in-flight requests with
+  // a counter so `sending` only clears when ALL of them finish.
+  const inFlightRef = useRef(0);
   const send = useCallback(
     async (raw: string) => {
       const text = raw.trim();
-      if (text === "" || sending) return;
+      if (text === "") return;
+      inFlightRef.current += 1;
       setSending(true);
       setTurnError(null);
       setDraft("");
@@ -226,11 +235,13 @@ export default function CompanionClient() {
         setDraft(raw);
         setStreamText(null);
         setTurnError("transport");
-        setSending(false);
+        inFlightRef.current -= 1;
+        setSending(inFlightRef.current > 0);
         return;
       }
 
       let acc = "";
+      let sawDelta = false;
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
@@ -257,6 +268,7 @@ export default function CompanionClient() {
             if (!live()) continue;
             if (event.type === "text_delta") {
               acc += event.text;
+              sawDelta = true;
               setStreamText(acc);
             } else if (event.type === "card") {
               // Upsert by id: Sage can UPDATE a proposed card mid-conversation
@@ -288,6 +300,7 @@ export default function CompanionClient() {
                   { role: "assistant", content: finalText, at: localIso() },
                 ]);
               }
+              acc = ""; // a drain turn may follow on this same stream (#91)
               setStreamText(null);
             } else if (event.type === "error") {
               // The route saved the user's words (and any partial reply) first.
@@ -297,6 +310,7 @@ export default function CompanionClient() {
                   { role: "assistant", content: acc, at: localIso() },
                 ]);
               }
+              acc = "";
               setStreamText(null);
               setTurnError("ai");
               // Cards created before the failure exist in the DB but their
@@ -315,15 +329,15 @@ export default function CompanionClient() {
         // the AI ran, so the calm copy is the true one (review R13/R8-mobile).
         if (live()) setTurnError("ai");
       } finally {
-        if (live()) {
-          setStreamText(null);
-          setSending(false);
-        } else {
-          setSending(false);
-        }
+        // Only the request that actually streamed may clear the thinking
+        // indicator - a queued send's stream ends instantly and must not
+        // clobber the live one's (#91).
+        if (live() && sawDelta) setStreamText(null);
+        inFlightRef.current -= 1;
+        setSending(inFlightRef.current > 0);
       }
     },
-    [sending, sessionId, selectDay],
+    [sessionId, selectDay],
   );
 
   // ---- trust-loop actions (shared state update) ----
@@ -585,7 +599,7 @@ export default function CompanionClient() {
               />
               <button
                 type="submit"
-                disabled={sending || draft.trim() === "" || loadError}
+                disabled={draft.trim() === "" || loadError}
                 aria-label={`Send to ${COMPANION_NAME}`}
                 className="min-h-11 min-w-11 rounded-full bg-c-accent text-white flex items-center justify-center disabled:opacity-50 cursor-pointer transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-c-accent"
               >

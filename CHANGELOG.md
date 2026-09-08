@@ -2,6 +2,21 @@
 
 ---
 
+## v4.0.2 - Crossing messages: the texting model
+*September 2026*
+
+### Fixed
+
+- **Sending while Sage thinks no longer errors** (#91) - messages now queue like texts. The
+  in-flight reply lands as composed; everything sent meanwhile drains as ONE combined
+  follow-up turn (each message keeps its time tag), so Sage catches up like a person reading
+  their texts - and can self-correct against its own prior reply. The composer never blocks.
+  Applies to every brain (the window is ~50s on the phone, 5-12s on the PC). Queue depth is
+  capped honestly; provider errors now leave a server-side trace. Graduates review item R20
+  from #88.
+
+---
+
 ## v4.0.1 - Phone companion fixes
 *September 2026*
 
